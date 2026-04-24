@@ -1,0 +1,187 @@
+
+
+scalar DateTime
+
+enum RoleProject {
+    OWNER
+    ADMIN
+    MEMBER
+    VIEWER
+}
+
+enum RoleSubgroup {
+    LEADER
+    MEMBER
+}
+
+enum TaskStatus {
+    TODO
+    IN_PROGRESS
+    REVIEW
+}
+
+type User {
+    id: ID!
+    fullName: String!
+    email: String!
+    user_password: String!
+    ownedProjects: [Project!]!
+    projectMemberships: [ProjectMember!]!
+    subgroupMemberships: [SubgroupMember!]!
+    createdTasks: [Task!]!
+    assignedTasks: [Task!]!
+}
+
+type Project {
+    id: ID!
+    name: String!
+    owner: User!
+    ownerUserId: ID!
+    members: [ProjectMember!]!
+    subgroups: [Subgroup!]!
+}
+
+type ProjectMember {
+    id: ID!
+    project: Project!
+    projectId: ID!
+    user: User!
+    userId: ID!
+    role: RoleProject
+}
+
+type Subgroup {
+    id: ID!
+    name: String!
+    project: Project!
+    projectId: ID!
+    members: [SubgroupMember!]!
+    tasks: [Task!]!
+}
+
+type SubgroupMember {
+    id: ID!
+    subgroup: Subgroup!
+    subgroupId: ID!
+    user: User!
+    userId: ID!
+    role: RoleSubgroup
+}
+
+type Task {
+    id: ID!
+    title: String!
+    description: String
+    subgroup: Subgroup!
+    subgroupId: ID!
+    createdBy: User
+    createdByUserId: ID
+    dueDate: DateTime
+    value: Int
+    status: Int!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    assignees: [User!]!
+}
+
+type Attachment {
+    id: ID!
+    fileName: String!
+    fileType: String
+    fileSize: Int
+    downloadUrl: String
+}
+
+extend type Task {
+    attachments: [Attachment!]!
+}
+extend type Query {
+    taskAttachments(taskId: ID!): [Attachment!]!
+}
+type AuthPayload {
+    token: String!
+    user: User!
+}
+# ==================== QUERIES ====================
+
+type Query {
+
+    # Пользователи
+    user(id: ID!): User
+    users(limit: Int, offset: Int): [User!]!
+
+    # Проекты
+    project(id: ID!): Project
+    projectsByOwner(ownerUserId: ID!): [Project!]!
+    projectsByMember(userId: ID!): [Project!]!
+
+    # Подгруппы
+    subgroup(id: ID!): Subgroup
+    subgroupsByProject(projectId: ID!): [Subgroup!]!
+
+    # Задачи
+    task(id: ID!): Task
+    tasksBySubgroup(subgroupId: ID!): [Task!]!
+    tasksByAssignee(userId: ID!): [Task!]!
+    tasksByCreator(createdByUserId: ID!): [Task!]!
+    me: User
+}
+
+# ==================== MUTATIONS ====================
+
+type Mutation {
+    # ----- ПОЛЬЗОВАТЕЛИ -----
+    updateUser(id: ID!, fullName: String, email: String, password: String): User!
+    deleteUser(id: ID!): Boolean!
+
+    login(email: String!, password: String!): AuthPayload!
+    createUser(fullName: String!, email: String!, password: String!): AuthPayload!
+    # ----- ПРОЕКТЫ -----
+    createProject(name: String!, ownerUserId: ID!): Project!
+    updateProject(id: ID!, name: String): Project!
+    deleteProject(id: ID!): Boolean!
+
+    # ----- УЧАСТНИКИ ПРОЕКТА -----
+    addProjectMember(projectId: ID!, userId: ID!, role: RoleProject): ProjectMember!
+    updateProjectMember(id: ID!, role: RoleProject): ProjectMember!
+    removeProjectMember(id: ID!): Boolean!
+
+    # ----- ПОДГРУППЫ (КОЛОНКИ) -----
+    createSubgroup(projectId: ID!, name: String!, creatorUserId: ID!): Subgroup!
+    updateSubgroup(id: ID!, name: String): Subgroup!
+    deleteSubgroup(id: ID!): Boolean!
+
+    # ----- ЧЛЕНЫ ПОДГРУППЫ -----
+    addSubgroupMember(subgroupId: ID!, userId: ID!, role: RoleSubgroup): SubgroupMember!
+    updateSubgroupMember(id: ID!, role: RoleSubgroup): SubgroupMember!
+    removeSubgroupMember(id: ID!): Boolean!
+
+    # ----- ЗАДАЧИ -----
+    createTask(
+        subgroupId: ID!
+        createdByUserId: ID!
+        title: String!
+        description: String
+        dueDate: DateTime
+        value: Int
+        status: TaskStatus = TODO
+        assigneeIds: [ID!]
+    ): Task!
+
+    updateTask(
+        id: ID!
+        subgroupId: ID
+        title: String
+        description: String
+        dueDate: DateTime
+        value: Int
+        status: TaskStatus
+    ): Task!
+
+    deleteTask(id: ID!): Boolean!
+
+    # ----- НАЗНАЧЕНИЕ ПОЛЬЗОВАТЕЛЕЙ НА ЗАДАЧУ -----
+    assignUserToTask(taskId: ID!, userId: ID!): Task!
+    unassignUserFromTask(taskId: ID!, userId: ID!): Task!
+    setTaskAssignees(taskId: ID!, userIds: [ID!]!): Task!
+}

@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "apollo-upload-client": "^17.0.0",
+    "extract-files": "^13.0.0"
+  }
+}
