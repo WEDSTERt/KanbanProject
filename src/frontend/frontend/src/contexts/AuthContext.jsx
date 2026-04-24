@@ -3,12 +3,12 @@ import { useQuery, useMutation } from '@apollo/client';
 import { GET_CURRENT_USER } from '../graphql/queries';
 import { LOGIN, REGISTER } from '../graphql/mutations';
 
-const AuthContext = createContext();
+const AuthContext = createContext(undefined);
 
 export const AuthProvider = ({ children }) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const { data, refetch } = useQuery(GET_CURRENT_USER, {
+    const { data} = useQuery(GET_CURRENT_USER, {
         skip: !localStorage.getItem('jwtToken'),
         fetchPolicy: 'network-only',
     });

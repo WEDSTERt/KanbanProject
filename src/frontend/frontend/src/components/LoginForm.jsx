@@ -12,7 +12,7 @@ const LoginForm = () => {
     const navigate = useNavigate();
     const { login } = useAuth();
 
-    const [loginMutation, { data, error, loading }] = useMutation(LOGIN);
+    const [, { data, error, loading }] = useMutation(LOGIN);
 
     useEffect(() => {
         if (data?.login) {

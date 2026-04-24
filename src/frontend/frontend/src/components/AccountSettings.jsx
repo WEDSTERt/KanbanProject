@@ -69,6 +69,7 @@ const AccountSettings = () => {
             const variables = { id: user.id, fullName: fullName.trim() };
             if (newPassword) variables.password = newPassword;
             const { data } = await updateUser({ variables });
+            data.updateUser = undefined;
             login(data.updateUser);
             setMessage('Профиль обновлён');
             setIsError(false);

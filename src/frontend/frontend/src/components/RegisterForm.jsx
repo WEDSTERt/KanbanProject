@@ -15,7 +15,7 @@ const RegisterForm = () => {
     const navigate = useNavigate();
     const { login } = useAuth();
 
-    const [registerMutation, { data, error, loading }] = useMutation(REGISTER);
+    const [, { data, error, loading }] = useMutation(REGISTER);
 
     useEffect(() => {
         if (data?.createUser) {
