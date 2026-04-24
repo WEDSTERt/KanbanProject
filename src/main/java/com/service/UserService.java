@@ -70,13 +70,12 @@ public class UserService {
         return userRepository.findAll(pageable).getContent();
     }
 
-    // Метод для входа (проверка email/пароль)
+
     public User login(String email, String password) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Invalid email or password"));
 
         boolean passwordMatches = passwordEncoder.matches(password, user.getUserPassword());
-        //boolean passwordMatches = password.equals(user.getUserPassword()); // простое сравнение
 
         if (!passwordMatches) {
             throw new RuntimeException("Invalid email or password");
