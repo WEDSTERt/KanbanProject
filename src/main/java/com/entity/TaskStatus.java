@@ -14,13 +14,4 @@ public enum TaskStatus {
     public int getCode() {
         return code;
     }
-
-    public static TaskStatus fromCode(int code) {
-        for (TaskStatus status : values()) {
-            if (status.code == code) {
-                return status;
-            }
-        }
-        throw new IllegalArgumentException("Invalid status code: " + code);
-    }
 }

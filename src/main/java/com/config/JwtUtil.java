@@ -43,15 +43,6 @@ public class JwtUtil {
         }
     }
 
-    public String extractEmail(String token) {
-        if (token == null || token.trim().isEmpty()) return null;
-        try {
-            return extractClaim(token, claims -> claims.get("email", String.class));
-        } catch (Exception e) {
-            return null;
-        }
-    }
-
     public Date extractExpiration(String token) {
         if (token == null || token.trim().isEmpty()) return null;
         try {
