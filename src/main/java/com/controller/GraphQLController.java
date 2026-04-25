@@ -14,20 +14,11 @@ import java.util.List;
 public class GraphQLController {
 
     private final UserService userService;
-    private final ProjectService projectService;
-    private final SubgroupService subgroupService;
-    private final TaskService taskService;
     private final JwtUtil jwtUtil;
 
     public GraphQLController(UserService userService,
-                             ProjectService projectService,
-                             SubgroupService subgroupService,
-                             TaskService taskService,
                              JwtUtil jwtUtil) {
         this.userService = userService;
-        this.projectService = projectService;
-        this.subgroupService = subgroupService;
-        this.taskService = taskService;
         this.jwtUtil = jwtUtil;
     }
 
