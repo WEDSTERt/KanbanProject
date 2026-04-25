@@ -1,6 +1,13 @@
 package com.entity;
 
 import jakarta.persistence.*;
+import java.time.OffsetDateTime;
+import java.util.ArrayList;
+import java.util.List;
+
+import jakarta.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -19,7 +26,6 @@ public class User {
     @Column(name = "user_password", nullable = false)
     private String userPassword;
 
-
     public User() {}
 
     public User(String fullName, String email, String userPassword) {
@@ -37,5 +43,4 @@ public class User {
     public void setEmail(String email) { this.email = email; }
     public String getUserPassword() { return userPassword; }
     public void setUserPassword(String userPassword) { this.userPassword = userPassword; }
-
 }
