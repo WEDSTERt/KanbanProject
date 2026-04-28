@@ -135,8 +135,6 @@ export const DELETE_TASK = gql`
 `;
 
 
-
-// Подгруппы
 export const CREATE_SUBGROUP = gql`
     mutation CreateSubgroup($projectId: ID!, $name: String!, $creatorUserId: ID!) {
         createSubgroup(projectId: $projectId, name: $name, creatorUserId: $creatorUserId) {
@@ -165,7 +163,6 @@ export const DELETE_SUBGROUP = gql`
   }
 `;
 
-// Члены подгруппы
 export const ADD_SUBGROUP_MEMBER = gql`
   mutation AddSubgroupMember($subgroupId: ID!, $userId: ID!, $role: RoleSubgroup) {
     addSubgroupMember(subgroupId: $subgroupId, userId: $userId, role: $role) {
@@ -190,7 +187,6 @@ export const REMOVE_SUBGROUP_MEMBER = gql`
     removeSubgroupMember(id: $id)
   }
 `;
-// Добавить в конец файла
 
 export const SET_TASK_ASSIGNEES = gql`
   mutation SetTaskAssignees($taskId: ID!, $userIds: [ID!]!) {
@@ -201,7 +197,6 @@ export const SET_TASK_ASSIGNEES = gql`
   }
 `;
 
-// Если нужны отдельные мутации (но setTaskAssignees удобнее)
 export const ASSIGN_USER_TO_TASK = gql`
   mutation AssignUserToTask($taskId: ID!, $userId: ID!) {
     assignUserToTask(taskId: $taskId, userId: $userId) {
