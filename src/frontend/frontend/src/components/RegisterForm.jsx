@@ -13,19 +13,19 @@ const RegisterForm = () => {
     const [localError, setLocalError] = useState('');
     const [validationError, setValidationError] = useState('');
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const { register } = useAuth();
 
     const [, { data, error, loading }] = useMutation(REGISTER);
 
     useEffect(() => {
         if (data?.createUser) {
-            login(data.createUser);
+            register(data.createUser);
             navigate('/');
         }
         if (error) {
             setLocalError(error.message);
         }
-    }, [data, error, login, navigate]);
+    }, [data, error, register, navigate]);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
