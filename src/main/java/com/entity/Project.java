@@ -1,11 +1,6 @@
 package com.entity;
 
-public class Project {
-
-package com.entity;
-
 import jakarta.persistence.*;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,7 +36,7 @@ public class Project {
         this.ownerUserId = owner.getId();
     }
 
-    // Геттеры и сеттеры
+    // Р“РµС‚С‚РµСЂС‹ Рё СЃРµС‚С‚РµСЂС‹
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getName() { return name; }
