@@ -50,7 +50,8 @@ public class TaskService {
 
     @Transactional
     public Task updateTask(Long id, Long subgroupId, String title, String description,
-                           OffsetDateTime dueDate, Integer value, TaskStatus status) {
+                           OffsetDateTime dueDate, Integer value, TaskStatus status,
+                           Long createdByUserId) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
         if (subgroupId != null) {
@@ -63,6 +64,15 @@ public class TaskService {
         if (dueDate != null) task.setDueDate(dueDate);
         if (value != null) task.setValue(value);
         if (status != null) task.setStatus(status.getCode());
+
+        // ← ИСПРАВЛЕНО: обработка смены создателя задачи
+        if (createdByUserId != null) {
+            User createdBy = userRepository.findById(createdByUserId)
+                    .orElseThrow(() -> new RuntimeException("Creator user not found"));
+            task.setCreatedBy(createdBy);
+            task.setCreatedByUserId(createdByUserId);
+        }
+
         return taskRepository.save(task);
     }
 

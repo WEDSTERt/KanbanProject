@@ -176,6 +176,7 @@ type Mutation {
         dueDate: DateTime
         value: Int
         status: TaskStatus
+        createdByUserId: ID
     ): Task!
 
     deleteTask(id: ID!): Boolean!

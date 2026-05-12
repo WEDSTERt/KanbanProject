@@ -26,6 +26,7 @@ const TaskModal = ({
     const [status, setStatus] = useState('TODO');
     const [priority, setPriority] = useState(2);
     const [assigneeIds, setAssigneeIds] = useState([]);
+    const [creatorId, setCreatorId] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
@@ -55,6 +56,7 @@ const TaskModal = ({
             setStatus(rawStatus === 'TODO' || rawStatus === 'IN_PROGRESS' || rawStatus === 'REVIEW' ? rawStatus : 'TODO');
             setPriority(task.value || 2);
             setAssigneeIds(task.assignees?.map(a => a.id) || []);
+            setCreatorId(task.createdBy?.id || null);
             setIsEditing(false);
         } else {
             setTitle('');
@@ -63,6 +65,7 @@ const TaskModal = ({
             setStatus('TODO');
             setPriority(2);
             setAssigneeIds(initialAssigneeIds || []);
+            setCreatorId(null);
             setIsEditing(true);
         }
     }, [task, initialAssigneeIds]);
@@ -112,6 +115,7 @@ const TaskModal = ({
                 status,
                 value: parseInt(priority),
                 assigneeIds,
+                creatorId,
             });
             onClose();
         } catch (err) {
@@ -176,6 +180,19 @@ const TaskModal = ({
         </div>
     );
 
+    // Форматирование даты
+    const formatDateTime = (dateStr) => {
+        if (!dateStr) return '—';
+        return new Date(dateStr).toLocaleString('ru', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit'
+        });
+    };
+
     // Режим просмотра
     if (task && !isEditing) {
         return (
@@ -183,6 +200,17 @@ const TaskModal = ({
                 <div className="modal-content task-view-modal" onClick={(e) => e.stopPropagation()}>
                     <button className="modal-close" onClick={onClose}>✕</button>
                     <h3>Просмотр задачи</h3>
+
+                    {/* Время создания и обновления */}
+                    <div className="task-timestamps">
+                        <div className="timestamp-item">
+                            <i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}
+                        </div>
+                        <div className="timestamp-item">
+                            <i className="fas fa-edit"></i> Обновлено: {formatDateTime(task.updatedAt)}
+                        </div>
+                    </div>
+
                     <div className="form-group">
                         <label className="form-label">Название</label>
                         <div className="form-input" style={{ background: '#f8fafc' }}>{task.title}</div>
@@ -264,6 +292,19 @@ const TaskModal = ({
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <button className="modal-close" onClick={onClose}>✕</button>
                 <h3>{task ? 'Редактировать задачу' : 'Новая задача'}</h3>
+
+                {/* Время создания и обновления */}
+                {task && (
+                    <div className="task-timestamps">
+                        <div className="timestamp-item">
+                            <i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}
+                        </div>
+                        <div className="timestamp-item">
+                            <i className="fas fa-edit"></i> Обновлено: {formatDateTime(task.updatedAt)}
+                        </div>
+                    </div>
+                )}
+
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label className="form-label" htmlFor="task-title">Название *</label>
@@ -283,7 +324,7 @@ const TaskModal = ({
                             id="task-desc"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            rows="10"
+                            rows="5"
                         />
                     </div>
                     <div className="form-group">
@@ -344,28 +385,55 @@ const TaskModal = ({
                             <option value="3">Высокая</option>
                         </select>
                     </div>
-                    {task && task.createdBy && (
+                    {task && (
                         <div className="form-group">
-                            <label className="form-label">Создатель</label>
-                            <div className="form-input" style={{ background: '#f8fafc' }}>
-                                <i className="fas fa-user"></i> {task.createdBy.fullName}
-                            </div>
+                            <label className="form-label" htmlFor="task-creator">Создатель задачи</label>
+                            <select
+                                className="form-select"
+                                id="task-creator"
+                                value={creatorId || ''}
+                                onChange={(e) => setCreatorId(e.target.value || null)}
+                            >
+                                {users
+                                    .filter(member => {
+                                        const projectMember = assignableUsers?.find(u => u.userId === member.userId);
+                                        return !projectMember || projectMember.role !== 'VIEWER';
+                                    })
+                                    .map(member => (
+                                        <option key={member.userId} value={member.userId}>
+                                            {member.user?.fullName || `Пользователь ${member.userId}`}
+                                        </option>
+                                    ))}
+                            </select>
                         </div>
                     )}
                     <fieldset className="form-group">
                         <legend className="form-label"><i className="fas fa-user-friends"></i> Исполнители (только участники текущей подгруппы)</legend>
                         <div className="assignees-checkbox-list">
-                            {users.map(member => (
-                                <label key={member.userId} className="assignees-checkbox-label">
-                                    <input
-                                        type="checkbox"
-                                        checked={assigneeIds.includes(member.userId)}
-                                        onChange={() => handleAssigneeToggle(member.userId)}
-                                    />
-                                    {member.user?.fullName || `Пользователь ${member.userId}`}
-                                </label>
-                            ))}
+                            {users
+                                .filter(member => {
+                                    const projectMember = assignableUsers?.find(u => u.userId === member.userId);
+                                    return !projectMember || projectMember.role !== 'VIEWER';
+                                })
+                                .map(member => (
+                                    <label key={member.userId} className="assignees-checkbox-label">
+                                        <input
+                                            type="checkbox"
+                                            checked={assigneeIds.includes(member.userId)}
+                                            onChange={() => handleAssigneeToggle(member.userId)}
+                                        />
+                                        {member.user?.fullName || `Пользователь ${member.userId}`}
+                                    </label>
+                                ))}
                         </div>
+                        {users.filter(member => {
+                            const projectMember = assignableUsers?.find(u => u.userId === member.userId);
+                            return !projectMember || projectMember.role !== 'VIEWER';
+                        }).length === 0 && (
+                            <div className="message-error" style={{ marginTop: '8px' }}>
+                                Нет доступных исполнителей
+                            </div>
+                        )}
                     </fieldset>
                     {task && (
                         <div className="form-group">

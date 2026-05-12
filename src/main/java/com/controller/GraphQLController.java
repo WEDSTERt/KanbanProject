@@ -235,9 +235,10 @@ public class GraphQLController {
                            @Argument String description,
                            @Argument OffsetDateTime dueDate,
                            @Argument Integer value,
-                           @Argument TaskStatus status) {
+                           @Argument TaskStatus status,
+                           @Argument Long createdByUserId) {
         return taskService.updateTask(id, subgroupId, title, description,
-                dueDate, value, status);
+                dueDate, value, status, createdByUserId);
     }
 
     @MutationMapping

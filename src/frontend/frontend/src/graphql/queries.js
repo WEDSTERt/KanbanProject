@@ -43,65 +43,6 @@ export const GET_PROJECT_DETAILS = gql`
         }
     }
 `;
-export const GET_PROJECT_WITH_SUBGROUPS = gql`
-  query GetProjectWithSubgroups($projectId: ID!) {
-    project(id: $projectId) {
-      id
-      name
-      owner { id fullName }
-      subgroups {
-        id
-        name
-        tasks {
-          id
-          title
-          description
-          dueDate
-          status
-          value
-          createdBy { id fullName }
-          assignees { id fullName }
-        }
-      }
-    }
-  }
-`;
-
-export const GET_SUBGROUPS = gql`
-  query GetSubgroups($projectId: ID!) {
-    subgroupsByProject(projectId: $projectId) {
-      id
-      name
-    }
-  }
-`;
-
-
-
-export const GET_PROJECT_TASKS = gql`
-  query GetProjectTasks($projectId: ID!) {
-    project(id: $projectId) {
-      id
-      name
-      owner { id fullName }
-      subgroups {
-        id
-        name
-        tasks {
-          id
-          title
-          description
-          dueDate
-          status
-          value
-          createdBy { id fullName }
-          assignees { id fullName }
-        }
-      }
-    }
-  }
-`;
-// ... существующие запросы
 
 export const GET_SUBGROUPS_BY_PROJECT = gql`
     query GetSubgroupsByProject($projectId: ID!) {
@@ -118,7 +59,6 @@ export const GET_SUBGROUPS_BY_PROJECT = gql`
     }
 `;
 
-
 export const GET_USERS = gql`
   query GetUsers($limit: Int, $offset: Int) {
     users(limit: $limit, offset: $offset) {
@@ -128,7 +68,6 @@ export const GET_USERS = gql`
     }
   }
 `;
-
 
 export const GET_TASK_ATTACHMENTS = gql`
   query GetTaskAttachments($taskId: ID!) {
@@ -151,12 +90,15 @@ export const GET_TASKS_BY_SUBGROUP = gql`
             dueDate
             status
             value
+            createdAt
+            updatedAt
             createdBy { id fullName }
             assignees { id fullName email }
             attachments { id }
         }
     }
 `;
+
 export const GET_CURRENT_USER = gql`
   query GetCurrentUser {
     me {
@@ -166,6 +108,7 @@ export const GET_CURRENT_USER = gql`
     }
   }
 `;
+
 export const GET_TASKS_BY_ASSIGNEE = gql`
     query GetTasksByAssignee($userId: ID!) {
         tasksByAssignee(userId: $userId) {
@@ -175,6 +118,8 @@ export const GET_TASKS_BY_ASSIGNEE = gql`
             dueDate
             status
             value
+            createdAt
+            updatedAt
             createdBy { id fullName }
             assignees { id fullName email }
             subgroupId

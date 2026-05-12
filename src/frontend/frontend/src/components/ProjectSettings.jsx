@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { GET_PROJECT_DETAILS, GET_USER_PROJECTS, GET_USERS } from '../graphql/queries';
 import { GET_TASKS_BY_SUBGROUP } from '../graphql/queries';
@@ -11,6 +11,7 @@ import {
     DELETE_PROJECT,
     SET_TASK_ASSIGNEES,
     REMOVE_SUBGROUP_MEMBER,
+    UPDATE_TASK,
 } from '../graphql/mutations';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
@@ -39,6 +40,7 @@ const ProjectSettings = () => {
     const [removeMember] = useMutation(REMOVE_MEMBER);
     const [removeSubgroupMember] = useMutation(REMOVE_SUBGROUP_MEMBER);
     const [setTaskAssignees] = useMutation(SET_TASK_ASSIGNEES);
+    const [updateTask] = useMutation(UPDATE_TASK);
     const [deleteProject] = useMutation(DELETE_PROJECT, {
         onCompleted: () => navigate('/'),
         refetchQueries: [{ query: GET_USER_PROJECTS, variables: { userId: user.id } }],
@@ -72,20 +74,70 @@ const ProjectSettings = () => {
     const handleRoleChange = async (memberId, newRole) => {
         const member = project.members.find(m => m.id === memberId);
         if (!member) return;
+        if (member.userId === project.owner.id) {
+            setMessage('Нельзя изменить роль владельца проекта');
+            setIsError(true);
+            return;
+        }
+        if (member.role === 'OWNER') {
+            setMessage('Нельзя изменить роль владельца проекта');
+            setIsError(true);
+            return;
+        }
         if (member.userId === user.id) {
             setMessage('Нельзя изменить собственную роль');
             setIsError(true);
             return;
         }
-        try {
-            await updateRole({ variables: { id: memberId, role: newRole } });
 
-            // Если роль стала VIEWER, удаляем пользователя из всех подгрупп и задач
+        try {
             if (newRole === 'VIEWER') {
                 const userId = member.userId;
                 const subgroups = project.subgroups || [];
+                const newCreatorId = user.id;
 
-                // Удаление из подгрупп
+                for (const sg of subgroups) {
+                    try {
+                        const { data: tasksData } = await client.query({
+                            query: GET_TASKS_BY_SUBGROUP,
+                            variables: { subgroupId: sg.id },
+                            fetchPolicy: 'network-only',
+                        });
+                        const tasks = tasksData?.tasksBySubgroup || [];
+
+                        for (const task of tasks) {
+                            if (task.assignees?.some(a => a.id === userId)) {
+                                const newIds = task.assignees.filter(a => a.id !== userId).map(a => a.id);
+                                try {
+                                    await setTaskAssignees({ variables: { taskId: task.id, userIds: newIds } });
+                                } catch (e) {
+                                    console.error('Ошибка удаления из задачи', e);
+                                }
+                            }
+
+                            if (task.createdBy?.id === userId) {
+                                try {
+                                    await updateTask({
+                                        variables: {
+                                            id: task.id,
+                                            createdByUserId: newCreatorId,
+                                        },
+                                    });
+                                } catch (e) {
+                                    console.error('Ошибка передачи задачи', e);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Ошибка запроса задач подгруппы', e);
+                    }
+                }
+
+                // Сбрасываем кэш Apollo для обновления данных на доске
+                client.cache.evict({ fieldName: 'tasksBySubgroup' });
+                client.cache.evict({ fieldName: 'tasksByAssignee' });
+                client.cache.gc();
+
                 for (const sg of subgroups) {
                     const sgMember = sg.members?.find(m => m.userId === userId);
                     if (sgMember) {
@@ -96,33 +148,10 @@ const ProjectSettings = () => {
                         }
                     }
                 }
-
-                // Удаление из задач во всех подгруппах
-                for (const sg of subgroups) {
-                    try {
-                        const { data: tasksData } = await client.query({
-                            query: GET_TASKS_BY_SUBGROUP,
-                            variables: { subgroupId: sg.id },
-                            fetchPolicy: 'network-only',
-                        });
-                        const tasks = tasksData?.tasksBySubgroup || [];
-                        for (const task of tasks) {
-                            if (task.assignees?.some(a => a.id === userId)) {
-                                const newIds = task.assignees.filter(a => a.id !== userId).map(a => a.id);
-                                try {
-                                    await setTaskAssignees({ variables: { taskId: task.id, userIds: newIds } });
-                                } catch (e) {
-                                    console.error('Ошибка удаления из задачи', e);
-                                }
-                            }
-                        }
-                    } catch (e) {
-                        console.error('Ошибка запроса задач подгруппы', e);
-                    }
-                }
             }
 
-            refetch();
+            await updateRole({ variables: { id: memberId, role: newRole } });
+            await refetch();
             setMessage('Роль обновлена');
             setIsError(false);
         } catch (err) {
@@ -133,8 +162,15 @@ const ProjectSettings = () => {
 
     const handleRemoveMember = (memberId) => setDeleteConfirm({ isOpen: true, memberId, isProject: false });
     const confirmRemoveMember = async () => {
+        const member = project.members.find(m => m.id === deleteConfirm.memberId);
+        if (member?.role === 'OWNER') {
+            setMessage('Нельзя удалить владельца проекта');
+            setIsError(true);
+            setDeleteConfirm({ isOpen: false, memberId: null, isProject: false });
+            return;
+        }
         await removeMember({ variables: { id: deleteConfirm.memberId } });
-        refetch();
+        await refetch();
         setMessage('Участник удалён');
         setIsError(false);
         setDeleteConfirm({ isOpen: false, memberId: null, isProject: false });
@@ -199,12 +235,17 @@ const ProjectSettings = () => {
                                     value={m.role}
                                     onChange={(e) => handleRoleChange(m.id, e.target.value)}
                                     style={{ width: 'auto' }}
+                                    disabled={m.userId === project.owner.id || m.role === 'OWNER'}
                                 >
                                     <option value="ADMIN">Админ</option>
                                     <option value="MEMBER">Участник</option>
                                     <option value="VIEWER">Наблюдатель</option>
                                 </select>
-                                <button className="btn btn--danger btn--small" onClick={() => handleRemoveMember(m.id)} disabled={m.userId === project.owner.id}>
+                                <button
+                                    className="btn btn--danger btn--small"
+                                    onClick={() => handleRemoveMember(m.id)}
+                                    disabled={m.userId === project.owner.id || m.role === 'OWNER'}
+                                >
                                     <i className="fas fa-user-minus"></i> Удалить
                                 </button>
                             </div>

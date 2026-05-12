@@ -1,4 +1,4 @@
-import React, { useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { GET_PROJECT_DETAILS } from '../graphql/queries';
@@ -191,6 +191,15 @@ const KanbanBoard = () => {
                 if (taskData.assigneeIds) {
                     await setTaskAssignees({ variables: { taskId: editingTask.id, userIds: taskData.assigneeIds } });
                 }
+                // Передача создателя задачи
+                if (taskData.creatorId && taskData.creatorId !== editingTask.createdBy?.id) {
+                    await updateTask({
+                        variables: {
+                            id: editingTask.id,
+                            createdByUserId: taskData.creatorId,
+                        },
+                    });
+                }
             } else {
                 let targetSubgroupId = activeSubgroupId;
                 let assigneeIds = taskData.assigneeIds || [];
@@ -205,7 +214,7 @@ const KanbanBoard = () => {
                 await createTask({
                     variables: {
                         subgroupId: targetSubgroupId,
-                        createdByUserId: user.id,
+                        createdByUserId: taskData.creatorId || user.id,
                         title: taskData.title,
                         description: taskData.description || null,
                         dueDate: formattedDueDate,

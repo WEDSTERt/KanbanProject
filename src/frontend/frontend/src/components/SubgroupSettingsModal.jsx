@@ -30,7 +30,11 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
     }, [subgroup]);
 
     const projectMembers = projectData?.project?.members || [];
-    const availableMembers = projectMembers.filter(pm => !members.some(m => m.userId === pm.userId));
+    // Фильтруем: исключаем уже добавленных в группу и наблюдателей проекта
+    const availableMembers = projectMembers.filter(pm =>
+        !members.some(m => m.userId === pm.userId) &&
+        pm.role !== 'VIEWER'
+    );
 
     const canManage = isOwner || subgroup.members.some(m => m.userId === user.id && m.role === 'LEADER');
 
@@ -152,17 +156,22 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
                             </button>
                         </div>
                     )}
+                    {availableMembers.length === 0 && canManage && (
+                        <div className="message-error" style={{ marginTop: '8px' }}>
+                            Нет доступных участников для добавления
+                        </div>
+                    )}
                 </div>
 
-                    <div className="flex-row" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
-                        {isOwner && (
-                            <button className="btn btn--danger" onClick={() => { onDelete(); onClose(); }}>
-                                <i className="fas fa-trash-alt"></i> Удалить группу
-                            </button>
-                        )}
-                        <button className="btn btn--secondary" onClick={onClose}>
-                            <i className="fas fa-times"></i> Закрыть
+                <div className="flex-row" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
+                    {isOwner && (
+                        <button className="btn btn--danger" onClick={() => { onDelete(); onClose(); }}>
+                            <i className="fas fa-trash-alt"></i> Удалить группу
                         </button>
+                    )}
+                    <button className="btn btn--secondary" onClick={onClose}>
+                        <i className="fas fa-times"></i> Закрыть
+                    </button>
                 </div>
             </div>
 

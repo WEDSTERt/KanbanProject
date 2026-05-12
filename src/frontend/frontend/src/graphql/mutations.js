@@ -100,32 +100,38 @@ export const CREATE_TASK = gql`
 `;
 
 export const UPDATE_TASK = gql`
-  mutation UpdateTask(
-    $id: ID!
-    $subgroupId: ID
-    $title: String
-    $description: String
-    $dueDate: DateTime
-    $value: Int
-    $status: TaskStatus
-  ) {
-    updateTask(
-      id: $id
-      subgroupId: $subgroupId
-      title: $title
-      description: $description
-      dueDate: $dueDate
-      value: $value
-      status: $status
+    mutation UpdateTask(
+        $id: ID!
+        $subgroupId: ID
+        $title: String
+        $description: String
+        $dueDate: DateTime
+        $value: Int
+        $status: TaskStatus
+        $createdByUserId: ID
     ) {
-      id
-      title
-      description
-      dueDate
-      status
-      value
+        updateTask(
+            id: $id
+            subgroupId: $subgroupId
+            title: $title
+            description: $description
+            dueDate: $dueDate
+            value: $value
+            status: $status
+            createdByUserId: $createdByUserId
+        ) {
+            id
+            title
+            description
+            dueDate
+            status
+            value
+            createdBy {
+                id
+                fullName
+            }
+        }
     }
-  }
 `;
 
 export const DELETE_TASK = gql`

@@ -842,6 +842,29 @@ fieldset {
   width: auto;
   margin: 0;
 }
+  /* Время создания и обновления задачи */
+  .task-timestamps {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    color: #64748b;
+    flex-wrap: wrap;
+  }
+
+  .timestamp-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  .timestamp-item i {
+    font-size: 0.7rem;
+    opacity: 0.7;
+  }
 
 /* Сетка проектов */
 .grid-2 {
