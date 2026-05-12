@@ -16,6 +16,8 @@ const TaskModal = ({
                        onDeleteTask,
                        isMyTasksGroup,
                        isCreator,
+                       canEdit = true,
+                       isViewer = false,
                        onClose
                    }) => {
     const [title, setTitle] = useState('');
@@ -40,7 +42,6 @@ const TaskModal = ({
 
     useEffect(() => {
         if (task) {
-            // Существующая задача – заполняем поля и начинаем в режиме просмотра
             setTitle(task.title || '');
             setDescription(task.description || '');
             setDueDate(task.dueDate ? new Date(task.dueDate) : null);
@@ -54,9 +55,8 @@ const TaskModal = ({
             setStatus(rawStatus === 'TODO' || rawStatus === 'IN_PROGRESS' || rawStatus === 'REVIEW' ? rawStatus : 'TODO');
             setPriority(task.value || 2);
             setAssigneeIds(task.assignees?.map(a => a.id) || []);
-            setIsEditing(false); // режим просмотра
+            setIsEditing(false);
         } else {
-            // Новая задача – режим редактирования
             setTitle('');
             setDescription('');
             setDueDate(null);
@@ -68,7 +68,7 @@ const TaskModal = ({
     }, [task, initialAssigneeIds]);
 
     const handleStatusChange = async (newStatus) => {
-        if (!task) return;
+        if (!task || isViewer) return;
         try {
             await updateTask({
                 variables: {
@@ -176,7 +176,7 @@ const TaskModal = ({
         </div>
     );
 
-    // Режим просмотра – только для существующей задачи, когда isEditing === false
+    // Режим просмотра
     if (task && !isEditing) {
         return (
             <div className="modal-overlay" onClick={onClose}>
@@ -205,6 +205,7 @@ const TaskModal = ({
                             className="form-select"
                             value={status}
                             onChange={(e) => handleStatusChange(e.target.value)}
+                            disabled={isViewer}
                         >
                             <option value="TODO">Создано</option>
                             <option value="IN_PROGRESS">В разработке</option>
@@ -238,11 +239,12 @@ const TaskModal = ({
                             <AttachmentList
                                 attachments={attachmentsData?.taskAttachments || []}
                                 onDelete={refetchAttachments}
+                                canDelete={canEdit && !isViewer}
                             />
                         </div>
                     )}
                     <div className="modal-actions" style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
-                        {isCreator && (
+                        {canEdit && isCreator && (
                             <button type="button" className="btn" onClick={() => setIsEditing(true)}>
                                 <i className="fas fa-edit"></i> Редактировать
                             </button>
@@ -256,7 +258,7 @@ const TaskModal = ({
         );
     }
 
-    // Режим редактирования (для новой задачи или когда isEditing === true)
+    // Режим редактирования (новая задача или isEditing == true)
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
@@ -281,7 +283,7 @@ const TaskModal = ({
                             id="task-desc"
                             value={description}
                             onChange={(e) => setDescription(e.target.value)}
-                            rows="3"
+                            rows="10"
                         />
                     </div>
                     <div className="form-group">
@@ -370,6 +372,7 @@ const TaskModal = ({
                             <AttachmentList
                                 attachments={attachmentsData?.taskAttachments || []}
                                 onDelete={refetchAttachments}
+                                canDelete={canEdit && !isViewer}
                             />
                             <div className="attachment-upload">
                                 <label className="btn btn--secondary btn--small">

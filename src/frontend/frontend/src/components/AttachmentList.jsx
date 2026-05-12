@@ -3,12 +3,11 @@ import ConfirmModal from './ConfirmModal';
 
 const STORAGE_KEY = 'downloadedFileIds';
 
-const AttachmentList = ({ attachments, onDelete }) => {
+const AttachmentList = ({ attachments, onDelete, canDelete = true }) => {
     const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, fileId: null });
     const [downloadedIds, setDownloadedIds] = useState([]);
     const [confirmRedownload, setConfirmRedownload] = useState({ isOpen: false, attachment: null });
 
-    // Загружаем историю скачанных файлов из localStorage при монтировании
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
@@ -20,7 +19,6 @@ const AttachmentList = ({ attachments, onDelete }) => {
         }
     }, []);
 
-    // Сохраняем историю в localStorage при её изменении
     useEffect(() => {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(downloadedIds));
     }, [downloadedIds]);
@@ -41,17 +39,12 @@ const AttachmentList = ({ attachments, onDelete }) => {
             alert('Не авторизован');
             return;
         }
-
-        // Проверяем, скачивался ли уже этот файл
         const alreadyDownloaded = downloadedIds.includes(attachment.id);
         if (alreadyDownloaded) {
-            // Показываем диалог подтверждения
             setConfirmRedownload({ isOpen: true, attachment });
             return;
         }
-
-        // Если не скачивался – сразу качаем
-        performDownload(attachment, token);
+        await performDownload(attachment, token);
     };
 
     const performDownload = async (attachment, token) => {
@@ -69,8 +62,6 @@ const AttachmentList = ({ attachments, onDelete }) => {
             link.click();
             document.body.removeChild(link);
             window.URL.revokeObjectURL(url);
-
-            // После успешного скачивания отмечаем файл как скачанный
             markAsDownloaded(attachment.id);
         } catch (err) {
             console.error(err);
@@ -113,7 +104,6 @@ const AttachmentList = ({ attachments, onDelete }) => {
                 headers: { Authorization: token ? `Bearer ${token}` : '' },
             });
             if (response.ok) {
-                // Удаляем запись о скачивании, если она есть
                 removeFromDownloaded(id);
                 if (onDelete) onDelete();
             } else {
@@ -149,18 +139,19 @@ const AttachmentList = ({ attachments, onDelete }) => {
                             </span>
                             <span className="attachment-size">{formatFileSize(att.fileSize)}</span>
                         </div>
-                        <button
-                            type="button"
-                            className="btn btn--danger btn--small"
-                            onClick={() => handleDeleteClick(att.id)}
-                        >
-                            <i className="fas fa-trash-alt"></i>
-                        </button>
+                        {canDelete && (
+                            <button
+                                type="button"
+                                className="btn btn--danger btn--small"
+                                onClick={() => handleDeleteClick(att.id)}
+                            >
+                                <i className="fas fa-trash-alt"></i>
+                            </button>
+                        )}
                     </li>
                 ))}
             </ul>
 
-            {/* Модалка подтверждения удаления файла */}
             <ConfirmModal
                 isOpen={confirmDelete.isOpen}
                 title="Удаление файла"
@@ -169,7 +160,6 @@ const AttachmentList = ({ attachments, onDelete }) => {
                 onCancel={handleCancelDelete}
             />
 
-            {/* Модалка предупреждения о повторном скачивании */}
             <ConfirmModal
                 isOpen={confirmRedownload.isOpen}
                 title="Файл уже был скачан"

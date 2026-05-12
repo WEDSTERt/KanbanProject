@@ -1,23 +1,26 @@
 import React, { useState } from 'react';
 import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
-import { useQuery, useMutation } from '@apollo/client';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { GET_PROJECT_DETAILS, GET_USER_PROJECTS, GET_USERS } from '../graphql/queries';
+import { GET_TASKS_BY_SUBGROUP } from '../graphql/queries';
 import {
     UPDATE_PROJECT,
     ADD_PROJECT_MEMBER,
     UPDATE_MEMBER_ROLE,
     REMOVE_MEMBER,
     DELETE_PROJECT,
+    SET_TASK_ASSIGNEES,
+    REMOVE_SUBGROUP_MEMBER,
 } from '../graphql/mutations';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
 
 const ProjectSettings = () => {
     const navigate = useNavigate();
-    const location = useLocation();
     const [searchParams] = useSearchParams();
     const projectId = searchParams.get('projectId');
     const { user } = useAuth();
+    const client = useApolloClient();
     const [newMemberEmail, setNewMemberEmail] = useState('');
     const [newMemberRole, setNewMemberRole] = useState('MEMBER');
     const [message, setMessage] = useState(null);
@@ -34,6 +37,8 @@ const ProjectSettings = () => {
     const [addMember] = useMutation(ADD_PROJECT_MEMBER);
     const [updateRole] = useMutation(UPDATE_MEMBER_ROLE);
     const [removeMember] = useMutation(REMOVE_MEMBER);
+    const [removeSubgroupMember] = useMutation(REMOVE_SUBGROUP_MEMBER);
+    const [setTaskAssignees] = useMutation(SET_TASK_ASSIGNEES);
     const [deleteProject] = useMutation(DELETE_PROJECT, {
         onCompleted: () => navigate('/'),
         refetchQueries: [{ query: GET_USER_PROJECTS, variables: { userId: user.id } }],
@@ -48,8 +53,6 @@ const ProjectSettings = () => {
     const currentMember = project.members.find(m => m.userId === user.id);
     const canManage = isOwner || currentMember?.role === 'ADMIN' || currentMember?.role === 'OWNER';
     if (!canManage) return <div className="message-error">У вас нет прав на управление этим проектом.</div>;
-
-
 
     const handleUpdateName = async () => {
         if (!newProjectName.trim()) return;
@@ -67,8 +70,58 @@ const ProjectSettings = () => {
     };
 
     const handleRoleChange = async (memberId, newRole) => {
+        const member = project.members.find(m => m.id === memberId);
+        if (!member) return;
+        if (member.userId === user.id) {
+            setMessage('Нельзя изменить собственную роль');
+            setIsError(true);
+            return;
+        }
         try {
             await updateRole({ variables: { id: memberId, role: newRole } });
+
+            // Если роль стала VIEWER, удаляем пользователя из всех подгрупп и задач
+            if (newRole === 'VIEWER') {
+                const userId = member.userId;
+                const subgroups = project.subgroups || [];
+
+                // Удаление из подгрупп
+                for (const sg of subgroups) {
+                    const sgMember = sg.members?.find(m => m.userId === userId);
+                    if (sgMember) {
+                        try {
+                            await removeSubgroupMember({ variables: { id: sgMember.id } });
+                        } catch (err) {
+                            console.error('Ошибка удаления из подгруппы', err);
+                        }
+                    }
+                }
+
+                // Удаление из задач во всех подгруппах
+                for (const sg of subgroups) {
+                    try {
+                        const { data: tasksData } = await client.query({
+                            query: GET_TASKS_BY_SUBGROUP,
+                            variables: { subgroupId: sg.id },
+                            fetchPolicy: 'network-only',
+                        });
+                        const tasks = tasksData?.tasksBySubgroup || [];
+                        for (const task of tasks) {
+                            if (task.assignees?.some(a => a.id === userId)) {
+                                const newIds = task.assignees.filter(a => a.id !== userId).map(a => a.id);
+                                try {
+                                    await setTaskAssignees({ variables: { taskId: task.id, userIds: newIds } });
+                                } catch (e) {
+                                    console.error('Ошибка удаления из задачи', e);
+                                }
+                            }
+                        }
+                    } catch (e) {
+                        console.error('Ошибка запроса задач подгруппы', e);
+                    }
+                }
+            }
+
             refetch();
             setMessage('Роль обновлена');
             setIsError(false);
@@ -182,7 +235,6 @@ const ProjectSettings = () => {
                 {message && <div className={`mt-4 ${isError ? 'message-error' : 'message-success'}`}>{message}</div>}
             </div>
 
-            {/* Модальное окно переименования */}
             {renameModalOpen && (
                 <div className="modal-overlay" onClick={() => setRenameModalOpen(false)}>
                     <div className="modal-content" onClick={(e) => e.stopPropagation()}>

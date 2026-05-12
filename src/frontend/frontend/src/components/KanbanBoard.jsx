@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect} from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import { GET_PROJECT_DETAILS } from '../graphql/queries';
@@ -61,17 +61,6 @@ const KanbanBoard = () => {
         else if (activeSubgroupId) refetchTasks();
     };
 
-    const visibleSubgroups = useMemo(() => {
-        if (!projectData?.project) return [];
-        const realSubgroups = projectData.project.subgroups || [];
-        const projectMembers = projectData.project.members || [];
-        const isOwner = projectData.project.owner.id === user.id;
-        const currentMember = projectMembers.find(m => m.userId === user.id);
-        const isAdmin = isOwner || currentMember?.role === 'ADMIN';
-        if (isOwner || isAdmin) return realSubgroups;
-        return realSubgroups.filter(group => group.members?.some(m => m.userId === user.id));
-    }, [projectData, user.id]);
-
     useEffect(() => {
         if (!projectData?.project) return;
         const realSubgroups = projectData.project.subgroups || [];
@@ -101,6 +90,7 @@ const KanbanBoard = () => {
     const isOwner = project.owner.id === user.id;
     const currentMember = project.members.find(m => m.userId === user.id);
     const canEditProject = isOwner || currentMember?.role === 'ADMIN';
+    const isViewer = currentMember?.role === 'VIEWER';
     const realSubgroups = project.subgroups || [];
     const projectMembers = project.members || [];
 
@@ -158,24 +148,27 @@ const KanbanBoard = () => {
 
     const handleCreateTask = () => {
         if (isCreatingTask) return;
+        if (isViewer) {
+            alert('У вас нет прав на создание задач');
+            return;
+        }
         if (!activeSubgroupId) {
             alert('Сначала выберите группу');
             return;
         }
         setIsCreatingTask(true);
         setEditingTask(null);
-        setInitialAssigneeIds([]); // всегда пустой массив – ни один чекбокс не выбран
-        setShowTaskModal(true);
-        setIsCreatingTask(false);
-        setInitialAssigneeIds(ids);
+        setInitialAssigneeIds([]);
         setShowTaskModal(true);
         setIsCreatingTask(false);
     };
+
     const handleCloseTaskModal = () => {
         setShowTaskModal(false);
         setIsCreatingTask(false);
         setEditingTask(null);
     };
+
     const handleEditTask = (task) => {
         setEditingTask(task);
         setShowTaskModal(true);
@@ -233,6 +226,7 @@ const KanbanBoard = () => {
 
     const handleDeleteTask = (taskId) => setDeleteConfirm({ isOpen: true, taskId });
     const confirmDeleteTask = async () => {
+        if (isViewer) return;
         await deleteTask({ variables: { id: deleteConfirm.taskId } });
         client.cache.evict({ fieldName: 'tasksBySubgroup' });
         client.cache.evict({ fieldName: 'tasksByAssignee' });
@@ -258,10 +252,15 @@ const KanbanBoard = () => {
     };
 
     const handleDragStart = (e, taskId, fromStatus) => {
+        if (isViewer) {
+            e.preventDefault();
+            return;
+        }
         e.dataTransfer.setData('taskId', taskId);
         e.dataTransfer.setData('fromStatus', fromStatus);
     };
     const handleDrop = async (e, toStatus) => {
+        if (isViewer) return;
         const taskId = e.dataTransfer.getData('taskId');
         const fromStatus = e.dataTransfer.getData('fromStatus');
         if (fromStatus === toStatus) return;
@@ -295,7 +294,7 @@ const KanbanBoard = () => {
                                 <i className="fas fa-bars"></i> Группы
                             </button>
                         )}
-                        {activeSubgroupId !== 'my-tasks' && (
+                        {!isViewer && activeSubgroupId !== 'my-tasks' && (
                             <button className="btn" onClick={handleCreateTask} disabled={isCreatingTask}>
                                 + Новая задача
                             </button>
@@ -318,7 +317,10 @@ const KanbanBoard = () => {
                                 </div>
                                 <div className="kanban-task-list">
                                     {tasksByStatus[status].map((task) => (
-                                        <div key={task.id} className="task-card" draggable onDragStart={(e) => handleDragStart(e, task.id, status)} onClick={() => handleEditTask(task)}>
+                                        <div key={task.id} className="task-card"
+                                             draggable={!isViewer}
+                                             onDragStart={(e) => handleDragStart(e, task.id, status)}
+                                             onClick={() => handleEditTask(task)}>
                                             <div className="task-title">
                                                 <span>{task.title}</span>
                                                 {task.attachments && task.attachments.length > 0 && (
@@ -342,14 +344,14 @@ const KanbanBoard = () => {
                                             <div className="task-assignees">
                                                 {task.assignees?.map(a => (
                                                     <div key={a.id} className="assignee-wrapper">
-            <span className="assignee-name">
-                <i className="fas fa-user"></i> {a.fullName}
-            </span>
+                                                        <span className="assignee-name">
+                                                            <i className="fas fa-user"></i> {a.fullName}
+                                                        </span>
                                                         <span className="assignee-tooltip">{a.email}</span>
                                                     </div>
                                                 ))}
                                             </div>
-                                            {activeSubgroupId !== 'my-tasks' && (
+                                            {!isViewer && activeSubgroupId !== 'my-tasks' && (
                                                 <button className="task-delete-btn" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}>
                                                     <i className="fas fa-trash-alt"></i>
                                                 </button>
@@ -373,6 +375,8 @@ const KanbanBoard = () => {
                     onDeleteTask={handleDeleteTaskFromModal}
                     isMyTasksGroup={activeSubgroupId === 'my-tasks'}
                     isCreator={editingTask?.createdBy?.id === user.id}
+                    canEdit={!isViewer && (editingTask?.createdBy?.id === user.id || canEditProject)}
+                    isViewer={isViewer}
                     onClose={handleCloseTaskModal}
                 />
             )}

@@ -20,8 +20,10 @@ const SubgroupsPanel = ({ projectId, activeSubgroupId, onSelectSubgroup, isOwner
     if (error) return <div className="message-error">{error.message}</div>;
 
     const allSubgroups = data?.subgroupsByProject || [];
-    const isAdmin = projectMembers?.some(m => m.userId === user.id && (m.role === 'ADMIN' || m.role === 'OWNER')) || false;
-    const visibleSubgroups = (isOwner || isAdmin)
+    const currentMember = projectMembers?.find(m => m.userId === user.id);
+    const isViewer = currentMember?.role === 'VIEWER';
+    const isAdmin = currentMember?.role === 'ADMIN' || currentMember?.role === 'OWNER' || isOwner;
+    const visibleSubgroups = (isOwner || isAdmin || isViewer)
         ? allSubgroups
         : allSubgroups.filter(group => group.members?.some(m => m.userId === user.id));
 
@@ -32,7 +34,9 @@ const SubgroupsPanel = ({ projectId, activeSubgroupId, onSelectSubgroup, isOwner
         refetch();
         setDeleteConfirm({ isOpen: false, groupId: null });
     };
+
     const canManageGroup = (group) => {
+        if (isViewer) return false;
         if (isOwner) return true;
         const member = group.members?.find(m => m.userId === user.id);
         return member?.role === 'LEADER';
