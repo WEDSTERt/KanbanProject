@@ -1,10 +1,10 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery, useMutation, useApolloClient } from '@apollo/client';
-import { GET_PROJECT_DETAILS } from '../graphql/queries';
-import { GET_TASKS_BY_SUBGROUP, GET_TASKS_BY_ASSIGNEE } from '../graphql/queries';
-import { UPDATE_TASK, DELETE_TASK, CREATE_TASK, SET_TASK_ASSIGNEES } from '../graphql/mutations';
-import { useAuth } from '../contexts/AuthContext';
+import React, {useState, useEffect} from 'react';
+import {useNavigate, useSearchParams} from 'react-router-dom';
+import {useQuery, useMutation, useApolloClient} from '@apollo/client';
+import {GET_PROJECT_DETAILS} from '../graphql/queries';
+import {GET_TASKS_BY_SUBGROUP, GET_TASKS_BY_ASSIGNEE} from '../graphql/queries';
+import {UPDATE_TASK, DELETE_TASK, CREATE_TASK, SET_TASK_ASSIGNEES} from '../graphql/mutations';
+import {useAuth} from '../contexts/AuthContext';
 import SubgroupsPanel from './SubgroupsPanel';
 import TaskModal from './TaskModal';
 import ConfirmModal from './ConfirmModal';
@@ -14,13 +14,13 @@ const KanbanBoard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const projectId = searchParams.get('projectId');
     const urlSubgroupId = searchParams.get('subgroupId');
-    const { user } = useAuth();
+    const {user} = useAuth();
     const client = useApolloClient();
 
     const [activeSubgroupId, setActiveSubgroupId] = useState(null);
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, taskId: null });
+    const [deleteConfirm, setDeleteConfirm] = useState({isOpen: false, taskId: null});
     const [initialAssigneeIds, setInitialAssigneeIds] = useState([]);
     const [isCreatingTask, setIsCreatingTask] = useState(false);
     const [showMobileGroups, setShowMobileGroups] = useState(false);
@@ -36,18 +36,18 @@ const KanbanBoard = () => {
         return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    const { loading: projectLoading, data: projectData, refetch: refetchProject } = useQuery(GET_PROJECT_DETAILS, {
-        variables: { projectId },
+    const {loading: projectLoading, data: projectData, refetch: refetchProject} = useQuery(GET_PROJECT_DETAILS, {
+        variables: {projectId},
         skip: !projectId,
     });
 
-    const { loading: tasksLoading, data: tasksData, refetch: refetchTasks } = useQuery(GET_TASKS_BY_SUBGROUP, {
-        variables: { subgroupId: activeSubgroupId },
+    const {loading: tasksLoading, data: tasksData, refetch: refetchTasks} = useQuery(GET_TASKS_BY_SUBGROUP, {
+        variables: {subgroupId: activeSubgroupId},
         skip: !activeSubgroupId || activeSubgroupId === 'my-tasks',
     });
 
-    const { loading: myTasksLoading, data: myTasksData, refetch: refetchMyTasks } = useQuery(GET_TASKS_BY_ASSIGNEE, {
-        variables: { userId: user.id },
+    const {loading: myTasksLoading, data: myTasksData, refetch: refetchMyTasks} = useQuery(GET_TASKS_BY_ASSIGNEE, {
+        variables: {userId: user.id},
         skip: activeSubgroupId !== 'my-tasks',
     });
 
@@ -69,17 +69,17 @@ const KanbanBoard = () => {
             else if (realSubgroups.some(g => g.id === urlSubgroupId)) setActiveSubgroupId(urlSubgroupId);
             else {
                 setActiveSubgroupId('my-tasks');
-                setSearchParams({ projectId, subgroupId: 'my-tasks' });
+                setSearchParams({projectId, subgroupId: 'my-tasks'});
             }
         } else {
             setActiveSubgroupId('my-tasks');
-            setSearchParams({ projectId, subgroupId: 'my-tasks' });
+            setSearchParams({projectId, subgroupId: 'my-tasks'});
         }
     }, [projectData, urlSubgroupId, projectId, setSearchParams]);
 
     const handleSelectSubgroup = (subgroupId) => {
         setActiveSubgroupId(subgroupId);
-        setSearchParams({ projectId, subgroupId });
+        setSearchParams({projectId, subgroupId});
         if (isMobile) setShowMobileGroups(false);
     };
 
@@ -130,7 +130,7 @@ const KanbanBoard = () => {
         IN_PROGRESS: <><i className="fas fa-cogs"></i> В разработке</>,
         REVIEW: <><i className="fas fa-check-circle"></i> Выполнено</>,
     };
-    const statusColors = { TODO: '#3b82f6', IN_PROGRESS: '#f59e0b', REVIEW: '#10b981' };
+    const statusColors = {TODO: '#3b82f6', IN_PROGRESS: '#f59e0b', REVIEW: '#10b981'};
 
     const tasksByStatus = {
         TODO: tasks.filter(t => normalizeStatus(t.status) === 'TODO').sort(sortByDueDate),
@@ -189,7 +189,7 @@ const KanbanBoard = () => {
                     },
                 });
                 if (taskData.assigneeIds) {
-                    await setTaskAssignees({ variables: { taskId: editingTask.id, userIds: taskData.assigneeIds } });
+                    await setTaskAssignees({variables: {taskId: editingTask.id, userIds: taskData.assigneeIds}});
                 }
                 // Передача создателя задачи
                 if (taskData.creatorId && taskData.creatorId !== editingTask.createdBy?.id) {
@@ -233,23 +233,23 @@ const KanbanBoard = () => {
         }
     };
 
-    const handleDeleteTask = (taskId) => setDeleteConfirm({ isOpen: true, taskId });
+    const handleDeleteTask = (taskId) => setDeleteConfirm({isOpen: true, taskId});
     const confirmDeleteTask = async () => {
         if (isViewer) return;
-        await deleteTask({ variables: { id: deleteConfirm.taskId } });
-        client.cache.evict({ fieldName: 'tasksBySubgroup' });
-        client.cache.evict({ fieldName: 'tasksByAssignee' });
+        await deleteTask({variables: {id: deleteConfirm.taskId}});
+        client.cache.evict({fieldName: 'tasksBySubgroup'});
+        client.cache.evict({fieldName: 'tasksByAssignee'});
         client.cache.gc();
         await refetchCurrentTasks();
         if (activeSubgroupId !== 'my-tasks') await refetchMyTasks();
-        setDeleteConfirm({ isOpen: false, taskId: null });
+        setDeleteConfirm({isOpen: false, taskId: null});
     };
 
     const handleDeleteTaskFromModal = async (taskId) => {
         try {
-            await deleteTask({ variables: { id: taskId } });
-            client.cache.evict({ fieldName: 'tasksBySubgroup' });
-            client.cache.evict({ fieldName: 'tasksByAssignee' });
+            await deleteTask({variables: {id: taskId}});
+            client.cache.evict({fieldName: 'tasksBySubgroup'});
+            client.cache.evict({fieldName: 'tasksByAssignee'});
             client.cache.gc();
             await refetchCurrentTasks();
             if (activeSubgroupId !== 'my-tasks') await refetchMyTasks();
@@ -273,7 +273,7 @@ const KanbanBoard = () => {
         const taskId = e.dataTransfer.getData('taskId');
         const fromStatus = e.dataTransfer.getData('fromStatus');
         if (fromStatus === toStatus) return;
-        await updateTask({ variables: { id: taskId, status: toStatus } });
+        await updateTask({variables: {id: taskId, status: toStatus}});
         refetchCurrentTasks();
         if (activeSubgroupId !== 'my-tasks') refetchMyTasks();
     };
@@ -310,7 +310,8 @@ const KanbanBoard = () => {
                         )}
                     </div>
                     {canEditProject && (
-                        <button className="btn btn--secondary" onClick={() => navigate(`/settings?projectId=${projectId}`)}>
+                        <button className="btn btn--secondary"
+                                onClick={() => navigate(`/settings?projectId=${projectId}`)}>
                             <i className="fas fa-cog"></i> Настройки проекта
                         </button>
                     )}
@@ -319,9 +320,10 @@ const KanbanBoard = () => {
                 {activeSubgroupId && (
                     <div className="kanban-board">
                         {['TODO', 'IN_PROGRESS', 'REVIEW'].map((status) => (
-                            <div key={status} className="kanban-column" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, status)}>
+                            <div key={status} className="kanban-column" onDragOver={handleDragOver}
+                                 onDrop={(e) => handleDrop(e, status)}>
                                 <div className="kanban-column-header">
-                                    <h3 style={{ borderLeftColor: statusColors[status] }}>{statusLabels[status]}</h3>
+                                    <h3 style={{borderLeftColor: statusColors[status]}}>{statusLabels[status]}</h3>
                                     <span className="kanban-task-count">{tasksByStatus[status].length}</span>
                                 </div>
                                 <div className="kanban-task-list">
@@ -336,7 +338,7 @@ const KanbanBoard = () => {
                                                     <i className="fas fa-paperclip attachment-icon"></i>
                                                 )}
                                             </div>
-                                            <div className="task-meta" />
+                                            <div className="task-meta"/>
                                             <div className="task-bottom-row">
                                                 <div className={`task-priority priority-${task.value || 2}`}>
                                                     {task.value === 1 && '🔵 Низкая'}
@@ -346,7 +348,13 @@ const KanbanBoard = () => {
                                                 </div>
                                                 {task.dueDate && (
                                                     <div className="task-date">
-                                                        <i className="far fa-calendar-alt"></i> {new Date(task.dueDate).toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                                                        <i className="far fa-calendar-alt"></i> {new Date(task.dueDate).toLocaleString([], {
+                                                        year: 'numeric',
+                                                        month: '2-digit',
+                                                        day: '2-digit',
+                                                        hour: '2-digit',
+                                                        minute: '2-digit'
+                                                    })}
                                                     </div>
                                                 )}
                                             </div>
@@ -361,7 +369,10 @@ const KanbanBoard = () => {
                                                 ))}
                                             </div>
                                             {!isViewer && activeSubgroupId !== 'my-tasks' && (
-                                                <button className="task-delete-btn" onClick={(e) => { e.stopPropagation(); handleDeleteTask(task.id); }}>
+                                                <button className="task-delete-btn" onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDeleteTask(task.id);
+                                                }}>
                                                     <i className="fas fa-trash-alt"></i>
                                                 </button>
                                             )}
@@ -395,7 +406,7 @@ const KanbanBoard = () => {
                 title="Удаление задачи"
                 message="Вы действительно хотите удалить эту задачу? Это действие необратимо."
                 onConfirm={confirmDeleteTask}
-                onCancel={() => setDeleteConfirm({ isOpen: false, taskId: null })}
+                onCancel={() => setDeleteConfirm({isOpen: false, taskId: null})}
             />
 
             {isMobile && showMobileGroups && (

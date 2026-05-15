@@ -65,7 +65,6 @@ public class TaskService {
         if (value != null) task.setValue(value);
         if (status != null) task.setStatus(status.getCode());
 
-        // ← ИСПРАВЛЕНО: обработка смены создателя задачи
         if (createdByUserId != null) {
             User createdBy = userRepository.findById(createdByUserId)
                     .orElseThrow(() -> new RuntimeException("Creator user not found"));
@@ -130,7 +129,7 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
-    // ----- ВЛОЖЕНИЯ (хранятся в БД) -----
+    // вложения
     @Transactional
     public Attachment addAttachment(Long taskId, MultipartFile file) {
         Task task = taskRepository.findById(taskId)

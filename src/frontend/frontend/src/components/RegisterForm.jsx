@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation } from '@apollo/client';
-import { useNavigate, Link } from 'react-router-dom';
-import { REGISTER } from '../graphql/mutations';
-import { useAuth } from '../contexts/AuthContext';
-import { validateFullName, validatePassword } from '../utils/validation';
+import React, {useState, useEffect} from 'react';
+import {useMutation} from '@apollo/client';
+import {useNavigate, Link} from 'react-router-dom';
+import {REGISTER} from '../graphql/mutations';
+import {useAuth} from '../contexts/AuthContext';
+import {validateFullName, validatePassword} from '../utils/validation';
 
 const RegisterForm = () => {
     const [fullName, setFullName] = useState('');
@@ -13,9 +13,9 @@ const RegisterForm = () => {
     const [localError, setLocalError] = useState('');
     const [validationError, setValidationError] = useState('');
     const navigate = useNavigate();
-    const { register } = useAuth();
+    const {register} = useAuth();
 
-    const [, { data, error, loading }] = useMutation(REGISTER);
+    const [, {data, error, loading}] = useMutation(REGISTER);
 
     useEffect(() => {
         if (data?.createUser) {
@@ -54,7 +54,7 @@ const RegisterForm = () => {
     };
 
     return (
-        <div className="card" style={{ maxWidth: 460, margin: '40px auto' }}>
+        <div className="card" style={{maxWidth: 460, margin: '40px auto'}}>
             <h2><i className="fas fa-user-plus"></i> Создать аккаунт</h2>
             <form onSubmit={handleSubmit}>
                 <div className="form-group">

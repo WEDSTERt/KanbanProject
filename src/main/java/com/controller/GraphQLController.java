@@ -275,7 +275,6 @@ public class GraphQLController {
         return true;
     }
 
-    // ---------- FIELD RESOLVERS (для избежания проблемы N+1) ----------
     @SchemaMapping(typeName = "User", field = "ownedProjects")
     public List<Project> ownedProjects(User user) {
         return projectService.findProjectsByOwner(user.getId());

@@ -1,13 +1,13 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation } from '@apollo/client';
-import { UPDATE_USER, DELETE_USER, LOGIN } from '../graphql/mutations';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import React, {useState, useEffect} from 'react';
+import {useMutation} from '@apollo/client';
+import {UPDATE_USER, DELETE_USER, LOGIN} from '../graphql/mutations';
+import {useAuth} from '../contexts/AuthContext';
+import {useNavigate} from 'react-router-dom';
 import ConfirmModal from './ConfirmModal';
-import { validateFullName, validatePassword } from '../utils/validation';
+import {validateFullName, validatePassword} from '../utils/validation';
 
 const AccountSettings = () => {
-    const { user, loading, login, logout } = useAuth();
+    const {user, loading, login, logout} = useAuth();
     const navigate = useNavigate();
     const [fullName, setFullName] = useState('');
     const [oldPassword, setOldPassword] = useState('');
@@ -25,8 +25,14 @@ const AccountSettings = () => {
 
     const [updateUser] = useMutation(UPDATE_USER);
     const [deleteUser] = useMutation(DELETE_USER, {
-        onCompleted: () => { logout(); navigate('/login'); },
-        onError: (err) => { setMessage(err.message); setIsError(true); },
+        onCompleted: () => {
+            logout();
+            navigate('/login');
+        },
+        onError: (err) => {
+            setMessage(err.message);
+            setIsError(true);
+        },
     });
     const [checkLogin] = useMutation(LOGIN);
 
@@ -58,7 +64,7 @@ const AccountSettings = () => {
             }
             // Проверяем старый пароль через логин
             try {
-                await checkLogin({ variables: { email: user.email, password: oldPassword } });
+                await checkLogin({variables: {email: user.email, password: oldPassword}});
             } catch (err) {
                 setValidationError('Неверный текущий пароль');
                 return;
@@ -66,9 +72,9 @@ const AccountSettings = () => {
         }
 
         try {
-            const variables = { id: user.id, fullName: fullName.trim() };
+            const variables = {id: user.id, fullName: fullName.trim()};
             if (newPassword) variables.password = newPassword;
-            const { data } = await updateUser({ variables });
+            const {data} = await updateUser({variables});
             data.updateUser = undefined;
             login(data.updateUser);
             setMessage('Профиль обновлён');
@@ -81,7 +87,7 @@ const AccountSettings = () => {
         }
     };
 
-    const handleDeleteAccount = () => deleteUser({ variables: { id: user.id } });
+    const handleDeleteAccount = () => deleteUser({variables: {id: user.id}});
 
     return (
         <div className="account-settings-container">
@@ -102,7 +108,8 @@ const AccountSettings = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label" htmlFor="account-old-password">Текущий пароль (обязателен для смены пароля)</label>
+                        <label className="form-label" htmlFor="account-old-password">Текущий пароль (обязателен для
+                            смены пароля)</label>
                         <div className="password-row">
                             <input
                                 className="form-input"
@@ -123,7 +130,8 @@ const AccountSettings = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label" htmlFor="account-new-password">Новый пароль (оставьте пустым, чтобы не менять)</label>
+                        <label className="form-label" htmlFor="account-new-password">Новый пароль (оставьте пустым,
+                            чтобы не менять)</label>
                         <div className="password-row">
                             <input
                                 className="form-input"
@@ -148,7 +156,9 @@ const AccountSettings = () => {
 
                     <div className="form-actions">
                         <button type="submit" className="btn">Сохранить изменения</button>
-                        <button type="button" className="btn btn--danger" onClick={() => setShowDeleteConfirm(true)}>Удалить аккаунт</button>
+                        <button type="button" className="btn btn--danger"
+                                onClick={() => setShowDeleteConfirm(true)}>Удалить аккаунт
+                        </button>
                     </div>
                 </form>
             </div>

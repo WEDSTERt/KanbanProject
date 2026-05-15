@@ -38,7 +38,7 @@ public class Subgroup {
         this.projectId = project.getId();
     }
 
-    // Геттеры и сеттеры
+    // Р“РµС‚С‚РµСЂС‹ Рё СЃРµС‚С‚РµСЂС‹
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getName() { return name; }

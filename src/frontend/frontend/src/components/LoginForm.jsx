@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation } from '@apollo/client';
-import { useNavigate, Link } from 'react-router-dom';
-import { LOGIN } from '../graphql/mutations';
-import { useAuth } from '../contexts/AuthContext';
+import React, {useState, useEffect} from 'react';
+import {useMutation} from '@apollo/client';
+import {useNavigate, Link} from 'react-router-dom';
+import {LOGIN} from '../graphql/mutations';
+import {useAuth} from '../contexts/AuthContext';
 
 const LoginForm = () => {
     const [email, setEmail] = useState('');
@@ -10,9 +10,9 @@ const LoginForm = () => {
     const [showPassword, setShowPassword] = useState(false);
     const [localError, setLocalError] = useState('');
     const navigate = useNavigate();
-    const { login } = useAuth();
+    const {login} = useAuth();
 
-    const [, { data, error, loading }] = useMutation(LOGIN);
+    const [, {data, error, loading}] = useMutation(LOGIN);
 
     useEffect(() => {
         if (data?.login) {
@@ -38,7 +38,7 @@ const LoginForm = () => {
     };
 
     return (
-        <div className="card" style={{ maxWidth: 460, margin: '40px auto' }}>
+        <div className="card" style={{maxWidth: 460, margin: '40px auto'}}>
             <h2><i className="fas fa-lock"></i> Вход в Kanban Docky</h2>
             <form onSubmit={handleSubmit}>
                 <div className="form-group">

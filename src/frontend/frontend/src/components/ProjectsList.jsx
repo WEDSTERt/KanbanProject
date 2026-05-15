@@ -1,26 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
-import { useQuery, useMutation } from '@apollo/client';
-import { useNavigate } from 'react-router-dom';
-import { GET_USER_PROJECTS } from '../graphql/queries';
-import { CREATE_PROJECT } from '../graphql/mutations';
-import { useAuth } from '../contexts/AuthContext';
+import React, {useState, useEffect} from 'react';
+import {createPortal} from 'react-dom';
+import {useQuery, useMutation} from '@apollo/client';
+import {useNavigate} from 'react-router-dom';
+import {GET_USER_PROJECTS} from '../graphql/queries';
+import {CREATE_PROJECT} from '../graphql/mutations';
+import {useAuth} from '../contexts/AuthContext';
 
 const ProjectsList = () => {
-    const { user } = useAuth();
+    const {user} = useAuth();
     const navigate = useNavigate();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [projectName, setProjectName] = useState('');
 
-    const { loading, error, data, refetch } = useQuery(GET_USER_PROJECTS, {
-        variables: { userId: user.id },
+    const {loading, error, data, refetch} = useQuery(GET_USER_PROJECTS, {
+        variables: {userId: user.id},
     });
 
     const [createProject] = useMutation(CREATE_PROJECT);
 
     useEffect(() => {
         document.body.style.overflow = showCreateModal ? 'hidden' : '';
-        return () => { document.body.style.overflow = ''; };
+        return () => {
+            document.body.style.overflow = '';
+        };
     }, [showCreateModal]);
 
     if (loading) return <div className="loading">Загрузка проектов...</div>;
@@ -34,7 +36,7 @@ const ProjectsList = () => {
         e.preventDefault();
         if (!projectName.trim()) return;
         try {
-            await createProject({ variables: { name: projectName, ownerUserId: user.id } });
+            await createProject({variables: {name: projectName, ownerUserId: user.id}});
             setShowCreateModal(false);
             setProjectName('');
             refetch();
@@ -75,7 +77,7 @@ const ProjectsList = () => {
                             required
                         />
                     </div>
-                    <div className="flex-row" style={{ justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
+                    <div className="flex-row" style={{justifyContent: 'flex-end', gap: '8px', marginTop: '16px'}}>
                         <button type="button" className="btn btn--secondary" onClick={() => setShowCreateModal(false)}>
                             <i className="fas fa-times"></i> Отмена
                         </button>
@@ -91,7 +93,7 @@ const ProjectsList = () => {
 
     return (
         <>
-            <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="flex-row" style={{justifyContent: 'space-between', alignItems: 'center'}}>
                 <h2><i className="fas fa-folder-open"></i> Мои проекты</h2>
                 <button className="btn" onClick={() => setShowCreateModal(true)}>
                     <i className="fas fa-plus"></i> Создать проект
@@ -112,11 +114,13 @@ const ProjectsList = () => {
                                 <p><i className="fas fa-crown"></i> Владелец: {proj.owner.fullName}</p>
                                 <p><i className="fas fa-users"></i> Участников: {proj.members.length}</p>
                                 <div className="flex-row mt-4">
-                                    <button className="btn btn--secondary btn--small" onClick={() => handleOpenBoard(proj.id)}>
+                                    <button className="btn btn--secondary btn--small"
+                                            onClick={() => handleOpenBoard(proj.id)}>
                                         <i className="fas fa-chalkboard"></i> Открыть доску
                                     </button>
                                     {canEdit && (
-                                        <button className="btn btn--small" onClick={() => navigate(`/settings?projectId=${proj.id}`, { state: { from: '/' } })}>
+                                        <button className="btn btn--small"
+                                                onClick={() => navigate(`/settings?projectId=${proj.id}`, {state: {from: '/'}})}>
                                             <i className="fas fa-cog"></i> Настройки
                                         </button>
                                     )}
@@ -126,7 +130,7 @@ const ProjectsList = () => {
                     })}
                 </div>
             )}
-            {showCreateModal && <Modal />}
+            {showCreateModal && <Modal/>}
         </>
     );
 };

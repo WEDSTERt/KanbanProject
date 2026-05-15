@@ -1,10 +1,15 @@
-import React, { useState } from 'react';
-import { useMutation } from '@apollo/client';
-import { CREATE_SUBGROUP } from '../graphql/mutations';
-import { useAuth } from '../contexts/AuthContext';
+import React, {useState} from 'react';
+import {useMutation} from '@apollo/client';
+import {CREATE_SUBGROUP} from '../graphql/mutations';
+import {useAuth} from '../contexts/AuthContext';
 
-const CreateSubgroupModal = ({ projectId, existingSubgroups, onClose, onCreated }) => {
-    const { user } = useAuth();
+const CreateSubgroupModal = ({
+                                 projectId,
+                                 existingSubgroups,
+                                 onClose,
+                                 onCreated
+                             }) => {
+    const {user} = useAuth();
     const [name, setName] = useState('');
     const [error, setError] = useState('');
     const [createSubgroup] = useMutation(CREATE_SUBGROUP);
@@ -19,7 +24,7 @@ const CreateSubgroupModal = ({ projectId, existingSubgroups, onClose, onCreated 
             return;
         }
         try {
-            await createSubgroup({ variables: { projectId, name: trimmed, creatorUserId: user.id } });
+            await createSubgroup({variables: {projectId, name: trimmed, creatorUserId: user.id}});
             onCreated();
             onClose();
         } catch (err) {
@@ -36,7 +41,8 @@ const CreateSubgroupModal = ({ projectId, existingSubgroups, onClose, onCreated 
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
                         <label className="form-label" htmlFor="subgroup-name">Название группы</label>
-                        <input className="form-input" type="text" id="subgroup-name" value={name} onChange={(e) => setName(e.target.value)} autoFocus required />
+                        <input className="form-input" type="text" id="subgroup-name" value={name}
+                               onChange={(e) => setName(e.target.value)} autoFocus required/>
                     </div>
                     {error && <div className="message-error">{error}</div>}
                     <div className="modal-actions">

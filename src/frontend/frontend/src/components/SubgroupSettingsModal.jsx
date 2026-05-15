@@ -1,24 +1,24 @@
-import React, { useState, useEffect } from 'react';
-import { useMutation, useQuery } from '@apollo/client';
-import { GET_PROJECT_DETAILS } from '../graphql/queries';
+import React, {useState, useEffect} from 'react';
+import {useMutation, useQuery} from '@apollo/client';
+import {GET_PROJECT_DETAILS} from '../graphql/queries';
 import {
     UPDATE_SUBGROUP,
     ADD_SUBGROUP_MEMBER,
     UPDATE_SUBGROUP_MEMBER,
     REMOVE_SUBGROUP_MEMBER,
 } from '../graphql/mutations';
-import { useAuth } from '../contexts/AuthContext';
+import {useAuth} from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
 
-const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate, onDelete }) => {
-    const { user } = useAuth();
+const SubgroupSettingsModal = ({subgroup, projectId, isOwner, onClose, onUpdate, onDelete}) => {
+    const {user} = useAuth();
     const [name, setName] = useState(subgroup.name);
     const [members, setMembers] = useState(subgroup.members || []);
     const [selectedUserId, setSelectedUserId] = useState('');
     const [selectedRole, setSelectedRole] = useState('MEMBER');
-    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, memberId: null });
+    const [deleteConfirm, setDeleteConfirm] = useState({isOpen: false, memberId: null});
 
-    const { data: projectData } = useQuery(GET_PROJECT_DETAILS, { variables: { projectId } });
+    const {data: projectData} = useQuery(GET_PROJECT_DETAILS, {variables: {projectId}});
 
     const [updateSubgroup] = useMutation(UPDATE_SUBGROUP);
     const [addMember] = useMutation(ADD_SUBGROUP_MEMBER);
@@ -40,19 +40,19 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
 
     const handleUpdateName = async () => {
         if (!name.trim()) return;
-        await updateSubgroup({ variables: { id: subgroup.id, name } });
+        await updateSubgroup({variables: {id: subgroup.id, name}});
         onUpdate();
     };
 
     const handleAddMember = async () => {
         if (!selectedUserId) return;
         try {
-            const { data } = await addMember({
-                variables: { subgroupId: subgroup.id, userId: selectedUserId, role: selectedRole },
+            const {data} = await addMember({
+                variables: {subgroupId: subgroup.id, userId: selectedUserId, role: selectedRole},
             });
             const newMember = data.addSubgroupMember;
-            const userInfo = projectMembers.find(m => m.userId === selectedUserId)?.user || { fullName: 'Unknown' };
-            setMembers([...members, { ...newMember, user: userInfo }]);
+            const userInfo = projectMembers.find(m => m.userId === selectedUserId)?.user || {fullName: 'Unknown'};
+            setMembers([...members, {...newMember, user: userInfo}]);
             setSelectedUserId('');
             onUpdate();
         } catch (err) {
@@ -62,16 +62,16 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
     };
 
     const handleRoleChange = async (memberId, newRole) => {
-        await updateMember({ variables: { id: memberId, role: newRole } });
-        setMembers(members.map(m => m.id === memberId ? { ...m, role: newRole } : m));
+        await updateMember({variables: {id: memberId, role: newRole}});
+        setMembers(members.map(m => m.id === memberId ? {...m, role: newRole} : m));
         onUpdate();
     };
 
-    const handleRemoveMember = (memberId) => setDeleteConfirm({ isOpen: true, memberId });
+    const handleRemoveMember = (memberId) => setDeleteConfirm({isOpen: true, memberId});
     const confirmRemoveMember = async () => {
-        await removeMember({ variables: { id: deleteConfirm.memberId } });
+        await removeMember({variables: {id: deleteConfirm.memberId}});
         setMembers(members.filter(m => m.id !== deleteConfirm.memberId));
-        setDeleteConfirm({ isOpen: false, memberId: null });
+        setDeleteConfirm({isOpen: false, memberId: null});
         onUpdate();
     };
 
@@ -83,7 +83,7 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
 
                 <div className="form-group">
                     <label className="form-label" htmlFor="subgroup-name">Название группы</label>
-                    <div className="flex-row" style={{ gap: '8px' }}>
+                    <div className="flex-row" style={{gap: '8px'}}>
                         <input
                             className="form-input"
                             type="text"
@@ -111,12 +111,13 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
                                             name="member-role"
                                             value={m.role}
                                             onChange={(e) => handleRoleChange(m.id, e.target.value)}
-                                            style={{ width: 'auto' }}
+                                            style={{width: 'auto'}}
                                         >
                                             <option value="LEADER">Лидер</option>
                                             <option value="MEMBER">Участник</option>
                                         </select>
-                                        <button className="btn btn--danger btn--small" onClick={() => handleRemoveMember(m.id)}>
+                                        <button className="btn btn--danger btn--small"
+                                                onClick={() => handleRemoveMember(m.id)}>
                                             <i className="fas fa-user-minus"></i> Удалить
                                         </button>
                                     </div>
@@ -126,14 +127,14 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
                     </ul>
 
                     {canManage && (
-                        <div className="flex-row" style={{ marginTop: '12px', gap: '8px' }}>
+                        <div className="flex-row" style={{marginTop: '12px', gap: '8px'}}>
                             <select
                                 className="form-select"
                                 id="subgroup-add-member"
                                 name="new-member"
                                 value={selectedUserId}
                                 onChange={(e) => setSelectedUserId(e.target.value)}
-                                style={{ flex: 2 }}
+                                style={{flex: 2}}
                             >
                                 <option value="">Выберите участника</option>
                                 {availableMembers.map(m => (
@@ -146,7 +147,7 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
                                 name="member-role-new"
                                 value={selectedRole}
                                 onChange={(e) => setSelectedRole(e.target.value)}
-                                style={{ flex: 1 }}
+                                style={{flex: 1}}
                             >
                                 <option value="LEADER">Лидер</option>
                                 <option value="MEMBER">Участник</option>
@@ -157,15 +158,18 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
                         </div>
                     )}
                     {availableMembers.length === 0 && canManage && (
-                        <div className="message-error" style={{ marginTop: '8px' }}>
+                        <div className="message-error" style={{marginTop: '8px'}}>
                             Нет доступных участников для добавления
                         </div>
                     )}
                 </div>
 
-                <div className="flex-row" style={{ marginTop: '20px', justifyContent: 'space-between' }}>
+                <div className="flex-row" style={{marginTop: '20px', justifyContent: 'space-between'}}>
                     {isOwner && (
-                        <button className="btn btn--danger" onClick={() => { onDelete(); onClose(); }}>
+                        <button className="btn btn--danger" onClick={() => {
+                            onDelete();
+                            onClose();
+                        }}>
                             <i className="fas fa-trash-alt"></i> Удалить группу
                         </button>
                     )}
@@ -180,7 +184,7 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
                 title="Удаление участника"
                 message="Вы действительно хотите удалить этого участника из группы?"
                 onConfirm={confirmRemoveMember}
-                onCancel={() => setDeleteConfirm({ isOpen: false, memberId: null })}
+                onCancel={() => setDeleteConfirm({isOpen: false, memberId: null})}
             />
         </div>
     );

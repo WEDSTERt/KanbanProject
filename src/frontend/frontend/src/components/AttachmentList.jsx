@@ -1,12 +1,16 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import ConfirmModal from './ConfirmModal';
 
 const STORAGE_KEY = 'downloadedFileIds';
 
-const AttachmentList = ({ attachments, onDelete, canDelete = true }) => {
-    const [confirmDelete, setConfirmDelete] = useState({ isOpen: false, fileId: null });
+const AttachmentList = ({
+                            attachments,
+                            onDelete,
+                            canDelete = true
+                        }) => {
+    const [confirmDelete, setConfirmDelete] = useState({isOpen: false, fileId: null});
     const [downloadedIds, setDownloadedIds] = useState([]);
-    const [confirmRedownload, setConfirmRedownload] = useState({ isOpen: false, attachment: null });
+    const [confirmRedownload, setConfirmRedownload] = useState({isOpen: false, attachment: null});
 
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY);
@@ -41,7 +45,7 @@ const AttachmentList = ({ attachments, onDelete, canDelete = true }) => {
         }
         const alreadyDownloaded = downloadedIds.includes(attachment.id);
         if (alreadyDownloaded) {
-            setConfirmRedownload({ isOpen: true, attachment });
+            setConfirmRedownload({isOpen: true, attachment});
             return;
         }
         await performDownload(attachment, token);
@@ -50,7 +54,7 @@ const AttachmentList = ({ attachments, onDelete, canDelete = true }) => {
     const performDownload = async (attachment, token) => {
         try {
             const response = await fetch(`/api/files/${attachment.id}`, {
-                headers: { Authorization: `Bearer ${token}` },
+                headers: {Authorization: `Bearer ${token}`},
             });
             if (!response.ok) throw new Error('Ошибка загрузки');
             const blob = await response.blob();
@@ -70,16 +74,16 @@ const AttachmentList = ({ attachments, onDelete, canDelete = true }) => {
     };
 
     const handleConfirmRedownload = () => {
-        const { attachment } = confirmRedownload;
+        const {attachment} = confirmRedownload;
         if (attachment) {
             const token = localStorage.getItem('jwtToken');
             performDownload(attachment, token);
         }
-        setConfirmRedownload({ isOpen: false, attachment: null });
+        setConfirmRedownload({isOpen: false, attachment: null});
     };
 
     const handleCancelRedownload = () => {
-        setConfirmRedownload({ isOpen: false, attachment: null });
+        setConfirmRedownload({isOpen: false, attachment: null});
     };
 
     const truncateFileName = (fileName) => {
@@ -93,7 +97,7 @@ const AttachmentList = ({ attachments, onDelete, canDelete = true }) => {
         return `${start}...${end}${extension}`;
     };
 
-    const handleDeleteClick = (id) => setConfirmDelete({ isOpen: true, fileId: id });
+    const handleDeleteClick = (id) => setConfirmDelete({isOpen: true, fileId: id});
 
     const handleConfirmDelete = async () => {
         const id = confirmDelete.fileId;
@@ -101,7 +105,7 @@ const AttachmentList = ({ attachments, onDelete, canDelete = true }) => {
             const token = localStorage.getItem('jwtToken');
             const response = await fetch(`/api/files/${id}`, {
                 method: 'DELETE',
-                headers: { Authorization: token ? `Bearer ${token}` : '' },
+                headers: {Authorization: token ? `Bearer ${token}` : ''},
             });
             if (response.ok) {
                 removeFromDownloaded(id);
@@ -113,11 +117,11 @@ const AttachmentList = ({ attachments, onDelete, canDelete = true }) => {
             console.error('Delete error:', err);
             alert('Ошибка удаления');
         } finally {
-            setConfirmDelete({ isOpen: false, fileId: null });
+            setConfirmDelete({isOpen: false, fileId: null});
         }
     };
 
-    const handleCancelDelete = () => setConfirmDelete({ isOpen: false, fileId: null });
+    const handleCancelDelete = () => setConfirmDelete({isOpen: false, fileId: null});
 
     const formatFileSize = (bytes) => {
         if (!bytes) return '';

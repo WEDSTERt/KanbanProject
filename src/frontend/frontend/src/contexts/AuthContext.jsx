@@ -1,16 +1,15 @@
-import React, { createContext, useState, useContext, useEffect } from 'react';
-import { useQuery, useMutation } from '@apollo/client';
-import { GET_CURRENT_USER } from '../graphql/queries';
-import { LOGIN, REGISTER } from '../graphql/mutations';
+import React, {createContext, useState, useContext, useEffect} from 'react';
+import {useQuery, useMutation} from '@apollo/client';
+import {GET_CURRENT_USER} from '../graphql/queries';
+import {LOGIN, REGISTER} from '../graphql/mutations';
 
 const AuthContext = createContext(undefined);
 
-export const AuthProvider = ({ children }) => {
+export const AuthProvider = ({children}) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const { data} = useQuery(GET_CURRENT_USER, {
-        skip: !localStorage.getItem('jwtToken'),
-        fetchPolicy: 'network-only',
+    const {data} = useQuery(GET_CURRENT_USER, {
+        skip: !localStorage.getItem('jwtToken'), fetchPolicy: 'network-only',
     });
     const [loginMutation] = useMutation(LOGIN);
     const [registerMutation] = useMutation(REGISTER);
@@ -34,9 +33,9 @@ export const AuthProvider = ({ children }) => {
     }, []);
 
     const login = async (email, password) => {
-        const { data } = await loginMutation({ variables: { email, password } });
+        const {data} = await loginMutation({variables: {email, password}});
         if (data?.login) {
-            const { token, user: userData } = data.login;
+            const {token, user: userData} = data.login;
             localStorage.setItem('jwtToken', token);
             setUser(userData); // сразу устанавливаем пользователя
             return userData;
@@ -45,9 +44,9 @@ export const AuthProvider = ({ children }) => {
     };
 
     const register = async (fullName, email, password) => {
-        const { data } = await registerMutation({ variables: { fullName, email, password } });
+        const {data} = await registerMutation({variables: {fullName, email, password}});
         if (data?.createUser) {
-            const { token, user: userData } = data.createUser;
+            const {token, user: userData} = data.createUser;
             localStorage.setItem('jwtToken', token);
             setUser(userData);
             return userData;
@@ -60,11 +59,9 @@ export const AuthProvider = ({ children }) => {
         setUser(null);
     };
 
-    return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout }}>
-            {children}
-        </AuthContext.Provider>
-    );
+    return (<AuthContext.Provider value={{user, loading, login, register, logout}}>
+        {children}
+    </AuthContext.Provider>);
 };
 
 export const useAuth = () => useContext(AuthContext);

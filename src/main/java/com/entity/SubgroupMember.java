@@ -38,7 +38,7 @@ public class SubgroupMember {
         this.role = role;
     }
 
-    // Геттеры и сеттеры
+    // Р“РµС‚С‚РµСЂС‹ Рё СЃРµС‚С‚РµСЂС‹
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Subgroup getSubgroup() { return subgroup; }

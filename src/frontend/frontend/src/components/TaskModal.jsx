@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, {useState, useEffect} from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
-import { useQuery, useMutation } from '@apollo/client';
-import { GET_TASK_ATTACHMENTS } from '../graphql/queries';
-import { UPDATE_TASK } from '../graphql/mutations';
+import {useQuery, useMutation} from '@apollo/client';
+import {GET_TASK_ATTACHMENTS} from '../graphql/queries';
+import {UPDATE_TASK} from '../graphql/mutations';
 import AttachmentList from './AttachmentList';
 import ConfirmModal from './ConfirmModal';
 
 const TaskModal = ({
                        task,
-                       subgroupId,
                        assignableUsers,
                        initialAssigneeIds,
                        onSave,
@@ -34,8 +33,8 @@ const TaskModal = ({
 
     const users = assignableUsers || [];
 
-    const { data: attachmentsData, refetch: refetchAttachments } = useQuery(GET_TASK_ATTACHMENTS, {
-        variables: { taskId: task?.id },
+    const {data: attachmentsData, refetch: refetchAttachments} = useQuery(GET_TASK_ATTACHMENTS, {
+        variables: {taskId: task?.id},
         skip: !task?.id,
     });
 
@@ -80,7 +79,7 @@ const TaskModal = ({
                 },
             });
             setStatus(newStatus);
-            if (onSave) onSave({ status: newStatus });
+            if (onSave) onSave({status: newStatus});
         } catch (err) {
             console.error('Ошибка обновления статуса:', err);
             alert('Ошибка обновления статуса');
@@ -142,7 +141,7 @@ const TaskModal = ({
             const token = localStorage.getItem('jwtToken');
             const response = await fetch(`/api/files/upload/${task.id}`, {
                 method: 'POST',
-                headers: { Authorization: token ? `Bearer ${token}` : '' },
+                headers: {Authorization: token ? `Bearer ${token}` : ''},
                 body: formData,
             });
             if (!response.ok) throw new Error('Upload failed');
@@ -163,17 +162,25 @@ const TaskModal = ({
     };
     const handleCancelDelete = () => setShowDeleteConfirm(false);
 
-    const customHeader = ({ date, changeYear, changeMonth, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => (
+    const customHeader = ({
+                              date,
+                              changeYear,
+                              changeMonth,
+                              decreaseMonth,
+                              increaseMonth,
+                              prevMonthButtonDisabled,
+                              nextMonthButtonDisabled
+                          }) => (
         <div className="custom-datepicker-header">
             <button onClick={decreaseMonth} disabled={prevMonthButtonDisabled}>{"<"}</button>
-            <select value={date.getFullYear()} onChange={({ target: { value } }) => changeYear(parseInt(value))}>
-                {Array.from({ length: 10 }, (_, i) => date.getFullYear() - 5 + i).map(y => (
+            <select value={date.getFullYear()} onChange={({target: {value}}) => changeYear(parseInt(value))}>
+                {Array.from({length: 10}, (_, i) => date.getFullYear() - 5 + i).map(y => (
                     <option key={y} value={y}>{y}</option>
                 ))}
             </select>
-            <select value={date.getMonth()} onChange={({ target: { value } }) => changeMonth(parseInt(value))}>
-                {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i} value={i}>{new Date(0, i).toLocaleString('ru', { month: 'long' })}</option>
+            <select value={date.getMonth()} onChange={({target: {value}}) => changeMonth(parseInt(value))}>
+                {Array.from({length: 12}, (_, i) => (
+                    <option key={i} value={i}>{new Date(0, i).toLocaleString('ru', {month: 'long'})}</option>
                 ))}
             </select>
             <button onClick={increaseMonth} disabled={nextMonthButtonDisabled}>{">"}</button>
@@ -213,7 +220,7 @@ const TaskModal = ({
 
                     <div className="form-group">
                         <label className="form-label">Название</label>
-                        <div className="form-input" style={{ background: '#f8fafc' }}>{task.title}</div>
+                        <div className="form-input" style={{background: '#f8fafc'}}>{task.title}</div>
                     </div>
                     <div className="form-group">
                         <label className="form-label">Описание</label>
@@ -223,8 +230,14 @@ const TaskModal = ({
                     </div>
                     <div className="form-group">
                         <label className="form-label">Дедлайн (дата и время)</label>
-                        <div className="form-input" style={{ background: '#f8fafc' }}>
-                            {task.dueDate ? new Date(task.dueDate).toLocaleString([], { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '—'}
+                        <div className="form-input" style={{background: '#f8fafc'}}>
+                            {task.dueDate ? new Date(task.dueDate).toLocaleString([], {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }) : '—'}
                         </div>
                     </div>
                     <div className="form-group">
@@ -242,7 +255,7 @@ const TaskModal = ({
                     </div>
                     <div className="form-group">
                         <label className="form-label">Важность</label>
-                        <div className="form-input" style={{ background: '#f8fafc' }}>
+                        <div className="form-input" style={{background: '#f8fafc'}}>
                             {priority === 1 && '🔵 Низкая'}
                             {priority === 2 && '🟡 Средняя'}
                             {priority === 3 && '🔴 Высокая'}
@@ -251,14 +264,14 @@ const TaskModal = ({
                     {task.createdBy && (
                         <div className="form-group">
                             <label className="form-label">Создатель</label>
-                            <div className="form-input" style={{ background: '#f8fafc' }}>
+                            <div className="form-input" style={{background: '#f8fafc'}}>
                                 <i className="fas fa-user"></i> {task.createdBy.fullName}
                             </div>
                         </div>
                     )}
                     <div className="form-group">
                         <label className="form-label">Исполнители</label>
-                        <div className="form-input" style={{ background: '#f8fafc' }}>
+                        <div className="form-input" style={{background: '#f8fafc'}}>
                             {users.filter(u => assigneeIds.includes(u.userId)).map(u => u.user?.fullName).join(', ') || '—'}
                         </div>
                     </div>
@@ -271,7 +284,8 @@ const TaskModal = ({
                             />
                         </div>
                     )}
-                    <div className="modal-actions" style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
+                    <div className="modal-actions"
+                         style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
                         {canEdit && isCreator && (
                             <button type="button" className="btn" onClick={() => setIsEditing(true)}>
                                 <i className="fas fa-edit"></i> Редактировать
@@ -329,8 +343,8 @@ const TaskModal = ({
                     </div>
                     <div className="form-group">
                         <label className="form-label" htmlFor="task-due">Дедлайн (дата и время)</label>
-                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                            <div style={{ flex: 1 }}>
+                        <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                            <div style={{flex: 1}}>
                                 <DatePicker
                                     selected={dueDate}
                                     onChange={(date) => setDueDate(date)}
@@ -350,12 +364,12 @@ const TaskModal = ({
                                 type="button"
                                 className="btn btn--secondary btn--small"
                                 onClick={setCurrentDateTime}
-                                style={{ whiteSpace: 'nowrap' }}
+                                style={{whiteSpace: 'nowrap'}}
                             >
                                 <i className="fas fa-clock"></i> Сейчас
                             </button>
                         </div>
-                        <small style={{ color: '#64748b', display: 'block', marginTop: '4px' }}>
+                        <small style={{color: '#64748b', display: 'block', marginTop: '4px'}}>
                             <i className="fas fa-clock"></i> Можно выбрать только текущую или будущую дату и время.
                         </small>
                     </div>
@@ -408,7 +422,9 @@ const TaskModal = ({
                         </div>
                     )}
                     <fieldset className="form-group">
-                        <legend className="form-label"><i className="fas fa-user-friends"></i> Исполнители (только участники текущей подгруппы)</legend>
+                        <legend className="form-label"><i className="fas fa-user-friends"></i> Исполнители (только
+                            участники текущей подгруппы)
+                        </legend>
                         <div className="assignees-checkbox-list">
                             {users
                                 .filter(member => {
@@ -430,7 +446,7 @@ const TaskModal = ({
                             const projectMember = assignableUsers?.find(u => u.userId === member.userId);
                             return !projectMember || projectMember.role !== 'VIEWER';
                         }).length === 0 && (
-                            <div className="message-error" style={{ marginTop: '8px' }}>
+                            <div className="message-error" style={{marginTop: '8px'}}>
                                 Нет доступных исполнителей
                             </div>
                         )}
@@ -449,14 +465,15 @@ const TaskModal = ({
                                         type="file"
                                         onChange={handleFileUpload}
                                         disabled={uploading}
-                                        style={{ display: 'none' }}
+                                        style={{display: 'none'}}
                                     />
                                 </label>
                                 {uploading && <span className="uploading">Загрузка...</span>}
                             </div>
                         </div>
                     )}
-                    <div className="modal-actions" style={{ display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px' }}>
+                    <div className="modal-actions"
+                         style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
                         {task && (
                             <button type="button" className="btn btn--secondary" onClick={() => setIsEditing(false)}>
                                 <i className="fas fa-arrow-left"></i> Назад
