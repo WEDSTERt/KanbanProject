@@ -3,6 +3,7 @@ package com.entity;
 import jakarta.persistence.*;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import jakarta.persistence.Transient;
 
 @Entity
 @Table(name = "attachments")
@@ -34,48 +35,41 @@ public class Attachment {
     public Long getId() {
         return id;
     }
-
     public void setId(Long id) {
         this.id = id;
     }
-
     public String getFileName() {
         return fileName;
     }
-
     public void setFileName(String fileName) {
         this.fileName = fileName;
     }
-
     public String getFileType() {
         return fileType;
     }
-
     public void setFileType(String fileType) {
         this.fileType = fileType;
     }
-
     public Long getFileSize() {
         return fileSize;
     }
-
     public void setFileSize(Long fileSize) {
         this.fileSize = fileSize;
     }
-
     public byte[] getFileData() {
         return fileData;
     }
-
     public void setFileData(byte[] fileData) {
         this.fileData = fileData;
     }
-
     public Task getTask() {
         return task;
     }
-
     public void setTask(Task task) {
         this.task = task;
+    }
+    @Transient
+    public String getDownloadUrl() {
+        return "/api/files/" + this.id;
     }
 }

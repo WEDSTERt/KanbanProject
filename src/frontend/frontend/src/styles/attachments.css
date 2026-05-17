@@ -1,0 +1,108 @@
+/* Вложения (файлы) */
+.attachments-list ul {
+    list-style: none;
+    padding: 0;
+    margin: 8px 0;
+}
+
+.attachment-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 12px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.attachment-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.attachment-wrapper {
+    position: relative;
+    display: inline-flex;
+    cursor: pointer;
+}
+
+.attachment-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #3b82f6;
+    transition: color 0.1s;
+    max-width: 300px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.attachment-link:hover {
+    color: #2563eb;
+    text-decoration: underline;
+}
+
+.attachment-link--downloaded {
+    color: #a855f7 !important;
+}
+
+.attachment-link--downloaded i {
+    color: #a855f7;
+}
+
+.attachment-link .fa-check-circle {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: scale(0.8);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.attachment-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    background-color: #1e293b;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    margin-bottom: 6px;
+    max-width: 300px;
+    white-space: normal;
+    word-break: break-all;
+    text-align: center;
+}
+
+.attachment-wrapper:hover .attachment-tooltip {
+    opacity: 1;
+}
+
+.attachment-size {
+    color: #64748b;
+    font-size: 0.875rem;
+    white-space: nowrap;
+}
+
+.attachment-upload {
+    margin-top: 8px;
+}
+
+.uploading {
+    margin-left: 8px;
+    font-size: 0.8rem;
+    color: #64748b;
+}

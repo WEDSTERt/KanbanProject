@@ -14,7 +14,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -262,17 +261,6 @@ public class GraphQLController {
     public Task setTaskAssignees(@Argument Long taskId,
                                  @Argument List<Long> userIds) {
         return taskService.setTaskAssignees(taskId, userIds);
-    }
-
-    @MutationMapping
-    public Attachment addAttachment(@Argument Long taskId, @Argument MultipartFile file) {
-        return taskService.addAttachment(taskId, file);
-    }
-
-    @MutationMapping
-    public boolean deleteAttachment(@Argument Long id) {
-        taskService.deleteAttachment(id);
-        return true;
     }
 
     @SchemaMapping(typeName = "User", field = "ownedProjects")

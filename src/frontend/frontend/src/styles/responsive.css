@@ -1,0 +1,270 @@
+/* Медиа-запросы */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+
+    .app-navbar {
+        flex-wrap: wrap;
+        padding: 8px 12px;
+        gap: 8px;
+        border-radius: 32px;
+        margin-bottom: 16px;
+    }
+
+    .app-logo {
+        font-size: 1rem;
+        flex: 1;
+    }
+
+    .app-nav-links {
+        gap: 8px;
+        flex-wrap: wrap;
+        justify-content: flex-end;
+    }
+
+    .app-nav-links a {
+        font-size: 0.85rem;
+        padding: 4px 0;
+    }
+
+    .app-user-info {
+        font-size: 0.75rem;
+        padding: 4px 8px;
+    }
+
+    .btn {
+        padding: 6px 12px;
+        font-size: 0.85rem;
+    }
+
+    .btn--small {
+        padding: 4px 8px;
+        font-size: 0.75rem;
+    }
+
+    .card {
+        padding: 16px;
+    }
+
+    .grid-2 {
+        grid-template-columns: 1fr;
+        gap: 16px;
+    }
+
+    .project-card {
+        padding: 16px;
+    }
+
+    .project-card h3 {
+        font-size: 1.2rem;
+    }
+
+    .project-card .flex-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 8px;
+    }
+
+    .project-card .flex-row button {
+        width: 100%;
+        justify-content: center;
+        font-size: 1rem;
+        padding: 8px 12px;
+    }
+
+    .kanban-layout {
+        flex-direction: column;
+    }
+
+    .groups-panel {
+        display: none;
+    }
+
+    .kanban-container {
+        overflow-x: visible;
+    }
+
+    .kanban-board {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+        width: 100%;
+    }
+
+    .kanban-column {
+        width: 100%;
+        max-width: 100%;
+        min-width: auto;
+    }
+
+    .kanban-header-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .kanban-controls-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .kanban-sort-panel {
+        justify-content: center;
+    }
+
+    .kanban-title-area {
+        justify-content: space-between;
+    }
+
+    .kanban-title {
+        font-size: 1.4rem;
+    }
+
+    .modal-content {
+        width: 95%;
+        max-height: 90vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+        padding: 16px;
+        word-break: break-word;
+    }
+
+    .task-view-modal {
+        min-width: 90vw;
+        max-width: 95vw;
+    }
+
+    .modal-close {
+        top: 12px;
+        right: 12px;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+        padding: 8px 12px;
+    }
+
+    .assignees-checkbox-list {
+        max-height: 150px;
+        overflow-x: hidden;
+    }
+
+    .task-card {
+        padding: 10px;
+    }
+
+    .task-title {
+        font-size: 0.9rem;
+    }
+
+    .task-bottom-row {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .task-priority {
+        order: 1;
+    }
+
+    .task-date {
+        order: 2;
+        font-size: 0.65rem;
+    }
+
+    .account-settings-card {
+        font-size: 0.9rem;
+    }
+
+    .account-settings-card .form-label {
+        font-size: 0.85rem;
+    }
+
+    .account-settings-card .form-input {
+        font-size: 0.9rem;
+        padding: 8px 10px;
+    }
+
+    .task-description-view {
+        max-height: 150px;
+    }
+
+    .account-settings-container {
+        min-height: auto;
+        padding: 10px;
+    }
+
+    .sort-btn {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+    }
+
+    .sort-label {
+        font-size: 0.7rem;
+    }
+
+    .task-date-group {
+        flex-direction: column;
+        align-items: flex-end;
+        gap: 4px;
+    }
+
+    .filter-badge {
+        font-size: 0.7rem;
+        padding: 3px 6px 3px 10px;
+    }
+
+    .tasks-count {
+        font-size: 0.7rem;
+    }
+
+    .filter-modal {
+        min-width: 90%;
+        max-width: 95%;
+    }
+
+    .date-range-row {
+        flex-direction: row;
+        gap: 6px;
+    }
+
+    .date-field .form-input {
+        font-size: 0.8rem;
+        padding: 8px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .app-navbar {
+        flex-direction: column;
+        align-items: stretch;
+        border-radius: 20px;
+    }
+
+    .app-logo {
+        text-align: center;
+        margin-bottom: 4px;
+    }
+
+    .app-nav-links {
+        justify-content: center;
+    }
+
+    .app-nav-links a,
+    .app-user-info,
+    .btn--small {
+        font-size: 0.7rem;
+    }
+}
+
+@media (max-width: 900px) {
+    .kanban-column {
+        min-width: 220px;
+    }
+
+    .kanban-board {
+        gap: 12px;
+    }
+}

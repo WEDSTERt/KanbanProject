@@ -1,0 +1,188 @@
+/* Карточка задачи */
+.task-card {
+    background: white;
+    border-radius: 16px;
+    padding: 12px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    cursor: pointer;
+    position: relative;
+    border-left: 4px solid #2563eb;
+    transition: all 0.15s;
+}
+
+.task-card:hover {
+    background: #fefce8;
+    transform: translateY(-2px);
+}
+
+.task-title {
+    font-weight: 600;
+    margin-bottom: 8px;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.attachment-icon {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+.task-meta {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.task-bottom-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: -5px;
+    font-size: 0.7rem;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+.task-priority {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 30px;
+}
+
+.priority-1 {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.priority-2 {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.priority-3 {
+    background: #fee2e2;
+    color: #b91c1c;
+}
+
+.task-date {
+    background: #f1f5f9;
+    padding: 2px 6px;
+    border-radius: 12px;
+    color: #475569;
+}
+
+.task-assignees {
+    font-size: 0.7rem;
+    color: #475569;
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.task-delete-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    opacity: 0.4;
+    font-size: 0.8rem;
+    padding: 4px;
+}
+
+.task-delete-btn:hover {
+    opacity: 1;
+}
+
+/* Исполнители с тултипом */
+.assignee-wrapper {
+    position: relative;
+    display: inline-flex;
+    margin-top: -3px;
+}
+
+.assignee-name {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #f1f5f9;
+    padding: 2px 8px;
+    border-radius: 30px;
+    font-size: 0.7rem;
+    color: #334155;
+    cursor: help;
+    transition: background 0.1s;
+}
+
+.assignee-name:hover {
+    background: #e2e8f0;
+}
+
+.assignee-tooltip {
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    background-color: #1e293b;
+    color: #fff;
+    padding: 4px 8px;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    margin-bottom: 6px;
+}
+
+.assignee-wrapper:hover .assignee-tooltip {
+    opacity: 1;
+}
+
+/* Время создания и обновления */
+.task-timestamps {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    padding: 8px 12px;
+    background: #f8fafc;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    color: #64748b;
+    flex-wrap: wrap;
+}
+
+.timestamp-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.timestamp-item i {
+    font-size: 0.7rem;
+    opacity: 0.7;
+}
+
+/* Группа для даты и предупреждения */
+.task-date-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.task-due-warning {
+    white-space: nowrap;
+}
+
+/* Иконки в приоритетах */
+.task-priority i {
+    margin-right: 4px;
+}
