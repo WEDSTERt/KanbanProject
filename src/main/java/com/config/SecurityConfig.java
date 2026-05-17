@@ -52,6 +52,7 @@ public class SecurityConfig {
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
                 "https://screamingly-big-brocket.cloudpub.ru",
+                "https://kanbandocky.ru",
                 "http://192.168.20.131:3000",
                 "http://192.168.55.20:3000",
                 "http://10.228.252.143:3000",
