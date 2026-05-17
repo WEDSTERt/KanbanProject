@@ -1,0 +1,49 @@
+extend type Query {
+    task(id: ID!): Task
+    tasksBySubgroup(subgroupId: ID!): [Task!]!
+    tasksByAssignee(userId: ID!): [Task!]!
+    tasksByCreator(createdByUserId: ID!): [Task!]!
+}
+
+extend type Mutation {
+    createTask(
+        subgroupId: ID!
+        createdByUserId: ID!
+        title: String!
+        description: String
+        dueDate: DateTime
+        value: Int
+        status: TaskStatus = TODO
+        assigneeIds: [ID!]
+    ): Task!
+    updateTask(
+        id: ID!
+        subgroupId: ID
+        title: String
+        description: String
+        dueDate: DateTime
+        value: Int
+        status: TaskStatus
+        createdByUserId: ID
+    ): Task!
+    deleteTask(id: ID!): Boolean!
+    assignUserToTask(taskId: ID!, userId: ID!): Task!
+    unassignUserFromTask(taskId: ID!, userId: ID!): Task!
+    setTaskAssignees(taskId: ID!, userIds: [ID!]!): Task!
+}
+
+type Task {
+    id: ID!
+    title: String!
+    description: String
+    subgroup: Subgroup!
+    subgroupId: ID!
+    createdBy: User
+    createdByUserId: ID
+    dueDate: DateTime
+    value: Int
+    status: Int!
+    createdAt: DateTime!
+    updatedAt: DateTime!
+    assignees: [User!]!
+}

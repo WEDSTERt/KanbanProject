@@ -1,0 +1,15 @@
+extend type Query {
+    taskAttachments(taskId: ID!): [Attachment!]!
+}
+
+extend type Task {
+    attachments: [Attachment!]!
+}
+
+type Attachment {
+    id: ID!
+    fileName: String!
+    fileType: String
+    fileSize: Int
+    downloadUrl: String
+}

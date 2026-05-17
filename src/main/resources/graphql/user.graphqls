@@ -1,0 +1,28 @@
+extend type Query {
+    user(id: ID!): User
+    users(limit: Int, offset: Int): [User!]!
+    me: User
+}
+
+extend type Mutation {
+    createUser(fullName: String!, email: String!, password: String!): AuthPayload!
+    login(email: String!, password: String!): AuthPayload!
+    updateUser(id: ID!, fullName: String, email: String, password: String): User!
+    deleteUser(id: ID!): Boolean!
+}
+
+type User {
+    id: ID!
+    fullName: String!
+    email: String!
+    ownedProjects: [Project!]!
+    projectMemberships: [ProjectMember!]!
+    subgroupMemberships: [SubgroupMember!]!
+    createdTasks: [Task!]!
+    assignedTasks: [Task!]!
+}
+
+type AuthPayload {
+    token: String!
+    user: User!
+}
