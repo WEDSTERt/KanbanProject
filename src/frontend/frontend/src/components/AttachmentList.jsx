@@ -11,30 +11,47 @@ const AttachmentList = ({
     const [confirmDelete, setConfirmDelete] = useState({isOpen: false, fileId: null});
     const [downloadedIds, setDownloadedIds] = useState([]);
     const [confirmRedownload, setConfirmRedownload] = useState({isOpen: false, attachment: null});
+    const [isInitialized, setIsInitialized] = useState(false);
 
+    // Загрузка истории из localStorage при монтировании (только один раз)
     useEffect(() => {
         const stored = localStorage.getItem(STORAGE_KEY);
         if (stored) {
             try {
-                setDownloadedIds(JSON.parse(stored));
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                    setDownloadedIds(parsed);
+                }
             } catch (e) {
                 console.error('Ошибка загрузки истории скачиваний', e);
             }
         }
+        setIsInitialized(true);
     }, []);
 
     useEffect(() => {
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(downloadedIds));
-    }, [downloadedIds]);
+        if (!isInitialized) return;
+        if (downloadedIds.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(downloadedIds));
+        }
+    }, [downloadedIds, isInitialized]);
 
     const markAsDownloaded = (attachmentId) => {
         if (!downloadedIds.includes(attachmentId)) {
-            setDownloadedIds(prev => [...prev, attachmentId]);
+            const newIds = [...downloadedIds, attachmentId];
+            setDownloadedIds(newIds);
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(newIds));
         }
     };
 
     const removeFromDownloaded = (attachmentId) => {
-        setDownloadedIds(prev => prev.filter(id => id !== attachmentId));
+        const newIds = downloadedIds.filter(id => id !== attachmentId);
+        setDownloadedIds(newIds);
+        if (newIds.length > 0) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(newIds));
+        } else {
+            localStorage.removeItem(STORAGE_KEY);
+        }
     };
 
     const downloadFile = async (attachment) => {
@@ -135,25 +152,39 @@ const AttachmentList = ({
             <label className="form-label">Прикреплённые файлы</label>
             {attachments.length === 0 && <div className="attachments-empty">Нет файлов</div>}
             <ul>
-                {attachments.map((att) => (
-                    <li key={att.id} className="attachment-item">
-                        <div className="attachment-info">
-                            <span className="attachment-link" onClick={() => downloadFile(att)}>
-                                <i className="fas fa-paperclip"></i> {truncateFileName(att.fileName)}
-                            </span>
-                            <span className="attachment-size">{formatFileSize(att.fileSize)}</span>
-                        </div>
-                        {canDelete && (
-                            <button
-                                type="button"
-                                className="btn btn--danger btn--small"
-                                onClick={() => handleDeleteClick(att.id)}
-                            >
-                                <i className="fas fa-trash-alt"></i>
-                            </button>
-                        )}
-                    </li>
-                ))}
+                {attachments.map((att) => {
+                    const isDownloaded = downloadedIds.includes(att.id);
+                    return (
+                        <li key={att.id} className="attachment-item">
+                            <div className="attachment-info">
+                                <div className="attachment-wrapper" onClick={() => downloadFile(att)}>
+                                    <span
+                                        className="attachment-link"
+                                        style={isDownloaded ? { color: '#a855f7' } : {}}
+                                    >
+                                        <i className="fas fa-paperclip"></i> {truncateFileName(att.fileName)}
+                                        {isDownloaded && (
+                                            <span style={{marginLeft: '8px', fontSize: '0.7rem', color: '#a855f7'}}>
+                                                <i className="fas fa-check-circle"></i>
+                                            </span>
+                                        )}
+                                    </span>
+                                    <span className="attachment-tooltip">{att.fileName}</span>
+                                </div>
+                                <span className="attachment-size">{formatFileSize(att.fileSize)}</span>
+                            </div>
+                            {canDelete && (
+                                <button
+                                    type="button"
+                                    className="btn btn--danger btn--small"
+                                    onClick={() => handleDeleteClick(att.id)}
+                                >
+                                    <i className="fas fa-trash-alt"></i>
+                                </button>
+                            )}
+                        </li>
+                    );
+                })}
             </ul>
 
             <ConfirmModal
