@@ -7,6 +7,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,6 +24,7 @@ public class UserService {
         this.passwordEncoder = passwordEncoder;
     }
 
+    @CacheEvict(value = {"users", "currentUser"}, allEntries = true)
     @Transactional
     public User createUser(String fullName, String email, String password) {
         if (!email.matches("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")) {
@@ -40,6 +43,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @CacheEvict(value = {"users", "currentUser"}, allEntries = true)
     @Transactional
     public User updateUser(Long id, String fullName, String email, String password) {
         User user = userRepository.findById(id)
@@ -50,6 +54,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @CacheEvict(value = {"users", "currentUser"}, allEntries = true)
     @Transactional
     public boolean deleteUser(Long id) {
         if (userRepository.existsById(id)) {
@@ -59,6 +64,7 @@ public class UserService {
         return false;
     }
 
+    @Cacheable(value = "users", key = "#id")
     public Optional<User> findById(Long id) {
         return userRepository.findById(id);
     }
@@ -70,7 +76,7 @@ public class UserService {
         return userRepository.findAll(pageable).getContent();
     }
 
-
+    @Cacheable(value = "users", key = "#email")
     public User login(String email, String password) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Invalid email or password"));

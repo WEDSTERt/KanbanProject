@@ -9,6 +9,8 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 @Service
 public class TaskService {
@@ -28,6 +30,7 @@ public class TaskService {
         this.attachmentRepository = attachmentRepository;
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task createTask(Long subgroupId, Long createdByUserId, String title,
                            String description, OffsetDateTime dueDate, Integer value,
@@ -48,6 +51,7 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task updateTask(Long id, Long subgroupId, String title, String description,
                            OffsetDateTime dueDate, Integer value, TaskStatus status,
@@ -88,10 +92,12 @@ public class TaskService {
         return taskRepository.findById(id);
     }
 
+    @Cacheable(value = "tasksBySubgroup", key = "#subgroupId")
     public List<Task> findTasksBySubgroup(Long subgroupId) {
         return taskRepository.findBySubgroupId(subgroupId);
     }
 
+    @Cacheable(value = "tasksByAssignee", key = "#userId")
     public List<Task> findTasksByAssignee(Long userId) {
         return taskRepository.findByAssigneesId(userId);
     }
@@ -100,6 +106,7 @@ public class TaskService {
         return taskRepository.findByCreatedByUserId(createdByUserId);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task assignUserToTask(Long taskId, Long userId) {
         Task task = taskRepository.findById(taskId)
@@ -158,6 +165,7 @@ public class TaskService {
                 .orElseThrow(() -> new RuntimeException("Attachment not found"));
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public void deleteAttachment(Long attachmentId) {
         if (attachmentRepository.existsById(attachmentId)) {
