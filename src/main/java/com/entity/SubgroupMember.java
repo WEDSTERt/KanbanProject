@@ -1,5 +1,6 @@
 package com.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 
 @Entity
@@ -12,6 +13,7 @@ public class SubgroupMember {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subgroup_id", nullable = false)
+    @JsonIgnore
     private Subgroup subgroup;
 
     @Column(name = "subgroup_id", insertable = false, updatable = false)
@@ -19,6 +21,7 @@ public class SubgroupMember {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     private User user;
 
     @Column(name = "user_id", insertable = false, updatable = false)
@@ -38,7 +41,7 @@ public class SubgroupMember {
         this.role = role;
     }
 
-    // Геттеры и сеттеры
+    // Геттеры
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public Subgroup getSubgroup() { return subgroup; }

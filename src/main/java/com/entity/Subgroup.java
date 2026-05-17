@@ -1,8 +1,7 @@
 package com.entity;
 
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
-
 import java.util.ArrayList;
 import java.util.List;
 
@@ -19,15 +18,18 @@ public class Subgroup {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = false)
+    @JsonIgnore
     private Project project;
 
     @Column(name = "project_id", insertable = false, updatable = false)
     private Long projectId;
 
     @OneToMany(mappedBy = "subgroup", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<SubgroupMember> members = new ArrayList<>();
 
     @OneToMany(mappedBy = "subgroup", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<Task> tasks = new ArrayList<>();
 
     public Subgroup() {}
@@ -38,7 +40,7 @@ public class Subgroup {
         this.projectId = project.getId();
     }
 
-    // Геттеры и сеттеры
+    // Геттеры
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getName() { return name; }

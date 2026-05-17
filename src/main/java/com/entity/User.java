@@ -1,9 +1,9 @@
 package com.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.util.ArrayList;
 import java.util.List;
-
 
 @Entity
 @Table(name = "users")
@@ -20,21 +20,27 @@ public class User {
     private String email;
 
     @Column(name = "user_password", nullable = false)
+    @JsonIgnore
     private String userPassword;
 
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<Project> ownedProjects = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<ProjectMember> projectMemberships = new ArrayList<>();
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<SubgroupMember> subgroupMemberships = new ArrayList<>();
 
     @OneToMany(mappedBy = "createdBy")
+    @JsonIgnore
     private List<Task> createdTasks = new ArrayList<>();
 
     @ManyToMany(mappedBy = "assignees")
+    @JsonIgnore
     private List<Task> assignedTasks = new ArrayList<>();
 
     public User() {}
@@ -45,7 +51,7 @@ public class User {
         this.userPassword = userPassword;
     }
 
-    // Геттеры и сеттеры
+    // Геттеры
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getFullName() { return fullName; }

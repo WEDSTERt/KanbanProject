@@ -1,5 +1,6 @@
 package com.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ public class Task {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "subgroup_id", nullable = false)
+    @JsonIgnore
     private Subgroup subgroup;
 
     @Column(name = "subgroup_id", insertable = false, updatable = false)
@@ -28,6 +30,7 @@ public class Task {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by_user_id")
+    @JsonIgnore
     private User createdBy;
 
     @Column(name = "created_by_user_id", insertable = false, updatable = false)
@@ -49,6 +52,7 @@ public class Task {
     private OffsetDateTime updatedAt;
 
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private List<Attachment> attachments = new ArrayList<>();
 
     @ManyToMany
@@ -57,11 +61,11 @@ public class Task {
             joinColumns = @JoinColumn(name = "task_id"),
             inverseJoinColumns = @JoinColumn(name = "user_id")
     )
+    @JsonIgnore
     private List<User> assignees = new ArrayList<>();
 
     public Task() {}
 
-    // Конструктор без статуса, статус будет задан отдельно
     public Task(String title, String description, Subgroup subgroup, User createdBy) {
         this.title = title;
         this.description = description;
@@ -71,7 +75,7 @@ public class Task {
         this.createdByUserId = createdBy.getId();
     }
 
-    // Геттеры и сеттеры
+    // Геттеры
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getTitle() { return title; }
