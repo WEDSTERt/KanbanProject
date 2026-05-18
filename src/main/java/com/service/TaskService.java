@@ -30,11 +30,13 @@ public class TaskService {
         this.attachmentRepository = attachmentRepository;
     }
 
+    // ============ ОСНОВНЫЕ ОПЕРАЦИИ С ЗАДАЧАМИ ============
+
     @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task createTask(Long subgroupId, Long createdByUserId, String title,
                            String description, OffsetDateTime dueDate, Integer value,
-                           TaskStatus status, List<Long> assigneeIds) {
+                           TaskStatus status, List<Long> assigneeIds, Long parentTaskId) {
         Subgroup subgroup = subgroupRepository.findById(subgroupId)
                 .orElseThrow(() -> new RuntimeException("Subgroup not found"));
         User createdBy = userRepository.findById(createdByUserId)
@@ -44,6 +46,17 @@ public class TaskService {
         task.setDueDate(dueDate);
         task.setValue(value);
         task.setStatus(status != null ? status.getCode() : TaskStatus.TODO.getCode());
+
+        // Устанавливаем родительскую задачу, если указана
+        if (parentTaskId != null && parentTaskId > 0) {
+            Task parentTask = taskRepository.findById(parentTaskId)
+                    .orElseThrow(() -> new RuntimeException("Parent task not found"));
+            task.setParentTask(parentTask);
+            task.setParentTaskId(parentTaskId);
+        } else {
+            task.setParentTaskId(0L);
+        }
+
         if (assigneeIds != null && !assigneeIds.isEmpty()) {
             List<User> assignees = userRepository.findAllById(assigneeIds);
             task.getAssignees().addAll(assignees);
@@ -55,7 +68,7 @@ public class TaskService {
     @Transactional
     public Task updateTask(Long id, Long subgroupId, String title, String description,
                            OffsetDateTime dueDate, Integer value, TaskStatus status,
-                           Long createdByUserId) {
+                           Long createdByUserId, Long parentTaskId) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
         if (subgroupId != null) {
@@ -76,9 +89,21 @@ public class TaskService {
             task.setCreatedByUserId(createdByUserId);
         }
 
+        if (parentTaskId != null) {
+            if (parentTaskId > 0) {
+                Task parentTask = taskRepository.findById(parentTaskId)
+                        .orElseThrow(() -> new RuntimeException("Parent task not found"));
+                task.setParentTask(parentTask);
+            } else {
+                task.setParentTask(null);
+                task.setParentTaskId(0L);
+            }
+        }
+
         return taskRepository.save(task);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public boolean deleteTask(Long id) {
         if (taskRepository.existsById(id)) {
@@ -92,31 +117,52 @@ public class TaskService {
         return taskRepository.findById(id);
     }
 
+    // НОВЫЙ МЕТОД: поиск нескольких задач по ID с подгрузкой подзадач
+    @Cacheable(value = "tasksByIds", key = "#ids")
+    public List<Task> findAllByIds(List<Long> ids) {
+        return taskRepository.findAllByIdsWithDetails(ids);
+    }
+
     @Cacheable(value = "tasksBySubgroup", key = "#subgroupId")
     public List<Task> findTasksBySubgroup(Long subgroupId) {
+        return taskRepository.findRootTasksBySubgroup(subgroupId);
+    }
+
+    // Получить все задачи включая подзадачи (для Ганта и фильтрации)
+    public List<Task> findAllTasksBySubgroup(Long subgroupId) {
         return taskRepository.findBySubgroupId(subgroupId);
     }
 
     @Cacheable(value = "tasksByAssignee", key = "#userId")
     public List<Task> findTasksByAssignee(Long userId) {
-        return taskRepository.findByAssigneesId(userId);
+        return taskRepository.findRootTasksByAssignee(userId);
     }
 
     public List<Task> findTasksByCreator(Long createdByUserId) {
         return taskRepository.findByCreatedByUserId(createdByUserId);
     }
 
-    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
+    // Получить подзадачи для задачи
+    public List<Task> findSubTasks(Long parentTaskId) {
+        return taskRepository.findSubTasksByParentId(parentTaskId);
+    }
+
+    // ============ НАЗНАЧЕНИЕ ИСПОЛНИТЕЛЕЙ ============
+
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
     @Transactional
     public Task assignUserToTask(Long taskId, Long userId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        task.getAssignees().add(user);
+        if (!task.getAssignees().contains(user)) {
+            task.getAssignees().add(user);
+        }
         return taskRepository.save(task);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
     @Transactional
     public Task unassignUserFromTask(Long taskId, Long userId) {
         Task task = taskRepository.findById(taskId)
@@ -127,6 +173,7 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
     @Transactional
     public Task setTaskAssignees(Long taskId, List<Long> userIds) {
         Task task = taskRepository.findById(taskId)
@@ -136,7 +183,8 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
-    // вложения
+    // ============ ВЛОЖЕНИЯ ============
+
     @Transactional
     public Attachment addAttachment(Long taskId, MultipartFile file) {
         Task task = taskRepository.findById(taskId)
@@ -165,7 +213,7 @@ public class TaskService {
                 .orElseThrow(() -> new RuntimeException("Attachment not found"));
     }
 
-    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
     @Transactional
     public void deleteAttachment(Long attachmentId) {
         if (attachmentRepository.existsById(attachmentId)) {

@@ -19,6 +19,7 @@ public class CacheConfig {
                 "subgroups",
                 "tasksBySubgroup",
                 "tasksByAssignee",
+                "tasksByIds",        // НОВЫЙ КЭШ
                 "users",
                 "currentUser"
         );

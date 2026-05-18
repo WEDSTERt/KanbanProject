@@ -51,6 +51,18 @@ public class Task {
     @Column(name = "updated_at", insertable = false, updatable = false)
     private OffsetDateTime updatedAt;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_task_id")
+    @JsonIgnore
+    private Task parentTask;
+
+    @Column(name = "parent_task_id", insertable = false, updatable = false)
+    private Long parentTaskId;
+
+    @OneToMany(mappedBy = "parentTask", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    private List<Task> subTasks = new ArrayList<>();
+
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<Attachment> attachments = new ArrayList<>();
@@ -73,35 +85,77 @@ public class Task {
         this.subgroupId = subgroup.getId();
         this.createdBy = createdBy;
         this.createdByUserId = createdBy.getId();
+        this.parentTaskId = 0L;
     }
 
-    // Геттеры
+    // Геттеры и сеттеры
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
+
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }
+
     public String getDescription() { return description; }
     public void setDescription(String description) { this.description = description; }
+
     public Subgroup getSubgroup() { return subgroup; }
-    public void setSubgroup(Subgroup subgroup) { this.subgroup = subgroup; }
+    public void setSubgroup(Subgroup subgroup) {
+        this.subgroup = subgroup;
+        if (subgroup != null) {
+            this.subgroupId = subgroup.getId();
+        }
+    }
+
     public Long getSubgroupId() { return subgroupId; }
     public void setSubgroupId(Long subgroupId) { this.subgroupId = subgroupId; }
+
     public User getCreatedBy() { return createdBy; }
-    public void setCreatedBy(User createdBy) { this.createdBy = createdBy; }
+    public void setCreatedBy(User createdBy) {
+        this.createdBy = createdBy;
+        if (createdBy != null) {
+            this.createdByUserId = createdBy.getId();
+        }
+    }
+
     public Long getCreatedByUserId() { return createdByUserId; }
     public void setCreatedByUserId(Long createdByUserId) { this.createdByUserId = createdByUserId; }
+
     public OffsetDateTime getDueDate() { return dueDate; }
     public void setDueDate(OffsetDateTime dueDate) { this.dueDate = dueDate; }
+
     public Integer getValue() { return value; }
     public void setValue(Integer value) { this.value = value; }
+
     public Integer getStatus() { return status; }
     public void setStatus(Integer status) { this.status = status; }
+
     public OffsetDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
+
     public OffsetDateTime getUpdatedAt() { return updatedAt; }
     public void setUpdatedAt(OffsetDateTime updatedAt) { this.updatedAt = updatedAt; }
+
+    public Task getParentTask() { return parentTask; }
+    public void setParentTask(Task parentTask) {
+        this.parentTask = parentTask;
+        if (parentTask != null) {
+            this.parentTaskId = parentTask.getId();
+        } else {
+            this.parentTaskId = 0L;
+        }
+    }
+
+    public Long getParentTaskId() { return parentTaskId; }
+    public void setParentTaskId(Long parentTaskId) {
+        this.parentTaskId = parentTaskId != null ? parentTaskId : 0L;
+    }
+
+    public List<Task> getSubTasks() { return subTasks; }
+    public void setSubTasks(List<Task> subTasks) { this.subTasks = subTasks; }
+
     public List<User> getAssignees() { return assignees; }
     public void setAssignees(List<User> assignees) { this.assignees = assignees; }
+
     public List<Attachment> getAttachments() { return attachments; }
     public void setAttachments(List<Attachment> attachments) { this.attachments = attachments; }
 }

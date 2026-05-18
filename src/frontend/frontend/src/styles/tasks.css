@@ -15,14 +15,42 @@
     transform: translateY(-2px);
 }
 
+/* Заголовок задачи в одной строке с кнопкой */
+.task-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 8px;
+    gap: 8px;
+}
+
 .task-title {
     font-weight: 600;
-    margin-bottom: 8px;
     font-size: 0.95rem;
     display: flex;
     align-items: center;
     gap: 4px;
     flex-wrap: wrap;
+    flex: 1;
+}
+
+/* Кнопка троеточия справа от заголовка в той же строке */
+.task-menu-btn-top {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    color: #94a3b8;
+    transition: all 0.1s;
+    flex-shrink: 0;
+    margin-top: -4px;
+    margin-right: -4px;
+}
+
+.task-menu-btn-top:hover {
+    background: #f1f5f9;
+    color: #2563eb;
 }
 
 .attachment-icon {
@@ -42,7 +70,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-top: -5px;
+    margin-top: 8px;
     font-size: 0.7rem;
     gap: 12px;
     flex-wrap: wrap;
@@ -83,6 +111,172 @@
     gap: 6px;
     flex-wrap: wrap;
     margin-top: 10px;
+}
+
+/* Карточка подзадачи (уменьшенная) */
+.task-card.subtask-card {
+    margin-left: 0;
+    margin-top: 8px;
+    margin-bottom: 8px;
+    border-left-width: 3px;
+    padding: 8px 10px;
+    background: #fafbfc;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Контейнер для раскрытых подзадач */
+.task-subtasks-expanded {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 12px;
+    padding: 12px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Вложенные подзадачи должны быть на всю ширину родителя */
+.task-subtasks-expanded .task-card.subtask-card {
+    margin-left: 0 !important;
+    width: 100%;
+}
+
+/* Для рекурсивных подзадач - отступ слева только визуально через padding */
+.task-card.subtask-card {
+    position: relative;
+}
+
+.task-card.subtask-card::before {
+    content: '';
+    position: absolute;
+    left: -16px;
+    top: 0;
+    bottom: 0;
+    width: 2px;
+    background: #e2e8f0;
+    display: none;
+}
+
+/* Первый уровень подзадач */
+.task-card.subtask-card.level-1 {
+    padding-left: 28px;
+}
+
+/* Второй уровень подзадач */
+.task-card.subtask-card.level-2 {
+    padding-left: 44px;
+}
+
+/* Третий уровень подзадач */
+.task-card.subtask-card.level-3 {
+    padding-left: 60px;
+}
+
+/* Четвертый уровень подзадач */
+.task-card.subtask-card.level-4 {
+    padding-left: 76px;
+}
+
+.subtask-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 6px;
+    margin-bottom: 6px;
+}
+
+.subtask-title {
+    font-size: 0.8rem !important;
+    font-weight: 500;
+    color: #475569;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    flex-wrap: wrap;
+}
+
+.subtask-title span:first-child {
+    color: #64748b;
+}
+
+.subtask-menu-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 6px;
+    color: #94a3b8;
+    transition: all 0.1s;
+    flex-shrink: 0;
+}
+
+.subtask-menu-btn:hover {
+    background: #f1f5f9;
+    color: #2563eb;
+}
+
+.subtask-bottom-row {
+    margin-top: 4px;
+    font-size: 0.65rem;
+}
+
+.subtask-priority {
+    padding: 1px 6px;
+    font-size: 0.6rem;
+}
+
+.subtask-date {
+    font-size: 0.6rem;
+    padding: 1px 5px;
+}
+
+.subtask-warning {
+    font-size: 0.55rem !important;
+    padding: 1px 4px !important;
+}
+
+.subtask-assignees {
+    margin-top: 6px;
+    gap: 4px;
+}
+
+.subtask-assignee-name {
+    font-size: 0.6rem;
+    padding: 1px 6px;
+}
+
+.assignee-more {
+    font-size: 0.6rem;
+    color: #64748b;
+    background: #f1f5f9;
+    padding: 1px 6px;
+    border-radius: 20px;
+}
+
+.subtask-footer {
+    margin-top: 6px;
+    padding-top: 4px;
+}
+
+.subtask-expand-btn {
+    font-size: 0.6rem;
+    padding: 2px 6px;
+}
+
+.subtask-subtasks-expanded {
+    margin-top: 8px;
+    padding-top: 8px;
+    margin-left: 0;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.subtask-badge {
+    font-size: 0.55rem;
+    padding: 1px 5px;
 }
 
 .task-delete-btn {
@@ -185,4 +379,286 @@
 /* Иконки в приоритетах */
 .task-priority i {
     margin-right: 4px;
+}
+
+/* Подзадачи */
+.subtasks-container {
+    margin-top: 16px;
+}
+
+.subtasks-header {
+    margin-bottom: 12px;
+}
+
+.subtasks-progress {
+    margin-left: 8px;
+    font-size: 0.75rem;
+    color: #64748b;
+    font-weight: normal;
+}
+
+.subtasks-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    max-height: 250px;
+    overflow-y: auto;
+}
+
+.subtask-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.subtask-item.completed .subtask-title {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+.subtasks-empty {
+    padding: 16px;
+    text-align: center;
+    color: #94a3b8;
+    font-size: 0.85rem;
+}
+
+/* Кнопка троеточия и футер карточки */
+.task-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid #e2e8f0;
+    position: relative;
+}
+
+.task-expand-btn {
+    background: none;
+    border: none;
+    font-size: 0.7rem;
+    color: #64748b;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    transition: all 0.1s;
+}
+
+.task-expand-btn:hover {
+    background: #f1f5f9;
+    color: #2563eb;
+}
+
+.task-menu-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 12px;
+    color: #64748b;
+    transition: all 0.1s;
+}
+
+.task-menu-btn:hover {
+    background: #f1f5f9;
+    color: #2563eb;
+}
+
+/* Бейдж с количеством подзадач */
+.subtasks-badge {
+    background: #e2e8f0;
+    border-radius: 20px;
+    padding: 2px 8px;
+    font-size: 0.65rem;
+    margin-left: 8px;
+    color: #475569;
+}
+
+.task-subtasks-list {
+    font-size: 0.8rem;
+}
+
+.task-subtasks-header {
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-bottom: 8px;
+    font-weight: 500;
+}
+
+.task-subtask-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid #eef2f6;
+}
+
+.task-subtask-item:last-child {
+    border-bottom: none;
+}
+
+.task-subtask-item input {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.task-subtask-item span {
+    flex: 1;
+    font-size: 0.75rem;
+    color: #334155;
+    cursor: pointer;
+}
+
+.task-subtask-item span:hover {
+    color: #2563eb;
+}
+
+.task-subtask-item span.completed {
+    text-decoration: line-through;
+    color: #94a3b8;
+}
+
+.task-subtask-delete {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #94a3b8;
+    font-size: 0.6rem;
+    padding: 2px;
+    border-radius: 4px;
+}
+
+.task-subtask-delete:hover {
+    color: #dc2626;
+    background: #fee2e2;
+}
+
+.task-subtasks-empty {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    text-align: center;
+    padding: 12px;
+}
+
+/* Контекстное меню */
+.context-menu {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    min-width: 220px;
+    overflow: hidden;
+    border: 1px solid #e2e8f0;
+    z-index: 10000;
+}
+
+.context-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: #334155;
+    transition: background 0.1s;
+}
+
+.context-menu-item:hover {
+    background: #f1f5f9;
+}
+
+.context-menu-item i {
+    width: 18px;
+    font-size: 0.85rem;
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 4px 0;
+}
+
+.context-menu-subtask {
+    position: relative;
+}
+
+.context-menu-subtask-form {
+    padding: 8px 12px 12px 12px;
+    display: flex;
+    gap: 8px;
+    border-top: 1px solid #e2e8f0;
+    background: #fafbfc;
+}
+
+.context-menu-subtask-form input {
+    flex: 1;
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    outline: none;
+}
+
+.context-menu-subtask-form input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.context-menu-subtask-form button {
+    padding: 6px 12px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    transition: background 0.1s;
+}
+
+.context-menu-subtask-form button:hover {
+    background: #1d4ed8;
+}
+
+/* Кнопки переключения режимов */
+.view-mode-buttons {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 20px;
+}
+
+.view-mode-btn {
+    padding: 8px 20px;
+    border-radius: 30px;
+    border: 1px solid #e2e8f0;
+    background: white;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.85rem;
+}
+
+.view-mode-btn.active {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+}
+
+.view-mode-btn i {
+    font-size: 0.9rem;
+}
+
+.subtask-loading {
+    padding: 16px;
+    text-align: center;
+    font-size: 0.7rem;
+    color: #94a3b8;
 }

@@ -3,6 +3,8 @@ extend type Query {
     tasksBySubgroup(subgroupId: ID!): [Task!]!
     tasksByAssignee(userId: ID!): [Task!]!
     tasksByCreator(createdByUserId: ID!): [Task!]!
+    taskSubTasks(taskId: ID!): [Task!]!
+    tasksByIds(ids: [ID!]!): [Task!]!
 }
 
 extend type Mutation {
@@ -15,6 +17,7 @@ extend type Mutation {
         value: Int
         status: TaskStatus = TODO
         assigneeIds: [ID!]
+        parentTaskId: ID
     ): Task!
     updateTask(
         id: ID!
@@ -25,11 +28,18 @@ extend type Mutation {
         value: Int
         status: TaskStatus
         createdByUserId: ID
+        parentTaskId: ID
     ): Task!
     deleteTask(id: ID!): Boolean!
     assignUserToTask(taskId: ID!, userId: ID!): Task!
     unassignUserFromTask(taskId: ID!, userId: ID!): Task!
     setTaskAssignees(taskId: ID!, userIds: [ID!]!): Task!
+}
+
+extend type Task {
+    parentTask: Task
+    parentTaskId: ID
+    subTasks: [Task!]!
 }
 
 type Task {
