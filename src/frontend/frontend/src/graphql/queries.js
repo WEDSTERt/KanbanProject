@@ -80,6 +80,35 @@ export const GET_TASK_ATTACHMENTS = gql`
     }
 `;
 
+export const GET_CURRENT_USER = gql`
+    query GetCurrentUser {
+        me {
+            id
+            fullName
+            email
+        }
+    }
+`;
+
+export const GET_TASK_SUBTASKS = gql`
+    query GetTaskSubTasks($taskId: ID!) {
+        taskSubTasks(taskId: $taskId) {
+            id
+            title
+            description
+            dueDate
+            status
+            value
+            createdAt
+            updatedAt
+            parentTaskId
+            createdBy { id fullName }
+            assignees { id fullName email }
+            attachments { id }
+        }
+    }
+`;
+
 export const GET_TASKS_BY_SUBGROUP = gql`
     query GetTasksBySubgroup($subgroupId: ID!) {
         tasksBySubgroup(subgroupId: $subgroupId) {
@@ -95,64 +124,6 @@ export const GET_TASKS_BY_SUBGROUP = gql`
             subTasksCount
             createdBy { id fullName }
             assignees { id fullName email }
-            attachments { id }
-        }
-    }
-`;
-
-// Пагинированная версия
-export const GET_TASKS_BY_SUBGROUP_PAGINATED = gql`
-    query GetTasksBySubgroupPaginated($subgroupId: ID!, $page: Int!, $size: Int!) {
-        tasksBySubgroupPaginated(subgroupId: $subgroupId, page: $page, size: $size) {
-            content {
-                id
-                title
-                description
-                dueDate
-                status
-                value
-                createdAt
-                updatedAt
-                parentTaskId
-                subTasksCount
-                createdBy { id fullName }
-                assignees { id fullName email }
-                attachments { id }
-            }
-            last
-            totalElements
-            totalPages
-        }
-    }
-`;
-
-export const GET_CURRENT_USER = gql`
-    query GetCurrentUser {
-        me {
-            id
-            fullName
-            email
-        }
-    }
-`;
-
-export const GET_TASKS_BY_ASSIGNEE = gql`
-    query GetTasksByAssignee($userId: ID!) {
-        tasksByAssignee(userId: $userId) {
-            id
-            title
-            description
-            dueDate
-            status
-            value
-            createdAt
-            updatedAt
-            parentTaskId
-            subTasksCount
-            createdBy { id fullName }
-            assignees { id fullName email }
-            subgroupId
-            subgroup { id name }
             attachments { id }
         }
     }
@@ -179,10 +150,9 @@ export const GET_ALL_SUBTASKS = gql`
         }
     }
 `;
-
-export const GET_TASK_SUBTASKS = gql`
-    query GetTaskSubTasks($taskId: ID!) {
-        taskSubTasks(taskId: $taskId) {
+export const GET_TASKS_BY_ASSIGNEE_AND_PROJECT = gql`
+    query GetTasksByAssigneeAndProject($userId: ID!, $projectId: ID!) {
+        tasksByAssigneeAndProject(userId: $userId, projectId: $projectId) {
             id
             title
             description
@@ -192,9 +162,24 @@ export const GET_TASK_SUBTASKS = gql`
             createdAt
             updatedAt
             parentTaskId
-            createdBy { id fullName }
-            assignees { id fullName email }
-            attachments { id }
+            subTasksCount
+            createdBy {
+                id
+                fullName
+            }
+            assignees {
+                id
+                fullName
+                email
+            }
+            subgroupId
+            subgroup {
+                id
+                name
+            }
+            attachments {
+                id
+            }
         }
     }
 `;

@@ -410,4 +410,8 @@ public class GraphQLController {
                                                @Argument int size) {
         return taskService.findTasksBySubgroupWithPagination(subgroupId, page, size);
     }
+    @QueryMapping
+    public List<Task> tasksByAssigneeAndProject(@Argument Long userId, @Argument Long projectId) {
+        return taskService.findTasksByAssigneeAndProject(userId, projectId);
+    }
 }

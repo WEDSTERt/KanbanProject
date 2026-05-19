@@ -47,4 +47,13 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     @Query("SELECT t.parentTaskId, COUNT(t) FROM Task t WHERE t.parentTaskId IN :taskIds GROUP BY t.parentTaskId")
     List<Object[]> countSubTasksByParentIds(@Param("taskIds") List<Long> taskIds);
+    @Query("SELECT DISTINCT t FROM Task t " +
+            "JOIN t.assignees a " +
+            "JOIN t.subgroup s " +
+            "JOIN s.project p " +
+            "WHERE a.id = :userId " +
+            "AND p.id = :projectId " +
+            "AND (t.parentTaskId IS NULL OR t.parentTaskId = 0)")
+    List<Task> findRootTasksByAssigneeAndProject(@Param("userId") Long userId,
+                                                 @Param("projectId") Long projectId);
 }

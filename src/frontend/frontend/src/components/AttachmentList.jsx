@@ -33,6 +33,8 @@ const AttachmentList = ({
         if (!isInitialized) return;
         if (downloadedIds.length > 0) {
             localStorage.setItem(STORAGE_KEY, JSON.stringify(downloadedIds));
+        } else {
+            localStorage.removeItem(STORAGE_KEY);
         }
     }, [downloadedIds, isInitialized]);
 
@@ -52,20 +54,6 @@ const AttachmentList = ({
         } else {
             localStorage.removeItem(STORAGE_KEY);
         }
-    };
-
-    const downloadFile = async (attachment) => {
-        const token = localStorage.getItem('jwtToken');
-        if (!token) {
-            alert('Не авторизован');
-            return;
-        }
-        const alreadyDownloaded = downloadedIds.includes(attachment.id);
-        if (alreadyDownloaded) {
-            setConfirmRedownload({isOpen: true, attachment});
-            return;
-        }
-        await performDownload(attachment, token);
     };
 
     const performDownload = async (attachment, token) => {
@@ -90,11 +78,25 @@ const AttachmentList = ({
         }
     };
 
-    const handleConfirmRedownload = () => {
+    const downloadFile = async (attachment) => {
+        const token = localStorage.getItem('jwtToken');
+        if (!token) {
+            alert('Не авторизован');
+            return;
+        }
+        const alreadyDownloaded = downloadedIds.includes(attachment.id);
+        if (alreadyDownloaded) {
+            setConfirmRedownload({isOpen: true, attachment});
+            return;
+        }
+        await performDownload(attachment, token);
+    };
+
+    const handleConfirmRedownload = async () => {
         const {attachment} = confirmRedownload;
         if (attachment) {
             const token = localStorage.getItem('jwtToken');
-            performDownload(attachment, token);
+            await performDownload(attachment, token);
         }
         setConfirmRedownload({isOpen: false, attachment: null});
     };

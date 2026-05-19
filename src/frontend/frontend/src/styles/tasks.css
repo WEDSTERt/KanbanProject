@@ -125,6 +125,49 @@
     box-sizing: border-box;
 }
 
+/* Подзадача в статусе "В разработке" */
+.task-card.subtask-card.in-progress {
+    background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);
+    border-left-color: #f59e0b !important;
+}
+
+.task-card.subtask-card.in-progress:hover {
+    background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+}
+
+/* Подзадача в статусе "Выполнено" */
+.task-card.subtask-card.review {
+    background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
+    border-left-color: #22c55e !important;
+    opacity: 0.75;
+}
+
+.task-card.subtask-card.review:hover {
+    opacity: 0.85;
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+}
+
+/* Подзадача в статусе "Выполнено" - зачеркивание текста */
+.task-card.subtask-card.review .subtask-title span {
+    text-decoration: line-through;
+    color: #64748b;
+}
+
+.task-card.subtask-card.review .subtask-priority {
+    filter: grayscale(0.3);
+    opacity: 0.7;
+}
+
+.task-card.subtask-card.review .subtask-assignee-name {
+    filter: grayscale(0.3);
+    opacity: 0.7;
+}
+
+.task-card.subtask-card.review .subtask-date {
+    text-decoration: line-through;
+    opacity: 0.6;
+}
+
 /* Контейнер для раскрытых подзадач */
 .task-subtasks-expanded {
     margin-top: 12px;
@@ -146,17 +189,6 @@
 /* Для рекурсивных подзадач - отступ слева только визуально через padding */
 .task-card.subtask-card {
     position: relative;
-}
-
-.task-card.subtask-card::before {
-    content: '';
-    position: absolute;
-    left: -16px;
-    top: 0;
-    bottom: 0;
-    width: 2px;
-    background: #e2e8f0;
-    display: none;
 }
 
 /* Первый уровень подзадач */
@@ -277,6 +309,32 @@
 .subtask-badge {
     font-size: 0.55rem;
     padding: 1px 5px;
+}
+
+/* Бейдж статуса для подзадачи */
+.subtask-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.5rem;
+    padding: 1px 6px;
+    border-radius: 20px;
+    margin-left: 6px;
+}
+
+.subtask-status-badge.todo {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.subtask-status-badge.in-progress {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.subtask-status-badge.review {
+    background: #dcfce7;
+    color: #166534;
 }
 
 .task-delete-btn {
@@ -508,6 +566,7 @@
     height: 14px;
     cursor: pointer;
     flex-shrink: 0;
+    accent-color: #22c55e;
 }
 
 .task-subtask-item span {

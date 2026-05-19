@@ -7,19 +7,26 @@ import {AuthProvider} from './contexts/AuthContext';
 import App from './App';
 import './styles/index.css';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-    <React.StrictMode>
-        <ApolloProvider client={client}>
-            <BrowserRouter
-                future={{
-                    v7_startTransition: true,
-                    v7_relativeSplatPath: true,
-                }}
-            >
-                <AuthProvider>
-                    <App/>
-                </AuthProvider>
-            </BrowserRouter>
-        </ApolloProvider>
-    </React.StrictMode>
-);
+// Оборачиваем в асинхронную функцию для ожидания инициализации кэша
+const init = async () => {
+    // client уже с восстановленным кэшем из apollo.js
+
+    ReactDOM.createRoot(document.getElementById('root')).render(
+        <React.StrictMode>
+            <ApolloProvider client={client}>
+                <BrowserRouter
+                    future={{
+                        v7_startTransition: true,
+                        v7_relativeSplatPath: true,
+                    }}
+                >
+                    <AuthProvider>
+                        <App/>
+                    </AuthProvider>
+                </BrowserRouter>
+            </ApolloProvider>
+        </React.StrictMode>
+    );
+};
+
+init();

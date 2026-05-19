@@ -248,7 +248,10 @@ public class TaskService {
             attachmentRepository.deleteById(attachmentId);
         }
     }
-
+    @Cacheable(value = "tasksByAssignee", key = "#userId + '_' + #projectId")
+    public List<Task> findTasksByAssigneeAndProject(Long userId, Long projectId) {
+        return taskRepository.findRootTasksByAssigneeAndProject(userId, projectId);
+    }
     public List<Attachment> getAttachmentsByTask(Long taskId) {
         return attachmentRepository.findByTaskId(taskId);
     }

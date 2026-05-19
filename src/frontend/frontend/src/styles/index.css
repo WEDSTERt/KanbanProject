@@ -17,7 +17,6 @@
 @import './attachments.css';
 @import './members.css';
 @import './calendar.css';
-@import './gantt.css';
 
 /* Адаптация */
 @import './responsive.css';

@@ -5,6 +5,7 @@ extend type Query {
     tasksByCreator(createdByUserId: ID!): [Task!]!
     taskSubTasks(taskId: ID!): [Task!]!
     tasksByIds(ids: [ID!]!): [Task!]!
+    tasksByAssigneeAndProject(userId: ID!, projectId: ID!): [Task!]!
 }
 
 extend type Mutation {

@@ -210,24 +210,6 @@ export const SET_TASK_ASSIGNEES = gql`
     }
 `;
 
-export const ASSIGN_USER_TO_TASK = gql`
-    mutation AssignUserToTask($taskId: ID!, $userId: ID!) {
-        assignUserToTask(taskId: $taskId, userId: $userId) {
-            id
-            assignees { id fullName }
-        }
-    }
-`;
-
-export const UNASSIGN_USER_FROM_TASK = gql`
-    mutation UnassignUserFromTask($taskId: ID!, $userId: ID!) {
-        unassignUserFromTask(taskId: $taskId, userId: $userId) {
-            id
-            assignees { id fullName }
-        }
-    }
-`;
-
 export const LOGIN = gql`
     mutation Login($email: String!, $password: String!) {
         login(email: $email, password: $password) {
