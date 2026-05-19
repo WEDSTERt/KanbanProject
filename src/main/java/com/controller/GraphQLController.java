@@ -6,6 +6,7 @@ import com.service.ProjectService;
 import com.service.SubgroupService;
 import com.service.TaskService;
 import com.service.UserService;
+import org.springframework.data.domain.Page;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -393,10 +394,20 @@ public class GraphQLController {
     public Task taskParentTask(Task task) {
         return task.getParentTask();
     }
-
+    @SchemaMapping(typeName = "Task", field = "subTasksCount")
+    public Integer taskSubTasksCount(Task task) {
+        return taskService.countSubTasksByParentId(task.getId());
+    }
     // SubTasks mapping для получения подзадач
     @SchemaMapping(typeName = "Task", field = "subTasks")
     public List<Task> taskSubTasksResolver(Task task) {
         return taskService.findSubTasks(task.getId());
+    }
+
+    @QueryMapping
+    public Page<Task> tasksBySubgroupPaginated(@Argument Long subgroupId,
+                                               @Argument int page,
+                                               @Argument int size) {
+        return taskService.findTasksBySubgroupWithPagination(subgroupId, page, size);
     }
 }

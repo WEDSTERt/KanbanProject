@@ -19,14 +19,14 @@ public class CacheConfig {
                 "subgroups",
                 "tasksBySubgroup",
                 "tasksByAssignee",
-                "tasksByIds",        // НОВЫЙ КЭШ
+                "tasksByIds",
                 "users",
                 "currentUser"
         );
 
         cacheManager.setCaffeine(Caffeine.newBuilder()
-                .expireAfterWrite(1, TimeUnit.HOURS)
-                .maximumSize(1000)
+                .expireAfterWrite(20, TimeUnit.MINUTES)
+                .maximumSize(5000)
                 .recordStats()
         );
 

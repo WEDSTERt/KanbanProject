@@ -76,6 +76,9 @@ public class Task {
     @JsonIgnore
     private List<User> assignees = new ArrayList<>();
 
+    @Transient
+    private Integer subTasksCount;
+
     public Task() {}
 
     public Task(String title, String description, Subgroup subgroup, User createdBy) {
@@ -158,4 +161,7 @@ public class Task {
 
     public List<Attachment> getAttachments() { return attachments; }
     public void setAttachments(List<Attachment> attachments) { this.attachments = attachments; }
+
+    public Integer getSubTasksCount() { return subTasksCount; }
+    public void setSubTasksCount(Integer subTasksCount) { this.subTasksCount = subTasksCount; }
 }

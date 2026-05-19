@@ -92,9 +92,36 @@ export const GET_TASKS_BY_SUBGROUP = gql`
             createdAt
             updatedAt
             parentTaskId
+            subTasksCount
             createdBy { id fullName }
             assignees { id fullName email }
             attachments { id }
+        }
+    }
+`;
+
+// Пагинированная версия
+export const GET_TASKS_BY_SUBGROUP_PAGINATED = gql`
+    query GetTasksBySubgroupPaginated($subgroupId: ID!, $page: Int!, $size: Int!) {
+        tasksBySubgroupPaginated(subgroupId: $subgroupId, page: $page, size: $size) {
+            content {
+                id
+                title
+                description
+                dueDate
+                status
+                value
+                createdAt
+                updatedAt
+                parentTaskId
+                subTasksCount
+                createdBy { id fullName }
+                assignees { id fullName email }
+                attachments { id }
+            }
+            last
+            totalElements
+            totalPages
         }
     }
 `;
@@ -121,6 +148,7 @@ export const GET_TASKS_BY_ASSIGNEE = gql`
             createdAt
             updatedAt
             parentTaskId
+            subTasksCount
             createdBy { id fullName }
             assignees { id fullName email }
             subgroupId
@@ -130,7 +158,6 @@ export const GET_TASKS_BY_ASSIGNEE = gql`
     }
 `;
 
-// НОВЫЙ ЗАПРОС - массовая загрузка подзадач для нескольких задач
 export const GET_ALL_SUBTASKS = gql`
     query GetAllSubTasks($taskIds: [ID!]!) {
         tasksByIds(ids: $taskIds) {
@@ -152,6 +179,7 @@ export const GET_ALL_SUBTASKS = gql`
         }
     }
 `;
+
 export const GET_TASK_SUBTASKS = gql`
     query GetTaskSubTasks($taskId: ID!) {
         taskSubTasks(taskId: $taskId) {

@@ -40,7 +40,6 @@ const KanbanBoard = () => {
     const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
 
     // Кэш для задач по группам
-    const tasksCacheRef = useRef(new Map());
     const [cachedTasks, setCachedTasks] = useState({});
 
     // Состояния для сортировки
@@ -100,15 +99,13 @@ const KanbanBoard = () => {
     // Сохранение задач в кэш при загрузке
     useEffect(() => {
         if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssignee) {
-            tasksCacheRef.current.set(activeSubgroupId, myTasksData.tasksByAssignee);
             setCachedTasks(prev => ({ ...prev, [activeSubgroupId]: myTasksData.tasksByAssignee }));
         } else if (tasksData?.tasksBySubgroup) {
-            tasksCacheRef.current.set(activeSubgroupId, tasksData.tasksBySubgroup);
             setCachedTasks(prev => ({ ...prev, [activeSubgroupId]: tasksData.tasksBySubgroup }));
         }
     }, [tasksData, myTasksData, activeSubgroupId]);
 
-    // Получение задач из кэша или из запроса
+    // Получение задач из кэша
     const getTasksForGroup = useCallback((groupId) => {
         if (cachedTasks[groupId]) {
             return cachedTasks[groupId];
@@ -122,76 +119,44 @@ const KanbanBoard = () => {
         return [];
     }, [cachedTasks, myTasksData, tasksData]);
 
-    // МАССОВАЯ ЗАГРУЗКА ПОДЗАДАЧ - ОДНИМ ЗАПРОСОМ
-    const fetchSubTasksBatch = useCallback(async (taskIds, force = false) => {
-        if (!taskIds || taskIds.length === 0) return;
+    // ЗАГРУЗКА ПОДЗАДАЧ ДЛЯ ОДНОЙ ЗАДАЧИ (при раскрытии)
+    const fetchSubTasksForTask = useCallback(async (taskId, force = false) => {
+        if (!force && subTasksCache[taskId]) return;
 
-        // Фильтруем только те задачи, у которых ещё нет подзадач в кэше (или принудительно)
-        const missingTaskIds = force
-            ? taskIds
-            : taskIds.filter(id => !subTasksCache[id]);
-
-        if (missingTaskIds.length === 0) return;
-
-        setLoadingSubTasks(prev => {
-            const newState = { ...prev };
-            missingTaskIds.forEach(id => { newState[id] = true; });
-            return newState;
-        });
+        setLoadingSubTasks(prev => ({ ...prev, [taskId]: true }));
 
         try {
             const { data } = await client.query({
                 query: GET_ALL_SUBTASKS,
-                variables: { taskIds: missingTaskIds },
+                variables: { taskIds: [taskId] },
                 fetchPolicy: force ? 'network-only' : 'cache-first'
             });
 
-            console.log('Получены подзадачи:', data);
-
-            if (data?.tasksByIds) {
-                const newCache = {};
-                data.tasksByIds.forEach(task => {
-                    // ВАЖНО: данные приходят в поле subTasks
-                    newCache[task.id] = task.subTasks || [];
-                    console.log(`Задача ${task.id}: ${task.subTasks?.length || 0} подзадач`);
-                });
-                setSubTasksCache(prev => ({ ...prev, ...newCache }));
+            if (data?.tasksByIds && data.tasksByIds.length > 0) {
+                const taskData = data.tasksByIds[0];
+                setSubTasksCache(prev => ({ ...prev, [taskId]: taskData.subTasks || [] }));
+            } else {
+                setSubTasksCache(prev => ({ ...prev, [taskId]: [] }));
             }
         } catch (err) {
-            console.error('Ошибка массовой загрузки подзадач:', err);
+            console.error('Ошибка загрузки подзадач:', err);
+            setSubTasksCache(prev => ({ ...prev, [taskId]: [] }));
         } finally {
-            setLoadingSubTasks(prev => {
-                const newState = { ...prev };
-                missingTaskIds.forEach(id => { delete newState[id]; });
-                return newState;
-            });
+            setLoadingSubTasks(prev => ({ ...prev, [taskId]: false }));
         }
     }, [client, subTasksCache]);
 
-    // Загружаем подзадачи для всех задач на доске (ОДИН ЗАПРОС!)
-    const loadAllSubTasks = useCallback(async () => {
-        const allTasks = getTasksForGroup(activeSubgroupId);
-        if (!allTasks || allTasks.length === 0) return;
-
-        const taskIds = allTasks.map(t => t.id);
-        console.log('Загружаем подзадачи для задач:', taskIds);
-        await fetchSubTasksBatch(taskIds);
-    }, [activeSubgroupId, getTasksForGroup, fetchSubTasksBatch]);
-
-    // Автоматическая загрузка подзадач для всех задач при загрузке доски
-    useEffect(() => {
-        if (activeSubgroupId && (tasksData || myTasksData)) {
-            loadAllSubTasks();
-        }
-    }, [activeSubgroupId, tasksData, myTasksData, loadAllSubTasks]);
-
-    const toggleExpandTask = (taskId) => {
+    // Переключение раскрытия карточки - загружаем подзадачи только при раскрытии
+    const toggleExpandTask = useCallback((taskId) => {
         if (expandedTaskId === taskId) {
             setExpandedTaskId(null);
         } else {
             setExpandedTaskId(taskId);
+            if (!subTasksCache[taskId]) {
+                fetchSubTasksForTask(taskId);
+            }
         }
-    };
+    }, [expandedTaskId, subTasksCache, fetchSubTasksForTask]);
 
     const handleAddSubTaskFromMenu = async (taskId) => {
         if (!newSubTaskTitle.trim()) return;
@@ -215,8 +180,7 @@ const KanbanBoard = () => {
                 }
             });
             setNewSubTaskTitle('');
-            // Принудительно обновляем подзадачи для родительской задачи
-            await fetchSubTasksBatch([taskId], true);
+            await fetchSubTasksForTask(taskId, true);
             await refetchCurrentTasks();
             setShowContextMenu(false);
         } catch (err) {
@@ -231,7 +195,7 @@ const KanbanBoard = () => {
             await updateTask({
                 variables: { id: subTaskId, status: newStatus }
             });
-            await fetchSubTasksBatch([taskId], true);
+            await fetchSubTasksForTask(taskId, true);
             await refetchCurrentTasks();
         } catch (err) {
             console.error('Ошибка обновления подзадачи:', err);
@@ -241,7 +205,7 @@ const KanbanBoard = () => {
     const handleDeleteSubTask = async (taskId, subTaskId) => {
         try {
             await deleteTask({ variables: { id: subTaskId } });
-            await fetchSubTasksBatch([taskId], true);
+            await fetchSubTasksForTask(taskId, true);
             await refetchCurrentTasks();
         } catch (err) {
             console.error('Ошибка удаления подзадачи:', err);
@@ -275,7 +239,7 @@ const KanbanBoard = () => {
             assignee: null
         });
         setExpandedTaskId(null);
-        setSubTasksCache({}); // Очищаем кэш подзадач при смене группы
+        setSubTasksCache({});
     };
 
     const handleGanttDateChange = async (taskId, newStartDate, newEndDate) => {
@@ -288,13 +252,6 @@ const KanbanBoard = () => {
             });
             await refetchCurrentTasks();
             if (activeSubgroupId !== 'my-tasks') await refetchMyTasks();
-
-            // Обновляем подзадачи для родительской задачи, если есть
-            const allTasks = getTasksForGroup(activeSubgroupId);
-            const task = allTasks.find(t => t.id === taskId);
-            if (task?.parentTaskId && task.parentTaskId !== 0) {
-                await fetchSubTasksBatch([task.parentTaskId], true);
-            }
         } catch (err) {
             console.error('Ошибка обновления даты:', err);
             alert('Ошибка обновления даты задачи');
@@ -581,9 +538,8 @@ const KanbanBoard = () => {
                         variables: { id: editingTask.id, createdByUserId: taskData.creatorId },
                     });
                 }
-                // Обновляем подзадачи для родительской задачи, если есть
                 if (editingTask.parentTaskId && editingTask.parentTaskId !== 0) {
-                    await fetchSubTasksBatch([editingTask.parentTaskId], true);
+                    await fetchSubTasksForTask(editingTask.parentTaskId, true);
                 }
             } else {
                 let targetSubgroupId = activeSubgroupId;
@@ -1072,6 +1028,7 @@ const KanbanBoard = () => {
                                     {tasksByStatus[status].map((task) => {
                                         const dueWarningText = getDueWarningText(task);
                                         const dueWarningColor = getTaskDueDateColor(task);
+                                        const subTasksCount = task.subTasksCount || 0;
                                         const currentSubTasks = subTasksCache[task.id] || [];
                                         const completedSubCount = currentSubTasks.filter(st => st.status === 2).length;
                                         const isExpanded = expandedTaskId === task.id;
@@ -1092,9 +1049,9 @@ const KanbanBoard = () => {
                                                                 {task.attachments && task.attachments.length > 0 && (
                                                                     <i className="fas fa-paperclip attachment-icon"></i>
                                                                 )}
-                                                                {currentSubTasks.length > 0 && (
+                                                                {subTasksCount > 0 && (
                                                                     <span className="subtasks-badge">
-                                                                        {completedSubCount}/{currentSubTasks.length}
+                                                                        {completedSubCount}/{subTasksCount}
                                                                     </span>
                                                                 )}
                                                             </div>
@@ -1159,7 +1116,7 @@ const KanbanBoard = () => {
                                                     </div>
 
                                                     <div className="task-card-footer">
-                                                        {currentSubTasks.length > 0 && (
+                                                        {subTasksCount > 0 && (
                                                             <button
                                                                 className="task-expand-btn"
                                                                 onClick={(e) => {
@@ -1168,7 +1125,7 @@ const KanbanBoard = () => {
                                                                 }}
                                                             >
                                                                 <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
-                                                                {currentSubTasks.length} подзадач
+                                                                {subTasksCount} подзадач
                                                             </button>
                                                         )}
                                                     </div>
@@ -1231,7 +1188,6 @@ const KanbanBoard = () => {
                 onCancel={() => setDeleteConfirm({isOpen: false, taskId: null})}
             />
 
-            {/* Контекстное меню */}
             {showContextMenu && (
                 <div
                     className="context-menu"

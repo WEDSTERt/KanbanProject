@@ -2,13 +2,15 @@ package com.service;
 
 import com.entity.*;
 import com.repository.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 
@@ -47,7 +49,6 @@ public class TaskService {
         task.setValue(value);
         task.setStatus(status != null ? status.getCode() : TaskStatus.TODO.getCode());
 
-        // Устанавливаем родительскую задачу, если указана
         if (parentTaskId != null && parentTaskId > 0) {
             Task parentTask = taskRepository.findById(parentTaskId)
                     .orElseThrow(() -> new RuntimeException("Parent task not found"));
@@ -117,9 +118,9 @@ public class TaskService {
         return taskRepository.findById(id);
     }
 
-    // НОВЫЙ МЕТОД: поиск нескольких задач по ID с подгрузкой подзадач
     @Cacheable(value = "tasksByIds", key = "#ids")
     public List<Task> findAllByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
         return taskRepository.findAllByIdsWithDetails(ids);
     }
 
@@ -128,7 +129,12 @@ public class TaskService {
         return taskRepository.findRootTasksBySubgroup(subgroupId);
     }
 
-    // Получить все задачи включая подзадачи (для Ганта и фильтрации)
+    // Пагинированная версия
+    public Page<Task> findTasksBySubgroupWithPagination(Long subgroupId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return taskRepository.findRootTasksBySubgroupWithPagination(subgroupId, pageable);
+    }
+
     public List<Task> findAllTasksBySubgroup(Long subgroupId) {
         return taskRepository.findBySubgroupId(subgroupId);
     }
@@ -142,9 +148,31 @@ public class TaskService {
         return taskRepository.findByCreatedByUserId(createdByUserId);
     }
 
-    // Получить подзадачи для задачи
     public List<Task> findSubTasks(Long parentTaskId) {
         return taskRepository.findSubTasksByParentId(parentTaskId);
+    }
+
+    // ============ ПОДСЧЕТ ПОДЗАДАЧ ============
+
+    public Integer countSubTasksByParentId(Long taskId) {
+        return taskRepository.countSubTasksByParentId(taskId);
+    }
+
+    public Map<Long, Integer> getSubTasksCountForTasks(List<Long> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        List<Object[]> results = taskRepository.countSubTasksByParentIds(taskIds);
+        Map<Long, Integer> countMap = new HashMap<>();
+        for (Object[] result : results) {
+            Long parentId = (Long) result[0];
+            Long count = (Long) result[1];
+            countMap.put(parentId, count.intValue());
+        }
+        for (Long taskId : taskIds) {
+            countMap.putIfAbsent(taskId, 0);
+        }
+        return countMap;
     }
 
     // ============ НАЗНАЧЕНИЕ ИСПОЛНИТЕЛЕЙ ============
