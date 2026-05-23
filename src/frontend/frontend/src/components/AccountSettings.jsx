@@ -1,14 +1,14 @@
 import React, {useState, useEffect} from 'react';
 import {useMutation} from '@apollo/client';
-import {UPDATE_USER, DELETE_USER, LOGIN} from '../graphql/mutations';
+import {UPDATE_USER, DELETE_USER} from '../graphql/mutations';
 import {useAuth} from '../contexts/AuthContext';
 import {useNavigate} from 'react-router-dom';
 import ConfirmModal from './ConfirmModal';
 import {validateFullName, validatePassword} from '../utils/validation';
-
+import { useApolloClient } from '@apollo/client';
 
 const AccountSettings = () => {
-    const {user, loading, login, logout} = useAuth();
+    const {user, loading, updateEmailNotifications, logout} = useAuth();
     const navigate = useNavigate();
     const [fullName, setFullName] = useState('');
     const [oldPassword, setOldPassword] = useState('');
@@ -19,23 +19,32 @@ const AccountSettings = () => {
     const [isError, setIsError] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [validationError, setValidationError] = useState('');
+    const [emailNotificationsEnabled, setEmailNotificationsEnabled] = useState(user?.emailNotificationsEnabled !== false);
+    const [notificationMessage, setNotificationMessage] = useState(null);
+    const [isNotificationUpdating, setIsNotificationUpdating] = useState(false);
+    const client = useApolloClient();
 
-    useEffect(() => {
-        if (user) setFullName(user.fullName || '');
-    }, [user]);
-
-    const [updateUser] = useMutation(UPDATE_USER);
     const [deleteUser] = useMutation(DELETE_USER, {
         onCompleted: () => {
-            logout();
-            navigate('/login');
+            client.resetStore().then(() => {
+                logout();
+                navigate('/login');
+            });
         },
         onError: (err) => {
             setMessage(err.message);
             setIsError(true);
         },
     });
-    const [checkLogin] = useMutation(LOGIN);
+
+    const [updateUser] = useMutation(UPDATE_USER);
+
+    useEffect(() => {
+        if (user) {
+            setFullName(user.fullName || '');
+            setEmailNotificationsEnabled(user.emailNotificationsEnabled !== false);
+        }
+    }, [user]);
 
     if (loading) return <div className="loading">Загрузка...</div>;
     if (!user) return null;
@@ -45,14 +54,12 @@ const AccountSettings = () => {
         setValidationError('');
         setMessage(null);
 
-        // Валидация имени
         const nameValidation = validateFullName(fullName);
         if (!nameValidation.isValid) {
             setValidationError(nameValidation.error);
             return;
         }
 
-        // Если новый пароль указан, проверяем старый
         if (newPassword) {
             const passValidation = validatePassword(newPassword);
             if (!passValidation.isValid) {
@@ -63,25 +70,17 @@ const AccountSettings = () => {
                 setValidationError('Для смены пароля введите текущий пароль');
                 return;
             }
-            // Проверяем старый пароль через логин
-            try {
-                await checkLogin({variables: {email: user.email, password: oldPassword}});
-            } catch (err) {
-                setValidationError('Неверный текущий пароль');
-                return;
-            }
         }
 
         try {
             const variables = {id: user.id, fullName: fullName.trim()};
             if (newPassword) variables.password = newPassword;
             const {data} = await updateUser({variables});
-            data.updateUser = undefined;
-            login(data.updateUser);
             setMessage('Профиль обновлён');
             setIsError(false);
             setOldPassword('');
             setNewPassword('');
+            window.location.reload();
         } catch (err) {
             setMessage(err.message);
             setIsError(true);
@@ -89,6 +88,27 @@ const AccountSettings = () => {
     };
 
     const handleDeleteAccount = () => deleteUser({variables: {id: user.id}});
+
+    const handleNotificationToggle = async () => {
+        setIsNotificationUpdating(true);
+        setNotificationMessage(null);
+        const previousState = emailNotificationsEnabled;
+        setEmailNotificationsEnabled(!previousState);
+
+        try {
+            const newValue = !previousState;
+            await updateEmailNotifications(newValue);
+            setNotificationMessage(newValue ? '✅ Email уведомления включены' : '🔕 Email уведомления отключены');
+            setTimeout(() => setNotificationMessage(null), 3000);
+        } catch (err) {
+            setEmailNotificationsEnabled(previousState);
+            setNotificationMessage(err.message);
+            setIsError(true);
+            setTimeout(() => setNotificationMessage(null), 3000);
+        } finally {
+            setIsNotificationUpdating(false);
+        }
+    };
 
     return (
         <div className="account-settings-container">
@@ -109,8 +129,7 @@ const AccountSettings = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label" htmlFor="account-old-password">Текущий пароль (обязателен для
-                            смены пароля)</label>
+                        <label className="form-label" htmlFor="account-old-password">Текущий пароль (обязателен для смены пароля)</label>
                         <div className="password-row">
                             <input
                                 className="form-input"
@@ -131,8 +150,7 @@ const AccountSettings = () => {
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label" htmlFor="account-new-password">Новый пароль (оставьте пустым,
-                            чтобы не менять)</label>
+                        <label className="form-label" htmlFor="account-new-password">Новый пароль (оставьте пустым, чтобы не менять)</label>
                         <div className="password-row">
                             <input
                                 className="form-input"
@@ -152,8 +170,60 @@ const AccountSettings = () => {
                         </div>
                     </div>
 
+                    {/* Переключатель email уведомлений - ВСЁ В ОДНОЙ СТРОКЕ */}
+                    <div className="form-group">
+                        <div style={{
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            width: '100%'
+                        }}>
+                            <div>
+                                <div style={{ fontWeight: '500', marginBottom: '4px', fontSize: '14px' }}>
+                                    <i className="fas fa-envelope"></i> Email уведомления
+                                </div>
+                                <div style={{ fontSize: '0.8rem', color: '#64748b' }}>
+                                    Получать уведомления о новых задачах, изменениях и назначениях на почту
+                                </div>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={handleNotificationToggle}
+                                disabled={isNotificationUpdating}
+                                style={{
+                                    width: '52px',
+                                    height: '28px',
+                                    borderRadius: '28px',
+                                    backgroundColor: emailNotificationsEnabled ? '#22c55e' : '#cbd5e1',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    position: 'relative',
+                                    transition: 'all 0.2s',
+                                    flexShrink: 0,
+                                    marginLeft: '16px'
+                                }}
+                            >
+                                <span style={{
+                                    position: 'absolute',
+                                    top: '3px',
+                                    left: emailNotificationsEnabled ? '27px' : '3px',
+                                    width: '22px',
+                                    height: '22px',
+                                    borderRadius: '50%',
+                                    backgroundColor: 'white',
+                                    transition: 'left 0.2s'
+                                }} />
+                            </button>
+                        </div>
+                    </div>
+
                     {validationError && <div className="message-error">{validationError}</div>}
                     {message && <div className={isError ? 'message-error' : 'message-success'}>{message}</div>}
+                    {notificationMessage && (
+                        <div className={notificationMessage.includes('✅') || notificationMessage.includes('включены') ? 'message-success' : 'message-error'}>
+                            {notificationMessage}
+                        </div>
+                    )}
 
                     <div className="form-actions">
                         <button type="submit" className="btn">Сохранить изменения</button>
@@ -163,6 +233,7 @@ const AccountSettings = () => {
                     </div>
                 </form>
             </div>
+
             <ConfirmModal
                 isOpen={showDeleteConfirm}
                 title="Удаление аккаунта"

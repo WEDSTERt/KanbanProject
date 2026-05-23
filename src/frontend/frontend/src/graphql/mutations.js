@@ -236,20 +236,33 @@ export const LOGIN = gql`
                 id
                 fullName
                 email
+                emailVerified
             }
         }
     }
 `;
 
+// ОБНОВЛЕННЫЙ REGISTER С TURNSTILE TOKEN
 export const REGISTER = gql`
-    mutation CreateUser($fullName: String!, $email: String!, $password: String!) {
-        createUser(fullName: $fullName, email: $email, password: $password) {
+    mutation CreateUser($fullName: String!, $email: String!, $password: String!, $turnstileToken: String!) {
+        createUser(fullName: $fullName, email: $email, password: $password, turnstileToken: $turnstileToken) {
             token
             user {
                 id
                 fullName
                 email
+                emailVerified
             }
+        }
+    }
+`;
+export const UPDATE_EMAIL_NOTIFICATIONS = gql`
+    mutation UpdateEmailNotifications($emailNotificationsEnabled: Boolean!) {
+        updateEmailNotifications(emailNotificationsEnabled: $emailNotificationsEnabled) {
+            id
+            fullName
+            email
+            emailNotificationsEnabled
         }
     }
 `;

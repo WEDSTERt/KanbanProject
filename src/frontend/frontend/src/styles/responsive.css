@@ -1,52 +1,109 @@
-/* Медиа-запросы */
-@media (max-width: 768px) {
-    body {
-        padding: 10px;
+/* Медиа-запросы для мобильных устройств */
+
+/* Планшеты и маленькие ноутбуки */
+@media (max-width: 1024px) {
+    .kanban-board {
+        flex-wrap: wrap;
     }
 
+    .kanban-column {
+        min-width: calc(50% - 10px);
+        max-width: calc(50% - 10px);
+    }
+}
+
+/* Мобильные телефоны (до 768px) */
+@media (max-width: 768px) {
+    body {
+        padding: 8px;
+        font-size: 14px;
+    }
+
+    /* Шапка */
     .app-navbar {
-        flex-wrap: wrap;
-        padding: 8px 12px;
-        gap: 8px;
-        border-radius: 32px;
+        flex-direction: column;
+        padding: 12px 16px;
+        border-radius: 20px;
+        gap: 12px;
         margin-bottom: 16px;
     }
 
     .app-logo {
-        font-size: 1rem;
-        flex: 1;
+        font-size: 1.3rem;
+        text-align: center;
     }
 
     .app-nav-links {
+        width: 100%;
+        justify-content: space-around;
         gap: 8px;
         flex-wrap: wrap;
-        justify-content: flex-end;
     }
 
-    .app-nav-links a {
-        font-size: 0.85rem;
-        padding: 4px 0;
-    }
-
+    .app-nav-links a,
     .app-user-info {
-        font-size: 0.75rem;
-        padding: 4px 8px;
-    }
-
-    .btn {
+        font-size: 0.8rem;
         padding: 6px 12px;
-        font-size: 0.85rem;
     }
 
-    .btn--small {
-        padding: 4px 8px;
-        font-size: 0.75rem;
-    }
-
+    /* Карточки */
     .card {
         padding: 16px;
+        border-radius: 20px;
+        margin-bottom: 16px;
     }
 
+    .card h2 {
+        font-size: 1.3rem;
+        margin-bottom: 16px;
+    }
+
+    /* Формы */
+    .form-group {
+        margin-bottom: 16px;
+    }
+
+    .form-label {
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+        padding: 10px 14px;
+        font-size: 16px;
+        border-radius: 14px;
+    }
+
+    /* Кнопки */
+    .btn {
+        padding: 10px 16px;
+        font-size: 0.9rem;
+        border-radius: 40px;
+        width: 100%;
+        text-align: center;
+        justify-content: center;
+    }
+
+    .flex-row {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .flex-row .btn {
+        width: 100%;
+    }
+
+    /* Кнопка-иконка (настройки группы) */
+    .btn--small,
+    .groups-settings-btn {
+        width: auto;
+        min-width: 32px;
+        padding: 6px 12px;
+    }
+
+    /* Проекты */
     .grid-2 {
         grid-template-columns: 1fr;
         gap: 16px;
@@ -63,208 +120,450 @@
     .project-card .flex-row {
         flex-direction: column;
         align-items: stretch;
-        gap: 8px;
     }
 
     .project-card .flex-row button {
         width: 100%;
-        justify-content: center;
-        font-size: 1rem;
-        padding: 8px 12px;
     }
 
+    /* Канбан доска */
     .kanban-layout {
         flex-direction: column;
     }
 
     .groups-panel {
-        display: none;
+        width: 100%;
+        margin-right: 0;
+        margin-bottom: 16px;
+        padding: 12px;
+        border-radius: 20px;
+    }
+
+    .groups-header h3 {
+        font-size: 1rem;
+    }
+
+    .groups-item {
+        padding: 8px 12px;
+        font-size: 0.85rem;
     }
 
     .kanban-container {
         overflow-x: visible;
     }
 
-    .kanban-board {
-        display: flex;
-        flex-direction: column;
-        gap: 20px;
-        width: 100%;
-    }
-
-    .kanban-column {
-        width: 100%;
-        max-width: 100%;
-        min-width: auto;
-    }
-
     .kanban-header-row {
         flex-direction: column;
         align-items: stretch;
+        gap: 12px;
+    }
+
+    .kanban-title-area {
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .kanban-title {
+        font-size: 1.3rem;
     }
 
     .kanban-controls-row {
         flex-direction: column;
         align-items: stretch;
+        gap: 12px;
     }
 
     .kanban-sort-panel {
-        justify-content: center;
+        justify-content: flex-start;
+        overflow-x: auto;
+        flex-wrap: nowrap;
+        padding: 6px 12px;
+        -webkit-overflow-scrolling: touch;
     }
 
-    .kanban-title-area {
+    .sort-btn {
+        white-space: nowrap;
+        font-size: 0.75rem;
+        padding: 4px 10px;
+    }
+
+    .kanban-filter-panel {
         justify-content: space-between;
     }
 
-    .kanban-title {
-        font-size: 1.4rem;
+    .filter-toggle-btn {
+        font-size: 0.85rem;
+        padding: 8px 14px;
     }
 
-    .modal-content {
-        width: 95%;
-        max-height: 90vh;
-        overflow-y: auto;
-        overflow-x: hidden;
-        padding: 16px;
-        word-break: break-word;
+    /* Канбан колонки */
+    .kanban-board {
+        flex-direction: column;
+        gap: 16px;
     }
 
-    .task-view-modal {
-        min-width: 90vw;
-        max-width: 95vw;
+    .kanban-column {
+        min-width: 100%;
+        max-width: 100%;
+        padding: 12px;
+        border-radius: 20px;
     }
 
-    .modal-close {
-        top: 12px;
-        right: 12px;
+    .kanban-column-header h3 {
+        font-size: 1rem;
     }
 
-    .form-input,
-    .form-select,
-    .form-textarea {
-        padding: 8px 12px;
+    .kanban-task-list {
+        gap: 10px;
     }
 
-    .assignees-checkbox-list {
-        max-height: 150px;
-        overflow-x: hidden;
-    }
-
+    /* Карточки задач */
     .task-card {
         padding: 10px;
     }
 
     .task-title {
-        font-size: 0.9rem;
+        font-size: 0.85rem;
     }
 
     .task-bottom-row {
         flex-direction: row;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 6px;
     }
 
     .task-priority {
-        order: 1;
+        font-size: 0.65rem;
+        padding: 2px 6px;
     }
 
     .task-date {
-        order: 2;
-        font-size: 0.65rem;
+        font-size: 0.6rem;
+        padding: 2px 5px;
     }
 
-    .account-settings-card {
-        font-size: 0.9rem;
+    .task-assignees {
+        gap: 4px;
+        margin-top: 8px;
     }
 
-    .account-settings-card .form-label {
-        font-size: 0.85rem;
+    .assignee-name {
+        font-size: 0.6rem;
+        padding: 2px 6px;
     }
 
-    .account-settings-card .form-input {
-        font-size: 0.9rem;
+    /* Подзадачи */
+    .task-card.subtask-card {
+        padding: 6px 8px;
+    }
+
+    .subtask-title {
+        font-size: 0.75rem !important;
+    }
+
+    .subtask-status-badge {
+        font-size: 0.45rem;
+        padding: 1px 4px;
+    }
+
+    .subtask-priority {
+        font-size: 0.55rem;
+    }
+
+    .subtask-date {
+        font-size: 0.55rem;
+    }
+
+    /* Модальные окна */
+    .modal-content {
+        width: 95%;
+        max-width: 95%;
+        padding: 16px;
+        max-height: 85vh;
+        border-radius: 20px;
+    }
+
+    .modal-content h3 {
+        font-size: 1.2rem;
+        margin-bottom: 12px;
+    }
+
+    .modal-close {
+        top: 12px;
+        right: 12px;
+        font-size: 1rem;
+    }
+
+    .modal-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .modal-actions .btn {
+        width: 100%;
+    }
+
+    /* Окно просмотра задачи */
+    .task-view-modal {
+        min-width: auto;
+        width: 95%;
+    }
+
+    .task-timestamps {
+        flex-direction: column;
+        gap: 6px;
         padding: 8px 10px;
+        font-size: 0.7rem;
     }
 
     .task-description-view {
         max-height: 150px;
+        font-size: 0.85rem;
     }
 
-    .account-settings-container {
-        min-height: auto;
-        padding: 10px;
-    }
-
-    .sort-btn {
-        padding: 4px 8px;
-        font-size: 0.7rem;
-    }
-
-    .sort-label {
-        font-size: 0.7rem;
-    }
-
-    .task-date-group {
-        flex-direction: column;
-        align-items: flex-end;
-        gap: 4px;
-    }
-
-    .filter-badge {
-        font-size: 0.7rem;
-        padding: 3px 6px 3px 10px;
-    }
-
-    .tasks-count {
-        font-size: 0.7rem;
-    }
-
+    /* Фильтры */
     .filter-modal {
         min-width: 90%;
         max-width: 95%;
     }
 
+    .filter-modal-body {
+        max-height: 50vh;
+    }
+
+    .filter-section-title {
+        font-size: 0.8rem;
+    }
+
+    .filter-option span {
+        font-size: 0.8rem;
+    }
+
     .date-range-row {
         flex-direction: row;
-        gap: 6px;
+        gap: 8px;
     }
 
     .date-field .form-input {
         font-size: 0.8rem;
         padding: 8px 10px;
     }
-}
 
-@media (max-width: 480px) {
-    .app-navbar {
-        flex-direction: column;
-        align-items: stretch;
+    /* Выбор даты */
+    .react-datepicker {
+        font-size: 0.8rem;
+    }
+
+    .react-datepicker__input-container input {
+        font-size: 0.85rem;
+        padding: 8px 12px;
+    }
+
+    /* Чекбоксы исполнителей */
+    .assignees-checkbox-list {
+        max-height: 150px;
+    }
+
+    .assignees-checkbox-label {
+        font-size: 0.8rem;
+    }
+
+    /* Контекстное меню */
+    .context-menu {
+        position: fixed !important;
+        bottom: 20px !important;
+        top: auto !important;
+        left: 50% !important;
+        transform: translateX(-50%);
+        width: 90%;
+        max-width: 320px;
         border-radius: 20px;
     }
 
-    .app-logo {
-        text-align: center;
-        margin-bottom: 4px;
+    /* Настройки аккаунта */
+    .account-settings-container {
+        padding: 8px;
+        min-height: auto;
     }
 
-    .app-nav-links {
-        justify-content: center;
+    .account-settings-card {
+        padding: 16px;
     }
 
-    .app-nav-links a,
-    .app-user-info,
-    .btn--small {
-        font-size: 0.7rem;
+    .form-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .form-actions button {
+        width: 100%;
+    }
+
+    /* Настройки проекта */
+    .project-settings-container {
+        padding: 8px;
+    }
+
+    .member-item {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 8px;
+        padding: 10px 0;
+    }
+
+    .member-item .flex-row {
+        flex-direction: row;
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .member-item select {
+        width: auto;
+        flex: 1;
+    }
+
+    /* Группы на мобильных */
+    .mobile-groups-modal .groups-panel {
+        width: 85%;
+        max-width: 300px;
+    }
+
+    /* Turnstile виджет */
+    .turnstile-container {
+        transform: scale(0.85);
+        margin: -5px 0;
     }
 }
 
-@media (max-width: 900px) {
-    .kanban-column {
-        min-width: 220px;
+/* Маленькие телефоны (до 480px) */
+@media (max-width: 480px) {
+    body {
+        padding: 6px;
     }
 
+    .app-navbar {
+        padding: 10px 12px;
+        border-radius: 16px;
+    }
+
+    .app-logo {
+        font-size: 1.1rem;
+    }
+
+    .app-nav-links a,
+    .app-user-info {
+        font-size: 0.7rem;
+        padding: 4px 8px;
+    }
+
+    .card {
+        padding: 12px;
+        border-radius: 16px;
+    }
+
+    .card h2 {
+        font-size: 1.1rem;
+    }
+
+    .form-input,
+    .form-select,
+    .form-textarea {
+        padding: 8px 12px;
+        font-size: 14px;
+    }
+
+    .btn {
+        padding: 8px 14px;
+        font-size: 0.85rem;
+    }
+
+    .kanban-title {
+        font-size: 1.1rem;
+    }
+
+    .groups-item {
+        padding: 6px 10px;
+        font-size: 0.8rem;
+    }
+
+    .task-title {
+        font-size: 0.8rem;
+    }
+
+    .task-priority {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+
+    .task-date {
+        font-size: 0.55rem;
+    }
+
+    .task-expand-btn {
+        font-size: 0.6rem;
+        padding: 2px 6px;
+    }
+
+    .modal-content {
+        padding: 12px;
+        border-radius: 16px;
+    }
+
+    .modal-content h3 {
+        font-size: 1rem;
+    }
+
+    .subtasks-list {
+        max-height: 200px;
+    }
+
+    .subtask-item {
+        font-size: 0.75rem;
+    }
+}
+
+/* Горизонтальная ориентация на телефонах */
+@media (max-width: 768px) and (orientation: landscape) {
     .kanban-board {
+        flex-direction: row;
+        overflow-x: auto;
         gap: 12px;
+    }
+
+    .kanban-column {
+        min-width: 280px;
+        max-width: 280px;
+    }
+
+    .modal-content {
+        max-height: 70vh;
+    }
+}
+
+/* Улучшение для касаний на мобильных */
+@media (max-width: 768px) {
+    button,
+    .btn,
+    .groups-item,
+    .task-card,
+    .modal-close,
+    .password-toggle {
+        cursor: pointer;
+        min-height: 44px;
+    }
+
+    button:active,
+    .btn:active,
+    .groups-item:active,
+    .task-card:active {
+        opacity: 0.7;
+        transform: scale(0.98);
+    }
+
+    input,
+    select,
+    textarea {
+        font-size: 16px;
     }
 }

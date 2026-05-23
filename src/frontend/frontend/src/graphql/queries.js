@@ -132,6 +132,8 @@ export const GET_CURRENT_USER = gql`
             id
             fullName
             email
+            emailVerified
+            emailNotificationsEnabled
         }
     }
 `;

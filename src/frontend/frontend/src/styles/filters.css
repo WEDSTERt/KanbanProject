@@ -43,6 +43,7 @@
     font-size: 0.8rem;
     color: #64748b;
     font-weight: 500;
+    flex-shrink: 0;
 }
 
 .sort-label i {
@@ -61,6 +62,7 @@
     align-items: center;
     gap: 6px;
     color: #334155;
+    white-space: nowrap;
 }
 
 .sort-btn:hover {
@@ -271,4 +273,76 @@
     height: 1px;
     background: #e2e8f0;
     margin: 16px 0;
+}
+
+/* Мобильная версия панели сортировки */
+@media (max-width: 768px) {
+    .kanban-sort-panel {
+        display: flex;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overflow-y: hidden;
+        gap: 8px;
+        padding: 8px 12px;
+        border-radius: 30px;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+        white-space: nowrap;
+    }
+
+    .kanban-sort-panel::-webkit-scrollbar {
+        height: 3px;
+    }
+
+    .kanban-sort-panel::-webkit-scrollbar-track {
+        background: #e2e8f0;
+        border-radius: 10px;
+    }
+
+    .kanban-sort-panel::-webkit-scrollbar-thumb {
+        background: #94a3b8;
+        border-radius: 10px;
+    }
+
+    .sort-label {
+        font-size: 0.7rem;
+        position: sticky;
+        left: 0;
+        background: #f8fafc;
+        padding-right: 8px;
+        z-index: 1;
+    }
+
+    .sort-btn {
+        font-size: 0.7rem;
+        padding: 4px 10px;
+        white-space: nowrap;
+        flex-shrink: 0;
+    }
+
+    .filter-modal {
+        min-width: 90%;
+        max-width: 95%;
+    }
+}
+
+/* Для очень маленьких экранов */
+@media (max-width: 480px) {
+    .kanban-sort-panel {
+        gap: 6px;
+        padding: 6px 10px;
+    }
+
+    .sort-label {
+        font-size: 0.65rem;
+    }
+
+    .sort-btn {
+        font-size: 0.65rem;
+        padding: 3px 8px;
+    }
+
+    .sort-btn i {
+        font-size: 0.7rem;
+    }
 }

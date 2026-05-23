@@ -94,3 +94,29 @@
 .form-actions button {
     flex: 1;
 }
+/* Бейдж успешной проверки Turnstile */
+.turnstile-verified-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    border-radius: 40px;
+    color: #166534;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid #22c55e;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.turnstile-verified-badge i {
+    font-size: 1rem;
+    color: #22c55e;
+}
+
+.turnstile-verified-badge span {
+    font-size: 0.85rem;
+}
