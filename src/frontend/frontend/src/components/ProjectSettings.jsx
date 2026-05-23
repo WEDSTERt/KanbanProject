@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useState, useEffect} from 'react';
 import {useNavigate, useSearchParams} from 'react-router-dom';
 import {useQuery, useMutation, useApolloClient} from '@apollo/client';
 import {GET_PROJECT_DETAILS, GET_USER_PROJECTS, GET_USERS} from '../graphql/queries';
@@ -12,6 +12,7 @@ import {
     SET_TASK_ASSIGNEES,
     REMOVE_SUBGROUP_MEMBER,
     UPDATE_TASK,
+    UPDATE_PROJECT_NOTIFICATIONS,
 } from '../graphql/mutations';
 import {useAuth} from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
@@ -30,6 +31,8 @@ const ProjectSettings = () => {
     const [deleteConfirm, setDeleteConfirm] = useState({isOpen: false, memberId: null, isProject: false});
     const [renameModalOpen, setRenameModalOpen] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
+    const [projectNotificationsEnabled, setProjectNotificationsEnabled] = useState(true);
+    const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
 
     const {loading, error, data, refetch} = useQuery(GET_PROJECT_DETAILS, {variables: {projectId}});
     const {data: usersData} = useQuery(GET_USERS, {variables: {limit: 100}});
@@ -45,6 +48,16 @@ const ProjectSettings = () => {
         onCompleted: () => navigate('/'),
         refetchQueries: [{query: GET_USER_PROJECTS, variables: {userId: user.id}}],
     });
+    const [updateProjectNotifications] = useMutation(UPDATE_PROJECT_NOTIFICATIONS);
+
+    useEffect(() => {
+        if (data?.project) {
+            const currentMember = data.project.members.find(m => m.userId === user.id);
+            if (currentMember) {
+                setProjectNotificationsEnabled(currentMember.notificationsEnabled !== false);
+            }
+        }
+    }, [data, user.id]);
 
     if (loading) return <div className="loading">Загрузка настроек проекта...</div>;
     if (error) return <div className="message-error">{error.message}</div>;
@@ -53,8 +66,14 @@ const ProjectSettings = () => {
     const project = data.project;
     const isOwner = project.owner.id === user.id;
     const currentMember = project.members.find(m => m.userId === user.id);
-    const canManage = isOwner || currentMember?.role === 'ADMIN' || currentMember?.role === 'OWNER';
-    if (!canManage) return <div className="message-error">У вас нет прав на управление этим проектом.</div>;
+    const isAdmin = isOwner || currentMember?.role === 'ADMIN' || currentMember?.role === 'OWNER';
+    const isMember = currentMember?.role === 'MEMBER';
+    const canManage = isAdmin; // Только админы могут управлять проектом
+    const canViewSettings = isAdmin || isMember; // Все участники могут открыть настройки
+
+    if (!canViewSettings) {
+        return <div className="message-error">У вас нет доступа к настройкам этого проекта.</div>;
+    }
 
     const handleUpdateName = async () => {
         if (!newProjectName.trim()) return;
@@ -72,6 +91,12 @@ const ProjectSettings = () => {
     };
 
     const handleRoleChange = async (memberId, newRole) => {
+        if (!isAdmin) {
+            setMessage('У вас нет прав на изменение ролей');
+            setIsError(true);
+            return;
+        }
+
         const member = project.members.find(m => m.id === memberId);
         if (!member) return;
         if (member.userId === project.owner.id) {
@@ -133,7 +158,6 @@ const ProjectSettings = () => {
                     }
                 }
 
-                // Сбрасываем кэш Apollo для обновления данных на доске
                 client.cache.evict({fieldName: 'tasksBySubgroup'});
                 client.cache.evict({fieldName: 'tasksByAssignee'});
                 client.cache.gc();
@@ -160,7 +184,15 @@ const ProjectSettings = () => {
         }
     };
 
-    const handleRemoveMember = (memberId) => setDeleteConfirm({isOpen: true, memberId, isProject: false});
+    const handleRemoveMember = (memberId) => {
+        if (!isAdmin) {
+            setMessage('У вас нет прав на удаление участников');
+            setIsError(true);
+            return;
+        }
+        setDeleteConfirm({isOpen: true, memberId, isProject: false});
+    };
+
     const confirmRemoveMember = async () => {
         const member = project.members.find(m => m.id === deleteConfirm.memberId);
         if (member?.role === 'OWNER') {
@@ -178,6 +210,12 @@ const ProjectSettings = () => {
 
     const handleAddMember = async (e) => {
         e.preventDefault();
+        if (!isAdmin) {
+            setMessage('У вас нет прав на добавление участников');
+            setIsError(true);
+            return;
+        }
+
         setSearchError('');
         if (!newMemberEmail.trim()) return;
         const allUsers = usersData?.users || [];
@@ -202,88 +240,191 @@ const ProjectSettings = () => {
         }
     };
 
-    const handleDeleteProject = () => setDeleteConfirm({isOpen: true, isProject: true});
+    const handleDeleteProject = () => {
+        if (!isAdmin) {
+            setMessage('У вас нет прав на удаление проекта');
+            setIsError(true);
+            return;
+        }
+        setDeleteConfirm({isOpen: true, isProject: true});
+    };
+
     const confirmDeleteProject = async () => {
         await deleteProject({variables: {id: projectId}});
         setDeleteConfirm({isOpen: false, isProject: false});
     };
 
     const openRenameModal = () => {
+        if (!isAdmin) {
+            setMessage('У вас нет прав на переименование проекта');
+            setIsError(true);
+            return;
+        }
         setNewProjectName(project.name);
         setRenameModalOpen(true);
+    };
+
+    const handleNotificationToggle = async () => {
+        setIsUpdatingNotifications(true);
+        const previousState = projectNotificationsEnabled;
+        setProjectNotificationsEnabled(!previousState);
+
+        try {
+            await updateProjectNotifications({
+                variables: {
+                    projectId: projectId,
+                    notificationsEnabled: !previousState
+                }
+            });
+            setMessage(!previousState ? 'Уведомления для проекта включены' : 'Уведомления для проекта отключены');
+            setIsError(false);
+            setTimeout(() => setMessage(null), 3000);
+        } catch (err) {
+            setProjectNotificationsEnabled(previousState);
+            setMessage(err.message);
+            setIsError(true);
+        } finally {
+            setIsUpdatingNotifications(false);
+        }
     };
 
     return (
         <div style={{position: 'relative'}}>
             <button className="modal-close--settings" onClick={() => navigate(-1)}>✕</button>
             <h2><i className="fas fa-cog"></i> Настройки проекта</h2>
+
             <div className="card">
-                <h3><i className="fas fa-pen"></i> Основное</h3>
+                {/* Блок уведомлений - виден ВСЕМ участникам */}
+                <h3><i className="fas fa-bell"></i> Уведомления</h3>
                 <div className="form-group">
-                    <label className="form-label" htmlFor="project-name">Название проекта</label>
-                    <input className="form-input" type="text" id="project-name" value={project.name} readOnly/>
-                </div>
-                <button className="btn btn--secondary" onClick={openRenameModal}>
-                    <i className="fas fa-edit"></i> Изменить название
-                </button>
-
-                <div className="divider"/>
-
-                <h3><i className="fas fa-users"></i> Участники</h3>
-                <div>
-                    {project.members.map((m) => (
-                        <div key={m.id} className="flex-row"
-                             style={{justifyContent: 'space-between', marginBottom: 12}}>
-                            <span><strong>{m.user.fullName}</strong> ({m.user.email}) <span
-                                className="badge-role">{m.role}</span></span>
-                            <div className="flex-row">
-                                <select
-                                    className="form-select"
-                                    id={`role-select-${m.id}`}
-                                    value={m.role}
-                                    onChange={(e) => handleRoleChange(m.id, e.target.value)}
-                                    style={{width: 'auto'}}
-                                    disabled={m.userId === project.owner.id || m.role === 'OWNER'}
-                                >
-                                    <option value="ADMIN">Админ</option>
-                                    <option value="MEMBER">Участник</option>
-                                    <option value="VIEWER">Наблюдатель</option>
-                                </select>
-                                <button
-                                    className="btn btn--danger btn--small"
-                                    onClick={() => handleRemoveMember(m.id)}
-                                    disabled={m.userId === project.owner.id || m.role === 'OWNER'}
-                                >
-                                    <i className="fas fa-user-minus"></i> Удалить
-                                </button>
-                            </div>
+                    <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                            <label className="form-label" style={{ marginBottom: '4px' }}>
+                                <i className="fas fa-envelope"></i> Email уведомления по проекту
+                            </label>
+                            <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0 }}>
+                                Получать уведомления о задачах, изменениях и назначениях в этом проекте
+                            </p>
+                            <p style={{ fontSize: '0.7rem', color: '#64748b', marginTop: '4px' }}>
+                                <i className="fas fa-info-circle"></i> Отключение здесь переопределяет глобальные настройки
+                            </p>
                         </div>
-                    ))}
-                </div>
-                <form onSubmit={handleAddMember} className="mt-4">
-                    <div className="form-group">
-                        <label className="form-label" htmlFor="new-member-email">Добавить участника по email</label>
-                        <div className="flex-row">
-                            <input className="form-input" type="email" id="new-member-email" value={newMemberEmail}
-                                   onChange={(e) => setNewMemberEmail(e.target.value)} placeholder="Email пользователя"
-                                   style={{flex: 2}}/>
-                            <select className="form-select" id="new-member-role" value={newMemberRole}
-                                    onChange={(e) => setNewMemberRole(e.target.value)} style={{flex: 1}}>
-                                <option value="ADMIN">Админ</option>
-                                <option value="MEMBER">Участник</option>
-                                <option value="VIEWER">Наблюдатель</option>
-                            </select>
-                            <button type="submit" className="btn">
-                                <i className="fas fa-user-plus"></i> Добавить
-                            </button>
-                        </div>
-                        {searchError && <div className="message-error" style={{marginTop: '8px'}}>{searchError}</div>}
+                        <button
+                            type="button"
+                            onClick={handleNotificationToggle}
+                            disabled={isUpdatingNotifications}
+                            style={{
+                                width: '52px',
+                                height: '28px',
+                                borderRadius: '28px',
+                                backgroundColor: projectNotificationsEnabled ? '#22c55e' : '#cbd5e1',
+                                border: 'none',
+                                cursor: 'pointer',
+                                position: 'relative',
+                                transition: 'all 0.2s',
+                                flexShrink: 0
+                            }}
+                        >
+                            <span style={{
+                                position: 'absolute',
+                                top: '3px',
+                                left: projectNotificationsEnabled ? '27px' : '3px',
+                                width: '22px',
+                                height: '22px',
+                                borderRadius: '50%',
+                                backgroundColor: 'white',
+                                transition: 'left 0.2s'
+                            }} />
+                        </button>
                     </div>
-                </form>
-                <div className="divider"/>
-                <button className="btn btn--danger" onClick={handleDeleteProject}>
-                    <i className="fas fa-trash-alt"></i> Удалить проект
-                </button>
+                </div>
+
+                {/* Админская часть - видна только админам и владельцу */}
+                {isAdmin && (
+                    <>
+                        <div className="divider"/>
+
+                        <h3><i className="fas fa-pen"></i> Основное</h3>
+                        <div className="form-group">
+                            <label className="form-label" htmlFor="project-name">Название проекта</label>
+                            <input className="form-input" type="text" id="project-name" value={project.name} readOnly/>
+                        </div>
+                        <button className="btn btn--secondary" onClick={openRenameModal}>
+                            <i className="fas fa-edit"></i> Изменить название
+                        </button>
+
+                        <div className="divider"/>
+
+                        <h3><i className="fas fa-users"></i> Участники</h3>
+                        <div>
+                            {project.members.map((m) => (
+                                <div key={m.id} className="flex-row"
+                                     style={{justifyContent: 'space-between', marginBottom: 12}}>
+                                    <span>
+                                        <strong>{m.user.fullName}</strong> ({m.user.email})
+                                        <span className="badge-role">{m.role}</span>
+                                        {m.userId === user.id && <span className="badge-role" style={{background: '#22c55e', color: 'white'}}>Вы</span>}
+                                    </span>
+                                    <div className="flex-row">
+                                        <select
+                                            className="form-select"
+                                            id={`role-select-${m.id}`}
+                                            value={m.role}
+                                            onChange={(e) => handleRoleChange(m.id, e.target.value)}
+                                            style={{width: 'auto'}}
+                                            disabled={m.userId === project.owner.id || m.role === 'OWNER' || m.userId === user.id}
+                                        >
+                                            <option value="ADMIN">Админ</option>
+                                            <option value="MEMBER">Участник</option>
+                                            <option value="VIEWER">Наблюдатель</option>
+                                        </select>
+                                        <button
+                                            className="btn btn--danger btn--small"
+                                            onClick={() => handleRemoveMember(m.id)}
+                                            disabled={m.userId === project.owner.id || m.role === 'OWNER' || m.userId === user.id}
+                                        >
+                                            <i className="fas fa-user-minus"></i> Удалить
+                                        </button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                        <form onSubmit={handleAddMember} className="mt-4">
+                            <div className="form-group">
+                                <label className="form-label" htmlFor="new-member-email">Добавить участника по email</label>
+                                <div className="flex-row">
+                                    <input className="form-input" type="email" id="new-member-email" value={newMemberEmail}
+                                           onChange={(e) => setNewMemberEmail(e.target.value)} placeholder="Email пользователя"
+                                           style={{flex: 2}}/>
+                                    <select className="form-select" id="new-member-role" value={newMemberRole}
+                                            onChange={(e) => setNewMemberRole(e.target.value)} style={{flex: 1}}>
+                                        <option value="ADMIN">Админ</option>
+                                        <option value="MEMBER">Участник</option>
+                                        <option value="VIEWER">Наблюдатель</option>
+                                    </select>
+                                    <button type="submit" className="btn">
+                                        <i className="fas fa-user-plus"></i> Добавить
+                                    </button>
+                                </div>
+                                {searchError && <div className="message-error" style={{marginTop: '8px'}}>{searchError}</div>}
+                            </div>
+                        </form>
+
+                        <div className="divider"/>
+
+                        <button className="btn btn--danger" onClick={handleDeleteProject}>
+                            <i className="fas fa-trash-alt"></i> Удалить проект
+                        </button>
+                    </>
+                )}
+
+                {/* Информация для обычных участников */}
+                {!isAdmin && isMember && (
+                    <div className="info-message" style={{marginTop: '20px', padding: '16px', background: '#f0fdf4', borderRadius: '12px', color: '#166534'}}>
+                        <i className="fas fa-info-circle"></i> Вы участник проекта. Для управления проектом обратитесь к администратору.
+                    </div>
+                )}
+
                 {message && <div className={`mt-4 ${isError ? 'message-error' : 'message-success'}`}>{message}</div>}
             </div>
 

@@ -266,3 +266,11 @@ export const UPDATE_EMAIL_NOTIFICATIONS = gql`
         }
     }
 `;
+export const UPDATE_PROJECT_NOTIFICATIONS = gql`
+    mutation UpdateProjectNotifications($projectId: ID!, $notificationsEnabled: Boolean!) {
+        updateProjectNotifications(projectId: $projectId, notificationsEnabled: $notificationsEnabled) {
+            id
+            notificationsEnabled
+        }
+    }
+`;

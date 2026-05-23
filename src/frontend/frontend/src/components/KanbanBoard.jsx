@@ -16,6 +16,7 @@ const KanbanBoard = () => {
     const [searchParams, setSearchParams] = useSearchParams();
     const projectId = searchParams.get('projectId');
     const urlSubgroupId = searchParams.get('subgroupId');
+    const highlightTaskId = searchParams.get('highlightTask');
     const {user} = useAuth();
     const client = useApolloClient();
 
@@ -28,6 +29,7 @@ const KanbanBoard = () => {
     const [showMobileGroups, setShowMobileGroups] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
     const [viewMode, setViewMode] = useState('kanban');
+    const [highlightedTask, setHighlightedTask] = useState(null);
 
     // Состояния для подзадач на карточках
     const [expandedTaskId, setExpandedTaskId] = useState(null);
@@ -59,6 +61,27 @@ const KanbanBoard = () => {
     const [updateTask] = useMutation(UPDATE_TASK);
     const [deleteTask] = useMutation(DELETE_TASK);
     const [setTaskAssignees] = useMutation(SET_TASK_ASSIGNEES);
+
+    // Эффект для подсветки задачи
+    useEffect(() => {
+        if (highlightTaskId) {
+            setHighlightedTask(highlightTaskId);
+            const timer = setTimeout(() => {
+                setHighlightedTask(null);
+                searchParams.delete('highlightTask');
+                setSearchParams(searchParams);
+            }, 5000);
+
+            setTimeout(() => {
+                const taskElement = document.getElementById(`task-${highlightTaskId}`);
+                if (taskElement) {
+                    taskElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            }, 500);
+
+            return () => clearTimeout(timer);
+        }
+    }, [highlightTaskId, searchParams, setSearchParams]);
 
     useEffect(() => {
         if (!projectId) navigate('/');
@@ -106,7 +129,6 @@ const KanbanBoard = () => {
         }
     }, [activeSubgroupId, refetchMyTasks, refetchTasks]);
 
-    // Сохранение задач в кэш при загрузке
     useEffect(() => {
         if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
             setCachedTasks(prev => ({ ...prev, [activeSubgroupId]: myTasksData.tasksByAssigneeAndProject }));
@@ -115,7 +137,6 @@ const KanbanBoard = () => {
         }
     }, [tasksData, myTasksData, activeSubgroupId]);
 
-    // ЗАГРУЗКА ПОДЗАДАЧ ДЛЯ ОДНОЙ ЗАДАЧИ (при раскрытии)
     const fetchSubTasksForTask = useCallback(async (taskId, force = false) => {
         if (!force && subTasksCache[taskId]) return;
 
@@ -142,7 +163,6 @@ const KanbanBoard = () => {
         }
     }, [client, subTasksCache]);
 
-    // Переключение раскрытия карточки - загружаем подзадачи только при раскрытии
     const toggleExpandTask = useCallback((taskId) => {
         if (expandedTaskId === taskId) {
             setExpandedTaskId(null);
@@ -230,19 +250,6 @@ const KanbanBoard = () => {
         setSubTasksCache({});
     };
 
-    const handleGanttDateChange = async (taskId, newStartDate, newEndDate) => {
-        await updateTask({
-            variables: {
-                id: taskId,
-                dueDate: newEndDate.toISOString(),
-            },
-        });
-        await refetchCurrentTasks();
-        if (activeSubgroupId !== 'my-tasks') {
-            await refetchMyTasks();
-        }
-    };
-
     if (projectLoading) return <div className="loading">Загрузка проекта...</div>;
     if (!projectData?.project) return <div className="message-error">Проект не найден</div>;
 
@@ -251,6 +258,7 @@ const KanbanBoard = () => {
     const currentMember = project.members.find(m => m.userId === user.id);
     const canEditProject = isOwner || currentMember?.role === 'ADMIN';
     const isViewer = currentMember?.role === 'VIEWER';
+    const canViewSettings = !isViewer;
     const realSubgroups = project.subgroups || [];
     const projectMembers = project.members || [];
 
@@ -559,7 +567,6 @@ const KanbanBoard = () => {
         setShowTaskModal(false);
     };
 
-    // Drag and Drop handlers
     const handleDragStart = (e, taskId, fromStatus) => {
         if (isViewer) {
             e.preventDefault();
@@ -684,7 +691,6 @@ const KanbanBoard = () => {
         </div>
     );
 
-    // Компонент для отображения подзадач (уменьшенный вариант)
     const SubTaskCard = ({ subTask, level = 1 }) => {
         const dueWarningText = getDueWarningText(subTask);
         const dueWarningColor = getTaskDueDateColor(subTask);
@@ -734,10 +740,10 @@ const KanbanBoard = () => {
 
                     <div className="task-bottom-row subtask-bottom-row">
                         <div className={`task-priority priority-${subTask.value || 2} subtask-priority`}>
-                            {subTask.value === 1 && <>🔵 Низкая</>}
-                            {subTask.value === 2 && <>🟡 Средняя</>}
-                            {subTask.value === 3 && <>🔴 Высокая</>}
-                            {!subTask.value && <> Средняя</>}
+                            {subTask.value === 1 && <>Низкая</>}
+                            {subTask.value === 2 && <>Средняя</>}
+                            {subTask.value === 3 && <>Высокая</>}
+                            {!subTask.value && <>Средняя</>}
                         </div>
                         <div className="task-date-group">
                             {dueWarningText && !isCompleted && (
@@ -821,7 +827,7 @@ const KanbanBoard = () => {
                             </button>
                         )}
                     </div>
-                    {canEditProject && (
+                    {canViewSettings && (
                         <button className="btn btn--secondary settings-btn" onClick={() => navigate(`/settings?projectId=${projectId}`)}>
                             <i className="fas fa-cog"></i> Настройки проекта
                         </button>
@@ -900,7 +906,14 @@ const KanbanBoard = () => {
                                         const isLoadingSubTasks = loadingSubTasks[task.id];
 
                                         return (
-                                            <div key={task.id} className={`task-card ${isExpanded ? 'expanded' : ''}`} style={getTaskCardStyle(task)} draggable={!isViewer} onDragStart={(e) => handleDragStart(e, task.id, status)}>
+                                            <div
+                                                key={task.id}
+                                                id={`task-${task.id}`}
+                                                className={`task-card ${isExpanded ? 'expanded' : ''} ${highlightedTask === task.id ? 'task-highlighted' : ''}`}
+                                                style={getTaskCardStyle(task)}
+                                                draggable={!isViewer}
+                                                onDragStart={(e) => handleDragStart(e, task.id, status)}
+                                            >
                                                 <div className="task-card-main" onClick={() => handleEditTask(task)}>
                                                     <div className="task-header-row">
                                                         <div className="task-title">
@@ -916,10 +929,10 @@ const KanbanBoard = () => {
                                                     </div>
                                                     <div className="task-bottom-row">
                                                         <div className={`task-priority priority-${task.value || 2}`}>
-                                                            {task.value === 1 && <>🔵 Низкая</>}
-                                                            {task.value === 2 && <>🟡 Средняя</>}
-                                                            {task.value === 3 && <>🔴 Высокая</>}
-                                                            {!task.value && <> Средняя</>}
+                                                            {task.value === 1 && <>Низкая</>}
+                                                            {task.value === 2 && <>Средняя</>}
+                                                            {task.value === 3 && <>Высокая</>}
+                                                            {!task.value && <>Средняя</>}
                                                         </div>
                                                         <div className="task-date-group">
                                                             {task.dueDate && <div className="task-date"><i className="far fa-calendar-alt"></i> {new Date(task.dueDate).toLocaleString()}</div>}

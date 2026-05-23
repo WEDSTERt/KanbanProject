@@ -14,7 +14,7 @@ const ProjectsList = () => {
 
     const { loading, error, data, refetch } = useQuery(GET_USER_PROJECTS, {
         variables: { userId: user.id },
-        fetchPolicy: 'network-only', // Не использовать кэш
+        fetchPolicy: 'network-only',
     });
 
     const [createProject] = useMutation(CREATE_PROJECT);
@@ -25,11 +25,13 @@ const ProjectsList = () => {
             document.body.style.overflow = '';
         };
     }, [showCreateModal]);
+
     useEffect(() => {
         if (user) {
             refetch();
         }
     }, [user, refetch]);
+
     if (loading) return <div className="loading">Загрузка проектов...</div>;
     if (error) return <div className="message-error">Ошибка: {error.message}</div>;
 
@@ -54,6 +56,10 @@ const ProjectsList = () => {
         navigate(`/board?projectId=${projectId}&subgroupId=my-tasks`);
     };
 
+    const handleOpenSettings = (projectId) => {
+        navigate(`/settings?projectId=${projectId}`);
+    };
+
     const modalOverlayStyle = {
         position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
         width: '100vw', height: '100vh', backgroundColor: 'rgba(0,0,0,0.5)',
@@ -65,6 +71,7 @@ const ProjectsList = () => {
         minWidth: '320px', maxWidth: '90%', boxShadow: '0 10px 25px rgba(0,0,0,0.2)',
         zIndex: 100000,
     };
+
     const Modal = () => createPortal(
         <div style={modalOverlayStyle} onClick={() => setShowCreateModal(false)}>
             <div style={modalContentStyle} onClick={(e) => e.stopPropagation()}>
@@ -112,20 +119,23 @@ const ProjectsList = () => {
                         const isOwner = proj.owner.id === user.id;
                         const memberEntry = proj.members.find(m => m.userId === user.id);
                         const role = memberEntry?.role || (isOwner ? 'OWNER' : 'MEMBER');
-                        const canEdit = role === 'OWNER' || role === 'ADMIN';
+                        // Кнопка настроек видна для всех участников (OWNER, ADMIN, MEMBER)
+                        const canViewSettings = role === 'OWNER' || role === 'ADMIN' || role === 'MEMBER';
+
                         return (
                             <div className="project-card" key={proj.id}>
                                 <h3><i className="fas fa-chalkboard"></i> {proj.name}</h3>
                                 <p><i className="fas fa-crown"></i> Владелец: {proj.owner.fullName}</p>
                                 <p><i className="fas fa-users"></i> Участников: {proj.members.length}</p>
+                                <p><i className="fas fa-tag"></i> Ваша роль: {role === 'OWNER' ? 'Владелец' : role === 'ADMIN' ? 'Администратор' : role === 'MEMBER' ? 'Участник' : 'Наблюдатель'}</p>
                                 <div className="flex-row mt-4">
                                     <button className="btn btn--secondary btn--small"
                                             onClick={() => handleOpenBoard(proj.id)}>
                                         <i className="fas fa-chalkboard"></i> Открыть доску
                                     </button>
-                                    {canEdit && (
+                                    {canViewSettings && (
                                         <button className="btn btn--small"
-                                                onClick={() => navigate(`/settings?projectId=${proj.id}`, {state: {from: '/'}})}>
+                                                onClick={() => handleOpenSettings(proj.id)}>
                                             <i className="fas fa-cog"></i> Настройки
                                         </button>
                                     )}

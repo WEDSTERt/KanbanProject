@@ -27,6 +27,7 @@ export const GET_PROJECT_DETAILS = gql`
                 id
                 userId
                 role
+                notificationsEnabled
                 user { id fullName email }
             }
             subgroups {
