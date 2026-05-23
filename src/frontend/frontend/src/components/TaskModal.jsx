@@ -48,15 +48,6 @@ const TaskModal = ({
     const [updateTask] = useMutation(UPDATE_TASK);
     const [deleteTask] = useMutation(DELETE_TASK);
 
-    // Загрузка файлов при открытии модального окна
-    useEffect(() => {
-        if (task?.id && attachmentsData?.taskAttachments) {
-            setAttachments(attachmentsData.taskAttachments);
-        } else {
-            setAttachments([]);
-        }
-    }, [attachmentsData, task?.id]);
-
     useEffect(() => {
         if (task) {
             setTitle(task.title || '');

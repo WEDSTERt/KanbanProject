@@ -1,13 +1,14 @@
-/* eslint-disable no-unused-vars */
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {useNavigate, useSearchParams} from 'react-router-dom';
 import {useQuery, useMutation, useApolloClient} from '@apollo/client';
-import {GET_PROJECT_DETAILS, GET_TASKS_BY_SUBGROUP, GET_TASKS_BY_ASSIGNEE_AND_PROJECT, GET_ALL_SUBTASKS} from '../graphql/queries';
+import {GET_PROJECT_DETAILS} from '../graphql/queries';
+import {GET_TASKS_BY_SUBGROUP, GET_TASKS_BY_ASSIGNEE, GET_ALL_SUBTASKS} from '../graphql/queries';
 import {UPDATE_TASK, DELETE_TASK, CREATE_TASK, SET_TASK_ASSIGNEES} from '../graphql/mutations';
 import {useAuth} from '../contexts/AuthContext';
 import SubgroupsPanel from './SubgroupsPanel';
 import TaskModal from './TaskModal';
 import ConfirmModal from './ConfirmModal';
+import GanttChart from './GanttChart';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 
@@ -98,22 +99,33 @@ const KanbanBoard = () => {
         notifyOnNetworkStatusChange: true,
     });
 
-    const refetchCurrentTasks = useCallback(() => {
-        if (activeSubgroupId === 'my-tasks') {
-            refetchMyTasks();
-        } else if (activeSubgroupId) {
-            refetchTasks();
-        }
-    }, [activeSubgroupId, refetchMyTasks, refetchTasks]);
+    const refetchCurrentTasks = () => {
+        if (activeSubgroupId === 'my-tasks') refetchMyTasks();
+        else if (activeSubgroupId) refetchTasks();
+    };
 
     // Сохранение задач в кэш при загрузке
     useEffect(() => {
-        if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
-            setCachedTasks(prev => ({ ...prev, [activeSubgroupId]: myTasksData.tasksByAssigneeAndProject }));
+        if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssignee) {
+            setCachedTasks(prev => ({ ...prev, [activeSubgroupId]: myTasksData.tasksByAssignee }));
         } else if (tasksData?.tasksBySubgroup) {
             setCachedTasks(prev => ({ ...prev, [activeSubgroupId]: tasksData.tasksBySubgroup }));
         }
     }, [tasksData, myTasksData, activeSubgroupId]);
+
+    // Получение задач из кэша
+    const getTasksForGroup = useCallback((groupId) => {
+        if (cachedTasks[groupId]) {
+            return cachedTasks[groupId];
+        }
+        if (groupId === 'my-tasks' && myTasksData?.tasksByAssignee) {
+            return myTasksData.tasksByAssignee;
+        }
+        if (tasksData?.tasksBySubgroup) {
+            return tasksData.tasksBySubgroup;
+        }
+        return [];
+    }, [cachedTasks, myTasksData, tasksData]);
 
     // ЗАГРУЗКА ПОДЗАДАЧ ДЛЯ ОДНОЙ ЗАДАЧИ (при раскрытии)
     const fetchSubTasksForTask = useCallback(async (taskId, force = false) => {
@@ -125,10 +137,10 @@ const KanbanBoard = () => {
             const { data } = await client.query({
                 query: GET_ALL_SUBTASKS,
                 variables: { taskIds: [taskId] },
-                fetchPolicy: 'cache-first',
+                fetchPolicy: force ? 'network-only' : 'cache-first'
             });
 
-            if (data?.tasksByIds?.length > 0) {
+            if (data?.tasksByIds && data.tasksByIds.length > 0) {
                 const taskData = data.tasksByIds[0];
                 setSubTasksCache(prev => ({ ...prev, [taskId]: taskData.subTasks || [] }));
             } else {
@@ -187,17 +199,25 @@ const KanbanBoard = () => {
 
     const handleToggleSubTaskComplete = async (taskId, subTaskId, currentStatus) => {
         const newStatus = currentStatus === 2 ? 'TODO' : 'REVIEW';
-        await updateTask({
-            variables: { id: subTaskId, status: newStatus }
-        });
-        await fetchSubTasksForTask(taskId, true);
-        await refetchCurrentTasks();
+        try {
+            await updateTask({
+                variables: { id: subTaskId, status: newStatus }
+            });
+            await fetchSubTasksForTask(taskId, true);
+            await refetchCurrentTasks();
+        } catch (err) {
+            console.error('Ошибка обновления подзадачи:', err);
+        }
     };
 
     const handleDeleteSubTask = async (taskId, subTaskId) => {
-        await deleteTask({ variables: { id: subTaskId } });
-        await fetchSubTasksForTask(taskId, true);
-        await refetchCurrentTasks();
+        try {
+            await deleteTask({ variables: { id: subTaskId } });
+            await fetchSubTasksForTask(taskId, true);
+            await refetchCurrentTasks();
+        } catch (err) {
+            console.error('Ошибка удаления подзадачи:', err);
+        }
     };
 
     useEffect(() => {
@@ -231,15 +251,18 @@ const KanbanBoard = () => {
     };
 
     const handleGanttDateChange = async (taskId, newStartDate, newEndDate) => {
-        await updateTask({
-            variables: {
-                id: taskId,
-                dueDate: newEndDate.toISOString(),
-            },
-        });
-        await refetchCurrentTasks();
-        if (activeSubgroupId !== 'my-tasks') {
-            await refetchMyTasks();
+        try {
+            await updateTask({
+                variables: {
+                    id: taskId,
+                    dueDate: newEndDate.toISOString(),
+                },
+            });
+            await refetchCurrentTasks();
+            if (activeSubgroupId !== 'my-tasks') await refetchMyTasks();
+        } catch (err) {
+            console.error('Ошибка обновления даты:', err);
+            alert('Ошибка обновления даты задачи');
         }
     };
 
@@ -254,12 +277,7 @@ const KanbanBoard = () => {
     const realSubgroups = project.subgroups || [];
     const projectMembers = project.members || [];
 
-    let tasks = [];
-    if (activeSubgroupId === 'my-tasks') {
-        tasks = myTasksData?.tasksByAssigneeAndProject || [];
-    } else if (activeSubgroupId && tasksData?.tasksBySubgroup) {
-        tasks = tasksData.tasksBySubgroup;
-    }
+    let tasks = getTasksForGroup(activeSubgroupId);
 
     const showLoading = () => {
         if (activeSubgroupId === 'my-tasks') {
@@ -343,7 +361,9 @@ const KanbanBoard = () => {
 
     const getTaskCardStyle = (task, isSubTask = false) => {
         const dueDateColor = getTaskDueDateColor(task);
-        const baseStyle = { borderLeftColor: dueDateColor || '#2563eb' };
+        const baseStyle = {
+            borderLeftColor: dueDateColor || '#2563eb',
+        };
         if (isSubTask) {
             return {
                 ...baseStyle,
@@ -354,7 +374,10 @@ const KanbanBoard = () => {
             };
         }
         if (dueDateColor) {
-            return { ...baseStyle, backgroundColor: `${dueDateColor}08` };
+            return {
+                ...baseStyle,
+                backgroundColor: `${dueDateColor}08`,
+            };
         }
         return baseStyle;
     };
@@ -576,8 +599,20 @@ const KanbanBoard = () => {
         const taskId = e.dataTransfer.getData('taskId');
         const fromStatus = e.dataTransfer.getData('fromStatus');
         if (!taskId || fromStatus === toStatus) return;
-        await updateTask({variables: {id: taskId, status: toStatus}});
-        await refetchCurrentTasks();
+
+        try {
+            await updateTask({variables: {id: taskId, status: toStatus}});
+            await refetchCurrentTasks();
+            if (activeSubgroupId !== 'my-tasks') await refetchMyTasks();
+        } catch (err) {
+            console.error('Ошибка перемещения задачи:', err);
+            alert('Ошибка перемещения задачи');
+        }
+    };
+
+    const handleDragOver = (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = 'move';
     };
 
     const handleDragOver = (e) => {
@@ -611,6 +646,7 @@ const KanbanBoard = () => {
     const handleContextMenuDelete = async () => {
         if (contextMenuTaskId) {
             await handleDeleteTask(contextMenuTaskId);
+            setDeleteConfirm({isOpen: false, taskId: null});
         }
         setShowContextMenu(false);
     };
@@ -685,7 +721,7 @@ const KanbanBoard = () => {
     );
 
     // Компонент для отображения подзадач (уменьшенный вариант)
-    const SubTaskCard = ({ subTask, level = 1 }) => {
+    const SubTaskCard = ({ subTask, parentTaskId, level = 1 }) => {
         const dueWarningText = getDueWarningText(subTask);
         const dueWarningColor = getTaskDueDateColor(subTask);
         const childSubTasks = subTasksCache[subTask.id] || [];
@@ -693,19 +729,9 @@ const KanbanBoard = () => {
         const isExpanded = expandedTaskId === subTask.id;
         const isLoading = loadingSubTasks[subTask.id];
 
-        const subTaskStatus = normalizeStatus(subTask.status);
-        const isCompleted = subTaskStatus === 'REVIEW';
-        const isInProgress = subTaskStatus === 'IN_PROGRESS';
-
-        const getStatusClass = () => {
-            if (isCompleted) return 'review';
-            if (isInProgress) return 'in-progress';
-            return 'todo';
-        };
-
         return (
             <div
-                className={`task-card subtask-card level-${Math.min(level, 4)} ${getStatusClass()}`}
+                className={`task-card subtask-card level-${Math.min(level, 4)}`}
                 style={getTaskCardStyle(subTask, true)}
                 draggable={false}
             >
@@ -713,20 +739,20 @@ const KanbanBoard = () => {
                     <div className="subtask-header-row">
                         <div className="subtask-title">
                             <span>{'↳ '.repeat(level)}{subTask.title}</span>
-                            {subTask.attachments?.length > 0 && <i className="fas fa-paperclip attachment-icon"></i>}
+                            {subTask.attachments && subTask.attachments.length > 0 && (
+                                <i className="fas fa-paperclip attachment-icon"></i>
+                            )}
                             {childSubTasks.length > 0 && (
                                 <span className="subtasks-badge subtask-badge">
                                     {completedSubCount}/{childSubTasks.length}
                                 </span>
                             )}
-                            <span className={`subtask-status-badge ${getStatusClass()}`}>
-                                {subTaskStatus === 'TODO' && <><i className="fas fa-clipboard-list"></i> Создано</>}
-                                {subTaskStatus === 'IN_PROGRESS' && <><i className="fas fa-cogs"></i> В работе</>}
-                                {subTaskStatus === 'REVIEW' && <><i className="fas fa-check-circle"></i> Выполнена</>}
-                            </span>
                         </div>
                         {!isViewer && activeSubgroupId !== 'my-tasks' && (
-                            <button className="subtask-menu-btn" onClick={(e) => openContextMenu(e, subTask.id)}>
+                            <button
+                                className="subtask-menu-btn"
+                                onClick={(e) => openContextMenu(e, subTask.id)}
+                            >
                                 <i className="fas fa-ellipsis-v"></i>
                             </button>
                         )}
@@ -740,7 +766,7 @@ const KanbanBoard = () => {
                             {!subTask.value && <> Средняя</>}
                         </div>
                         <div className="task-date-group">
-                            {dueWarningText && !isCompleted && (
+                            {dueWarningText && (
                                 <span className="task-due-warning subtask-warning" style={{
                                     backgroundColor: dueWarningColor,
                                     color: 'white',
@@ -755,8 +781,14 @@ const KanbanBoard = () => {
                                 </span>
                             )}
                             {subTask.dueDate && (
-                                <div className="task-date subtask-date" style={isCompleted ? { textDecoration: 'line-through', opacity: 0.6 } : {}}>
-                                    <i className="far fa-calendar-alt"></i> {new Date(subTask.dueDate).toLocaleString()}
+                                <div className="task-date subtask-date">
+                                    <i className="far fa-calendar-alt"></i> {new Date(subTask.dueDate).toLocaleString([], {
+                                    year: 'numeric',
+                                    month: '2-digit',
+                                    day: '2-digit',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                })}
                                 </div>
                             )}
                         </div>
@@ -764,29 +796,47 @@ const KanbanBoard = () => {
                     <div className="task-assignees subtask-assignees">
                         {subTask.assignees?.slice(0, 2).map(a => (
                             <div key={a.id} className="assignee-wrapper">
-                                <span className="assignee-name subtask-assignee-name" style={isCompleted ? { opacity: 0.6 } : {}}>
+                                <span className="assignee-name subtask-assignee-name">
                                     <i className="fas fa-user"></i> {a.fullName}
                                 </span>
                                 <span className="assignee-tooltip">{a.email}</span>
                             </div>
                         ))}
-                        {subTask.assignees?.length > 2 && <span className="assignee-more">+{subTask.assignees.length - 2}</span>}
+                        {subTask.assignees?.length > 2 && (
+                            <span className="assignee-more">+{subTask.assignees.length - 2}</span>
+                        )}
                     </div>
                 </div>
 
                 <div className="task-card-footer subtask-footer">
                     {childSubTasks.length > 0 && (
-                        <button className="task-expand-btn subtask-expand-btn" onClick={(e) => { e.stopPropagation(); toggleExpandTask(subTask.id); }}>
-                            <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i> {childSubTasks.length} подзадач
+                        <button
+                            className="task-expand-btn subtask-expand-btn"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                toggleExpandTask(subTask.id);
+                            }}
+                        >
+                            <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
+                            {childSubTasks.length} подзадач
                         </button>
                     )}
                 </div>
 
                 {isExpanded && (
                     <div className="task-subtasks-expanded subtask-subtasks-expanded" onClick={(e) => e.stopPropagation()}>
-                        {isLoading ? <div className="subtask-loading">Загрузка...</div> : childSubTasks.map(nestedSubTask => (
-                            <SubTaskCard key={nestedSubTask.id} subTask={nestedSubTask} level={level + 1} />
-                        ))}
+                        {isLoading ? (
+                            <div className="subtask-loading">Загрузка...</div>
+                        ) : (
+                            childSubTasks.map(nestedSubTask => (
+                                <SubTaskCard
+                                    key={nestedSubTask.id}
+                                    subTask={nestedSubTask}
+                                    parentTaskId={subTask.id}
+                                    level={level + 1}
+                                />
+                            ))
+                        )}
                     </div>
                 )}
             </div>
@@ -826,6 +876,23 @@ const KanbanBoard = () => {
                             <i className="fas fa-cog"></i> Настройки проекта
                         </button>
                     )}
+                </div>
+
+                <div className="kanban-controls-row">
+                    <div className="view-mode-buttons">
+                        <button
+                            className={`view-mode-btn ${viewMode === 'kanban' ? 'active' : ''}`}
+                            onClick={() => setViewMode('kanban')}
+                        >
+                            <i className="fas fa-columns"></i> Канбан
+                        </button>
+                        <button
+                            className={`view-mode-btn ${viewMode === 'gantt' ? 'active' : ''}`}
+                            onClick={() => setViewMode('gantt')}
+                        >
+                            <i className="fas fa-chart-line"></i> Гант
+                        </button>
+                    </div>
                 </div>
 
                 <div className="kanban-controls-row">
@@ -884,7 +951,12 @@ const KanbanBoard = () => {
                 {activeSubgroupId && viewMode === 'kanban' && (
                     <div className="kanban-board">
                         {['TODO', 'IN_PROGRESS', 'REVIEW'].map((status) => (
-                            <div key={status} className="kanban-column" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, status)}>
+                            <div
+                                key={status}
+                                className="kanban-column"
+                                onDragOver={handleDragOver}
+                                onDrop={(e) => handleDrop(e, status)}
+                            >
                                 <div className="kanban-column-header">
                                     <h3 style={{borderLeftColor: statusColors[status]}}>{statusLabels[status]}</h3>
                                     <span className="kanban-task-count">{tasksByStatus[status].length}</span>
@@ -900,67 +972,132 @@ const KanbanBoard = () => {
                                         const isLoadingSubTasks = loadingSubTasks[task.id];
 
                                         return (
-                                            <div key={task.id} className={`task-card ${isExpanded ? 'expanded' : ''}`} style={getTaskCardStyle(task)} draggable={!isViewer} onDragStart={(e) => handleDragStart(e, task.id, status)}>
-                                                <div className="task-card-main" onClick={() => handleEditTask(task)}>
-                                                    <div className="task-header-row">
-                                                        <div className="task-title">
-                                                            <span>{task.title}</span>
-                                                            {task.attachments?.length > 0 && <i className="fas fa-paperclip attachment-icon"></i>}
-                                                            {subTasksCount > 0 && <span className="subtasks-badge">{completedSubCount}/{subTasksCount}</span>}
+                                            <React.Fragment key={task.id}>
+                                                <div
+                                                    className={`task-card ${isExpanded ? 'expanded' : ''}`}
+                                                    style={getTaskCardStyle(task)}
+                                                    draggable={!isViewer}
+                                                    onDragStart={(e) => handleDragStart(e, task.id, status)}
+                                                >
+                                                    <div className="task-card-main" onClick={() => handleEditTask(task)}>
+                                                        <div className="task-header-row">
+                                                            <div className="task-title">
+                                                                <span>{task.title}</span>
+                                                                {task.attachments && task.attachments.length > 0 && (
+                                                                    <i className="fas fa-paperclip attachment-icon"></i>
+                                                                )}
+                                                                {subTasksCount > 0 && (
+                                                                    <span className="subtasks-badge">
+                                                                        {completedSubCount}/{subTasksCount}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            {!isViewer && activeSubgroupId !== 'my-tasks' && (
+                                                                <button
+                                                                    className="task-menu-btn-top"
+                                                                    onClick={(e) => openContextMenu(e, task.id)}
+                                                                >
+                                                                    <i className="fas fa-ellipsis-v"></i>
+                                                                </button>
+                                                            )}
                                                         </div>
-                                                        {!isViewer && activeSubgroupId !== 'my-tasks' && (
-                                                            <button className="task-menu-btn-top" onClick={(e) => openContextMenu(e, task.id)}>
-                                                                <i className="fas fa-ellipsis-v"></i>
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                    <div className="task-bottom-row">
-                                                        <div className={`task-priority priority-${task.value || 2}`}>
-                                                            {task.value === 1 && <>🔵 Низкая</>}
-                                                            {task.value === 2 && <>🟡 Средняя</>}
-                                                            {task.value === 3 && <>🔴 Высокая</>}
-                                                            {!task.value && <> Средняя</>}
+
+                                                        <div className="task-bottom-row">
+                                                            <div className={`task-priority priority-${task.value || 2}`}>
+                                                                {task.value === 1 && <>🔵 Низкая</>}
+                                                                {task.value === 2 && <>🟡 Средняя</>}
+                                                                {task.value === 3 && <>🔴 Высокая</>}
+                                                                {!task.value && <> Средняя</>}
+                                                            </div>
+                                                            <div className="task-date-group">
+                                                                {dueWarningText && (
+                                                                    <span className="task-due-warning" style={{
+                                                                        backgroundColor: dueWarningColor,
+                                                                        color: 'white',
+                                                                        padding: '2px 6px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '0.65rem',
+                                                                        display: 'inline-flex',
+                                                                        alignItems: 'center',
+                                                                        gap: '4px'
+                                                                    }}>
+                                                                        <i className="fas fa-exclamation-triangle"></i> {dueWarningText}
+                                                                    </span>
+                                                                )}
+                                                                {task.dueDate && (
+                                                                    <div className="task-date">
+                                                                        <i className="far fa-calendar-alt"></i> {new Date(task.dueDate).toLocaleString([], {
+                                                                        year: 'numeric',
+                                                                        month: '2-digit',
+                                                                        day: '2-digit',
+                                                                        hour: '2-digit',
+                                                                        minute: '2-digit'
+                                                                    })}
+                                                                    </div>
+                                                                )}
+                                                            </div>
                                                         </div>
-                                                        <div className="task-date-group">
-                                                            {task.dueDate && <div className="task-date"><i className="far fa-calendar-alt"></i> {new Date(task.dueDate).toLocaleString()}</div>}
-                                                            {dueWarningText && (
-                                                                <span className="task-due-warning" style={{ backgroundColor: dueWarningColor, color: 'white', padding: '2px 6px', borderRadius: '12px', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                                                    <i className="fas fa-exclamation-triangle"></i> {dueWarningText}
-                                                                </span>
+                                                        <div className="task-assignees">
+                                                            {task.assignees?.slice(0, 3).map(a => (
+                                                                <div key={a.id} className="assignee-wrapper">
+                                                                    <span className="assignee-name">
+                                                                        <i className="fas fa-user"></i> {a.fullName}
+                                                                    </span>
+                                                                    <span className="assignee-tooltip">{a.email}</span>
+                                                                </div>
+                                                            ))}
+                                                            {task.assignees?.length > 3 && (
+                                                                <span className="assignee-more">+{task.assignees.length - 3}</span>
                                                             )}
                                                         </div>
                                                     </div>
-                                                    <div className="task-assignees">
-                                                        {task.assignees?.slice(0, 3).map(a => (
-                                                            <div key={a.id} className="assignee-wrapper">
-                                                                <span className="assignee-name"><i className="fas fa-user"></i> {a.fullName}</span>
-                                                                <span className="assignee-tooltip">{a.email}</span>
-                                                            </div>
-                                                        ))}
-                                                        {task.assignees?.length > 3 && <span className="assignee-more">+{task.assignees.length - 3}</span>}
+
+                                                    <div className="task-card-footer">
+                                                        {subTasksCount > 0 && (
+                                                            <button
+                                                                className="task-expand-btn"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    toggleExpandTask(task.id);
+                                                                }}
+                                                            >
+                                                                <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i>
+                                                                {subTasksCount} подзадач
+                                                            </button>
+                                                        )}
                                                     </div>
-                                                </div>
-                                                <div className="task-card-footer">
-                                                    {subTasksCount > 0 && (
-                                                        <button className="task-expand-btn" onClick={(e) => { e.stopPropagation(); toggleExpandTask(task.id); }}>
-                                                            <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i> {subTasksCount} подзадач
-                                                        </button>
+
+                                                    {isExpanded && (
+                                                        <div className="task-subtasks-expanded" onClick={(e) => e.stopPropagation()}>
+                                                            {isLoadingSubTasks ? (
+                                                                <div className="subtask-loading">Загрузка подзадач...</div>
+                                                            ) : (
+                                                                currentSubTasks.map(subTask => (
+                                                                    <SubTaskCard
+                                                                        key={subTask.id}
+                                                                        subTask={subTask}
+                                                                        parentTaskId={task.id}
+                                                                        level={1}
+                                                                    />
+                                                                ))
+                                                            )}
+                                                        </div>
                                                     )}
                                                 </div>
-                                                {isExpanded && (
-                                                    <div className="task-subtasks-expanded" onClick={(e) => e.stopPropagation()}>
-                                                        {isLoadingSubTasks ? <div className="subtask-loading">Загрузка подзадач...</div> : currentSubTasks.map(subTask => (
-                                                            <SubTaskCard key={subTask.id} subTask={subTask} level={1} />
-                                                        ))}
-                                                    </div>
-                                                )}
-                                            </div>
+                                            </React.Fragment>
                                         );
                                     })}
                                 </div>
                             </div>
                         ))}
                     </div>
+                )}
+
+                {activeSubgroupId && viewMode === 'gantt' && (
+                    <GanttChart
+                        tasks={tasks}
+                        onTaskDateChange={handleGanttDateChange}
+                    />
                 )}
             </div>
 
@@ -988,6 +1125,35 @@ const KanbanBoard = () => {
                     <div className="context-menu-subtask">
                         <div className="context-menu-subtask-form">
                             <input type="text" placeholder="Название подзадачи..." value={newSubTaskTitle} onChange={(e) => setNewSubTaskTitle(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleAddSubTaskFromMenu(contextMenuTaskId)} autoFocus />
+                            <button onClick={() => handleAddSubTaskFromMenu(contextMenuTaskId)}>Добавить</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {showContextMenu && (
+                <div
+                    className="context-menu"
+                    style={{ position: 'fixed', top: contextMenuPosition.y, left: contextMenuPosition.x, zIndex: 10000 }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="context-menu-item" onClick={handleContextMenuDelete}>
+                        <i className="fas fa-trash-alt"></i> Удалить задачу
+                    </div>
+                    <div className="context-menu-divider"></div>
+                    <div className="context-menu-subtask">
+                        <div className="context-menu-item">
+                            <i className="fas fa-plus"></i> Добавить подзадачу
+                        </div>
+                        <div className="context-menu-subtask-form">
+                            <input
+                                type="text"
+                                placeholder="Название подзадачи..."
+                                value={newSubTaskTitle}
+                                onChange={(e) => setNewSubTaskTitle(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleAddSubTaskFromMenu(contextMenuTaskId)}
+                                autoFocus
+                            />
                             <button onClick={() => handleAddSubTaskFromMenu(contextMenuTaskId)}>Добавить</button>
                         </div>
                     </div>

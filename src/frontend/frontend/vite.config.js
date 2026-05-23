@@ -10,7 +10,8 @@ export default defineConfig({
         allowedHosts: [
             'kanbandocky.ru',
             'screamingly-big-brocket.cloudpub.ru',
-            'localhost'
+            '.cloudpub.ru',
+            'kanbandocky.ru'
         ],
         proxy: {
             '/graphql': {

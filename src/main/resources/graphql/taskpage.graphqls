@@ -1,0 +1,10 @@
+type TaskPage {
+    content: [Task!]!
+    last: Boolean!
+    totalElements: Int!
+    totalPages: Int!
+}
+
+extend type Query {
+    tasksBySubgroupPaginated(subgroupId: ID!, page: Int!, size: Int!): TaskPage!
+}

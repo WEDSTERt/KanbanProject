@@ -8,9 +8,7 @@ import RegisterForm from './components/RegisterForm';
 import ProjectsList from './components/ProjectsList';
 import AccountSettings from './components/AccountSettings';
 import ProjectSettings from './components/ProjectSettings';
-import KanbanBoard from './components/KanbanBoard';
-import VerifyEmail from './components/VerifyEmail';
-import VerifyEmailPending from './components/VerifyEmailPending';
+import KanbanBoard from './components/KanbanBoard.jsx';
 
 const PrivateRoute = ({children}) => {
     const {user, loading} = useAuth();

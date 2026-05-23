@@ -7,6 +7,8 @@ import com.repository.SubgroupRepository;
 import com.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.util.List;
 import java.util.Optional;
@@ -29,6 +31,7 @@ public class SubgroupService {
         this.subgroupMemberRepository = subgroupMemberRepository;
     }
 
+    @CacheEvict(value = {"subgroups", "projectDetails"}, allEntries = true)
     @Transactional
     public Subgroup createSubgroup(Long projectId, String name, Long creatorUserId) {
         Project project = projectRepository.findById(projectId)
@@ -45,6 +48,7 @@ public class SubgroupService {
         return subgroup;
     }
 
+    @CacheEvict(value = {"subgroups", "projectDetails"}, allEntries = true)
     @Transactional
     public Subgroup updateSubgroup(Long id, String name) {
         Subgroup subgroup = subgroupRepository.findById(id)
@@ -53,6 +57,7 @@ public class SubgroupService {
         return subgroupRepository.save(subgroup);
     }
 
+    @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public boolean deleteSubgroup(Long id) {
         if (subgroupRepository.existsById(id)) {
@@ -62,14 +67,17 @@ public class SubgroupService {
         return false;
     }
 
+    @Cacheable(value = "subgroups", key = "#id")
     public Optional<Subgroup> findById(Long id) {
         return subgroupRepository.findById(id);
     }
 
+    @Cacheable(value = "subgroups", key = "#projectId")
     public List<Subgroup> findSubgroupsByProject(Long projectId) {
         return subgroupRepository.findByProjectIdWithMembers(projectId);
     }
 
+    @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public SubgroupMember addSubgroupMember(Long subgroupId, Long userId, RoleSubgroup role) {
         Subgroup subgroup = subgroupRepository.findById(subgroupId)
@@ -83,6 +91,7 @@ public class SubgroupService {
         return subgroupMemberRepository.save(sm);
     }
 
+    @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public SubgroupMember updateSubgroupMember(Long memberId, RoleSubgroup role) {
         SubgroupMember sm = subgroupMemberRepository.findById(memberId)
@@ -91,6 +100,7 @@ public class SubgroupService {
         return subgroupMemberRepository.save(sm);
     }
 
+    @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public boolean removeSubgroupMember(Long memberId) {
         if (subgroupMemberRepository.existsById(memberId)) {

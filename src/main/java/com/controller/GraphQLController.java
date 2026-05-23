@@ -6,6 +6,7 @@ import com.service.ProjectService;
 import com.service.SubgroupService;
 import com.service.TaskService;
 import com.service.UserService;
+import org.springframework.data.domain.Page;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
 import org.springframework.graphql.data.method.annotation.QueryMapping;
@@ -80,6 +81,15 @@ public class GraphQLController {
         return taskService.findById(id).orElse(null);
     }
 
+    // НОВЫЙ QUERY: получение нескольких задач по ID
+    @QueryMapping
+    public List<Task> tasksByIds(@Argument List<Long> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        return taskService.findAllByIds(ids);
+    }
+
     @QueryMapping
     public List<Task> tasksBySubgroup(@Argument Long subgroupId) {
         return taskService.findTasksBySubgroup(subgroupId);
@@ -98,6 +108,12 @@ public class GraphQLController {
     @QueryMapping
     public List<Attachment> taskAttachments(@Argument Long taskId) {
         return taskService.getAttachmentsByTask(taskId);
+    }
+
+    // НОВЫЙ QUERY: получение подзадач для задачи
+    @QueryMapping
+    public List<Task> taskSubTasks(@Argument Long taskId) {
+        return taskService.findSubTasks(taskId);
     }
 
     @QueryMapping
@@ -222,9 +238,10 @@ public class GraphQLController {
                            @Argument OffsetDateTime dueDate,
                            @Argument Integer value,
                            @Argument TaskStatus status,
-                           @Argument List<Long> assigneeIds) {
+                           @Argument List<Long> assigneeIds,
+                           @Argument Long parentTaskId) {
         return taskService.createTask(subgroupId, createdByUserId, title,
-                description, dueDate, value, status, assigneeIds);
+                description, dueDate, value, status, assigneeIds, parentTaskId);
     }
 
     @MutationMapping
@@ -235,9 +252,10 @@ public class GraphQLController {
                            @Argument OffsetDateTime dueDate,
                            @Argument Integer value,
                            @Argument TaskStatus status,
-                           @Argument Long createdByUserId) {
+                           @Argument Long createdByUserId,
+                           @Argument Long parentTaskId) {
         return taskService.updateTask(id, subgroupId, title, description,
-                dueDate, value, status, createdByUserId);
+                dueDate, value, status, createdByUserId, parentTaskId);
     }
 
     @MutationMapping
@@ -263,6 +281,9 @@ public class GraphQLController {
         return taskService.setTaskAssignees(taskId, userIds);
     }
 
+    // ============ SCHEMA MAPPINGS ============
+
+    // User mappings
     @SchemaMapping(typeName = "User", field = "ownedProjects")
     public List<Project> ownedProjects(User user) {
         return projectService.findProjectsByOwner(user.getId());
@@ -288,6 +309,7 @@ public class GraphQLController {
         return taskService.findTasksByAssignee(user.getId());
     }
 
+    // Project mappings
     @SchemaMapping(typeName = "Project", field = "owner")
     public User projectOwner(Project project) {
         return project.getOwner();
@@ -303,6 +325,7 @@ public class GraphQLController {
         return subgroupService.findSubgroupsByProject(project.getId());
     }
 
+    // ProjectMember mappings
     @SchemaMapping(typeName = "ProjectMember", field = "project")
     public Project memberProject(ProjectMember pm) {
         return pm.getProject();
@@ -313,6 +336,7 @@ public class GraphQLController {
         return pm.getUser();
     }
 
+    // Subgroup mappings
     @SchemaMapping(typeName = "Subgroup", field = "project")
     public Project subgroupProject(Subgroup subgroup) {
         return subgroup.getProject();
@@ -328,6 +352,7 @@ public class GraphQLController {
         return taskService.findTasksBySubgroup(subgroup.getId());
     }
 
+    // SubgroupMember mappings
     @SchemaMapping(typeName = "SubgroupMember", field = "subgroup")
     public Subgroup memberSubgroup(SubgroupMember sm) {
         return sm.getSubgroup();
@@ -338,6 +363,7 @@ public class GraphQLController {
         return sm.getUser();
     }
 
+    // Task mappings
     @SchemaMapping(typeName = "Task", field = "subgroup")
     public Subgroup taskSubgroup(Task task) {
         return task.getSubgroup();
@@ -361,5 +387,27 @@ public class GraphQLController {
     @SchemaMapping(typeName = "Task", field = "attachments")
     public List<Attachment> taskAttachmentsResolver(Task task) {
         return task.getAttachments();
+    }
+
+    // ParentTask mapping для получения родительской задачи
+    @SchemaMapping(typeName = "Task", field = "parentTask")
+    public Task taskParentTask(Task task) {
+        return task.getParentTask();
+    }
+    @SchemaMapping(typeName = "Task", field = "subTasksCount")
+    public Integer taskSubTasksCount(Task task) {
+        return taskService.countSubTasksByParentId(task.getId());
+    }
+    // SubTasks mapping для получения подзадач
+    @SchemaMapping(typeName = "Task", field = "subTasks")
+    public List<Task> taskSubTasksResolver(Task task) {
+        return taskService.findSubTasks(task.getId());
+    }
+
+    @QueryMapping
+    public Page<Task> tasksBySubgroupPaginated(@Argument Long subgroupId,
+                                               @Argument int page,
+                                               @Argument int size) {
+        return taskService.findTasksBySubgroupWithPagination(subgroupId, page, size);
     }
 }

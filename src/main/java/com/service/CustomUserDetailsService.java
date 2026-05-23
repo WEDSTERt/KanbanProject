@@ -9,6 +9,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
+import org.springframework.cache.annotation.Cacheable;
 
 @Service
 public class CustomUserDetailsService implements UserDetailsService {
@@ -20,6 +21,7 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     @Override
+    @Cacheable(value = "currentUser", key = "#userId")
     public UserDetails loadUserByUsername(String userId) throws UsernameNotFoundException {
         Long id = Long.parseLong(userId);
         User user = userRepository.findById(id)

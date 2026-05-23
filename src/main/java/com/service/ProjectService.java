@@ -9,6 +9,8 @@ import com.repository.ProjectRepository;
 import com.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,6 +30,7 @@ public class ProjectService {
         this.projectMemberRepository = projectMemberRepository;
     }
 
+    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public Project createProject(String name, Long ownerUserId) {
         User owner = userRepository.findById(ownerUserId)
@@ -38,6 +41,7 @@ public class ProjectService {
         return project;
     }
 
+    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public Project updateProject(Long id, String name) {
         Project project = projectRepository.findById(id)
@@ -46,6 +50,7 @@ public class ProjectService {
         return projectRepository.save(project);
     }
 
+    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public boolean deleteProject(Long id) {
         if (projectRepository.existsById(id)) {
@@ -55,18 +60,22 @@ public class ProjectService {
         return false;
     }
 
+    @Cacheable(value = "projectDetails", key = "#id")
     public Optional<Project> findById(Long id) {
         return projectRepository.findById(id);
     }
 
+    @Cacheable(value = "projects", key = "#ownerUserId")
     public List<Project> findProjectsByOwner(Long ownerUserId) {
         return projectRepository.findByOwnerUserId(ownerUserId);
     }
 
+    @Cacheable(value = "projects", key = "'member_' + #userId")
     public List<Project> findProjectsByMember(Long userId) {
         return projectRepository.findProjectsByMemberUserId(userId);
     }
 
+    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public ProjectMember addProjectMember(Long projectId, Long userId, RoleProject role) {
         Project project = projectRepository.findById(projectId)
@@ -80,6 +89,7 @@ public class ProjectService {
         return projectMemberRepository.save(pm);
     }
 
+    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public ProjectMember updateProjectMember(Long memberId, RoleProject role) {
         ProjectMember pm = projectMemberRepository.findById(memberId)
@@ -88,6 +98,7 @@ public class ProjectService {
         return projectMemberRepository.save(pm);
     }
 
+    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public boolean removeProjectMember(Long memberId) {
         if (projectMemberRepository.existsById(memberId)) {

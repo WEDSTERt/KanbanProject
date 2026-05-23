@@ -2,13 +2,17 @@ package com.service;
 
 import com.entity.*;
 import com.repository.*;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 
 @Service
 public class TaskService {
@@ -28,10 +32,13 @@ public class TaskService {
         this.attachmentRepository = attachmentRepository;
     }
 
+    // ============ ОСНОВНЫЕ ОПЕРАЦИИ С ЗАДАЧАМИ ============
+
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task createTask(Long subgroupId, Long createdByUserId, String title,
                            String description, OffsetDateTime dueDate, Integer value,
-                           TaskStatus status, List<Long> assigneeIds) {
+                           TaskStatus status, List<Long> assigneeIds, Long parentTaskId) {
         Subgroup subgroup = subgroupRepository.findById(subgroupId)
                 .orElseThrow(() -> new RuntimeException("Subgroup not found"));
         User createdBy = userRepository.findById(createdByUserId)
@@ -41,6 +48,16 @@ public class TaskService {
         task.setDueDate(dueDate);
         task.setValue(value);
         task.setStatus(status != null ? status.getCode() : TaskStatus.TODO.getCode());
+
+        if (parentTaskId != null && parentTaskId > 0) {
+            Task parentTask = taskRepository.findById(parentTaskId)
+                    .orElseThrow(() -> new RuntimeException("Parent task not found"));
+            task.setParentTask(parentTask);
+            task.setParentTaskId(parentTaskId);
+        } else {
+            task.setParentTaskId(0L);
+        }
+
         if (assigneeIds != null && !assigneeIds.isEmpty()) {
             List<User> assignees = userRepository.findAllById(assigneeIds);
             task.getAssignees().addAll(assignees);
@@ -48,10 +65,11 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task updateTask(Long id, Long subgroupId, String title, String description,
                            OffsetDateTime dueDate, Integer value, TaskStatus status,
-                           Long createdByUserId) {
+                           Long createdByUserId, Long parentTaskId) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
         if (subgroupId != null) {
@@ -72,9 +90,21 @@ public class TaskService {
             task.setCreatedByUserId(createdByUserId);
         }
 
+        if (parentTaskId != null) {
+            if (parentTaskId > 0) {
+                Task parentTask = taskRepository.findById(parentTaskId)
+                        .orElseThrow(() -> new RuntimeException("Parent task not found"));
+                task.setParentTask(parentTask);
+            } else {
+                task.setParentTask(null);
+                task.setParentTaskId(0L);
+            }
+        }
+
         return taskRepository.save(task);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public boolean deleteTask(Long id) {
         if (taskRepository.existsById(id)) {
@@ -88,28 +118,79 @@ public class TaskService {
         return taskRepository.findById(id);
     }
 
+    @Cacheable(value = "tasksByIds", key = "#ids")
+    public List<Task> findAllByIds(List<Long> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+        return taskRepository.findAllByIdsWithDetails(ids);
+    }
+
+    @Cacheable(value = "tasksBySubgroup", key = "#subgroupId")
     public List<Task> findTasksBySubgroup(Long subgroupId) {
+        return taskRepository.findRootTasksBySubgroup(subgroupId);
+    }
+
+    // Пагинированная версия
+    public Page<Task> findTasksBySubgroupWithPagination(Long subgroupId, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        return taskRepository.findRootTasksBySubgroupWithPagination(subgroupId, pageable);
+    }
+
+    public List<Task> findAllTasksBySubgroup(Long subgroupId) {
         return taskRepository.findBySubgroupId(subgroupId);
     }
 
+    @Cacheable(value = "tasksByAssignee", key = "#userId")
     public List<Task> findTasksByAssignee(Long userId) {
-        return taskRepository.findByAssigneesId(userId);
+        return taskRepository.findRootTasksByAssignee(userId);
     }
 
     public List<Task> findTasksByCreator(Long createdByUserId) {
         return taskRepository.findByCreatedByUserId(createdByUserId);
     }
 
+    public List<Task> findSubTasks(Long parentTaskId) {
+        return taskRepository.findSubTasksByParentId(parentTaskId);
+    }
+
+    // ============ ПОДСЧЕТ ПОДЗАДАЧ ============
+
+    public Integer countSubTasksByParentId(Long taskId) {
+        return taskRepository.countSubTasksByParentId(taskId);
+    }
+
+    public Map<Long, Integer> getSubTasksCountForTasks(List<Long> taskIds) {
+        if (taskIds == null || taskIds.isEmpty()) {
+            return new HashMap<>();
+        }
+        List<Object[]> results = taskRepository.countSubTasksByParentIds(taskIds);
+        Map<Long, Integer> countMap = new HashMap<>();
+        for (Object[] result : results) {
+            Long parentId = (Long) result[0];
+            Long count = (Long) result[1];
+            countMap.put(parentId, count.intValue());
+        }
+        for (Long taskId : taskIds) {
+            countMap.putIfAbsent(taskId, 0);
+        }
+        return countMap;
+    }
+
+    // ============ НАЗНАЧЕНИЕ ИСПОЛНИТЕЛЕЙ ============
+
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
     @Transactional
     public Task assignUserToTask(Long taskId, Long userId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        task.getAssignees().add(user);
+        if (!task.getAssignees().contains(user)) {
+            task.getAssignees().add(user);
+        }
         return taskRepository.save(task);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
     @Transactional
     public Task unassignUserFromTask(Long taskId, Long userId) {
         Task task = taskRepository.findById(taskId)
@@ -120,6 +201,7 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
     @Transactional
     public Task setTaskAssignees(Long taskId, List<Long> userIds) {
         Task task = taskRepository.findById(taskId)
@@ -129,7 +211,8 @@ public class TaskService {
         return taskRepository.save(task);
     }
 
-    // вложения
+    // ============ ВЛОЖЕНИЯ ============
+
     @Transactional
     public Attachment addAttachment(Long taskId, MultipartFile file) {
         Task task = taskRepository.findById(taskId)
@@ -158,6 +241,7 @@ public class TaskService {
                 .orElseThrow(() -> new RuntimeException("Attachment not found"));
     }
 
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
     @Transactional
     public void deleteAttachment(Long attachmentId) {
         if (attachmentRepository.existsById(attachmentId)) {
