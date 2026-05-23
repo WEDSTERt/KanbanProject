@@ -6,7 +6,7 @@ const STORAGE_KEY = 'downloadedFileIds';
 const AttachmentList = ({
                             attachments,
                             onDelete,
-                            canDelete = true
+                            isEditMode = false  // Новый пропс - режим редактирования
                         }) => {
     const [confirmDelete, setConfirmDelete] = useState({isOpen: false, fileId: null});
     const [downloadedIds, setDownloadedIds] = useState([]);
@@ -105,6 +105,19 @@ const AttachmentList = ({
         setConfirmRedownload({isOpen: false, attachment: null});
     };
 
+    const handleDeleteClick = (fileId) => setConfirmDelete({isOpen: true, fileId});
+
+    const handleConfirmDelete = async () => {
+        const fileId = confirmDelete.fileId;
+        if (onDelete) {
+            await onDelete(fileId);
+        }
+        removeFromDownloaded(fileId);
+        setConfirmDelete({isOpen: false, fileId: null});
+    };
+
+    const handleCancelDelete = () => setConfirmDelete({isOpen: false, fileId: null});
+
     const truncateFileName = (fileName) => {
         if (!fileName) return '';
         const lastDot = fileName.lastIndexOf('.');
@@ -115,32 +128,6 @@ const AttachmentList = ({
         const end = nameWithoutExt.slice(-5);
         return `${start}...${end}${extension}`;
     };
-
-    const handleDeleteClick = (id) => setConfirmDelete({isOpen: true, fileId: id});
-
-    const handleConfirmDelete = async () => {
-        const id = confirmDelete.fileId;
-        try {
-            const token = localStorage.getItem('jwtToken');
-            const response = await fetch(`/api/files/${id}`, {
-                method: 'DELETE',
-                headers: {Authorization: token ? `Bearer ${token}` : ''},
-            });
-            if (response.ok) {
-                removeFromDownloaded(id);
-                if (onDelete) onDelete();
-            } else {
-                alert('Ошибка удаления');
-            }
-        } catch (err) {
-            console.error('Delete error:', err);
-            alert('Ошибка удаления');
-        } finally {
-            setConfirmDelete({isOpen: false, fileId: null});
-        }
-    };
-
-    const handleCancelDelete = () => setConfirmDelete({isOpen: false, fileId: null});
 
     const formatFileSize = (bytes) => {
         if (!bytes) return '';
@@ -175,7 +162,8 @@ const AttachmentList = ({
                                 </div>
                                 <span className="attachment-size">{formatFileSize(att.fileSize)}</span>
                             </div>
-                            {canDelete && (
+                            {/* Кнопка удаления ТОЛЬКО в режиме редактирования */}
+                            {isEditMode && onDelete && (
                                 <button
                                     type="button"
                                     className="btn btn--danger btn--small"

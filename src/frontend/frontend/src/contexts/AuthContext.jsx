@@ -1,7 +1,7 @@
 import React, {createContext, useState, useContext, useEffect} from 'react';
 import {useQuery, useMutation} from '@apollo/client';
 import {GET_CURRENT_USER} from '../graphql/queries';
-import {LOGIN, REGISTER} from '../graphql/mutations';
+import {LOGIN, REGISTER, UPDATE_EMAIL_NOTIFICATIONS} from '../graphql/mutations';
 import {client} from '../apollo';
 
 const AuthContext = createContext(undefined);
@@ -9,11 +9,13 @@ const AuthContext = createContext(undefined);
 export const AuthProvider = ({children}) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
-    const {data} = useQuery(GET_CURRENT_USER, {
-        skip: !localStorage.getItem('jwtToken'), fetchPolicy: 'network-only',
+    const {data, refetch: refetchUser} = useQuery(GET_CURRENT_USER, {
+        skip: !localStorage.getItem('jwtToken'),
+        fetchPolicy: 'network-only',
     });
     const [loginMutation] = useMutation(LOGIN);
     const [registerMutation] = useMutation(REGISTER);
+    const [updateEmailNotificationsMutation] = useMutation(UPDATE_EMAIL_NOTIFICATIONS);
 
     useEffect(() => {
         if (data !== undefined) {
@@ -44,8 +46,8 @@ export const AuthProvider = ({children}) => {
         throw new Error('Login failed');
     };
 
-    const register = async (fullName, email, password) => {
-        const {data} = await registerMutation({variables: {fullName, email, password}});
+    const register = async (fullName, email, password, turnstileToken) => {
+        const {data} = await registerMutation({variables: {fullName, email, password, turnstileToken}});
         if (data?.createUser) {
             const {token, user: userData} = data.createUser;
             localStorage.setItem('jwtToken', token);
@@ -55,16 +57,32 @@ export const AuthProvider = ({children}) => {
         throw new Error('Registration failed');
     };
 
+    const updateEmailNotifications = async (emailNotificationsEnabled) => {
+        const {data} = await updateEmailNotificationsMutation({
+            variables: {emailNotificationsEnabled}
+        });
+        if (data?.updateEmailNotifications) {
+            // Сохраняем все существующие поля пользователя, обновляем только уведомления
+            setUser(prevUser => {
+                if (!prevUser) return data.updateEmailNotifications;
+                return {
+                    ...prevUser,
+                    emailNotificationsEnabled: data.updateEmailNotifications.emailNotificationsEnabled
+                };
+            });
+            return data.updateEmailNotifications;
+        }
+        throw new Error('Failed to update notification settings');
+    };
+
     const logout = () => {
         localStorage.removeItem('jwtToken');
-        // Очищаем Apollo кэш
         client.clearStore();
-        // Очищаем сохраненный кэш
         localStorage.removeItem('apollo-cache-persist');
         setUser(null);
     };
 
-    return (<AuthContext.Provider value={{user, loading, login, register, logout}}>
+    return (<AuthContext.Provider value={{user, loading, login, register, logout, updateEmailNotifications, refetchUser}}>
         {children}
     </AuthContext.Provider>);
 };

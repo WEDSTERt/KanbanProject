@@ -210,6 +210,24 @@ export const SET_TASK_ASSIGNEES = gql`
     }
 `;
 
+export const ASSIGN_USER_TO_TASK = gql`
+    mutation AssignUserToTask($taskId: ID!, $userId: ID!) {
+        assignUserToTask(taskId: $taskId, userId: $userId) {
+            id
+            assignees { id fullName }
+        }
+    }
+`;
+
+export const UNASSIGN_USER_FROM_TASK = gql`
+    mutation UnassignUserFromTask($taskId: ID!, $userId: ID!) {
+        unassignUserFromTask(taskId: $taskId, userId: $userId) {
+            id
+            assignees { id fullName }
+        }
+    }
+`;
+
 export const LOGIN = gql`
     mutation Login($email: String!, $password: String!) {
         login(email: $email, password: $password) {
@@ -218,20 +236,33 @@ export const LOGIN = gql`
                 id
                 fullName
                 email
+                emailVerified
             }
         }
     }
 `;
 
+// ОБНОВЛЕННЫЙ REGISTER С TURNSTILE TOKEN
 export const REGISTER = gql`
-    mutation CreateUser($fullName: String!, $email: String!, $password: String!) {
-        createUser(fullName: $fullName, email: $email, password: $password) {
+    mutation CreateUser($fullName: String!, $email: String!, $password: String!, $turnstileToken: String!) {
+        createUser(fullName: $fullName, email: $email, password: $password, turnstileToken: $turnstileToken) {
             token
             user {
                 id
                 fullName
                 email
+                emailVerified
             }
+        }
+    }
+`;
+export const UPDATE_EMAIL_NOTIFICATIONS = gql`
+    mutation UpdateEmailNotifications($emailNotificationsEnabled: Boolean!) {
+        updateEmailNotifications(emailNotificationsEnabled: $emailNotificationsEnabled) {
+            id
+            fullName
+            email
+            emailNotificationsEnabled
         }
     }
 `;

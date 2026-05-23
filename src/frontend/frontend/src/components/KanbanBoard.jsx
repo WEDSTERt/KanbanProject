@@ -44,6 +44,7 @@ const KanbanBoard = () => {
     // Состояния для сортировки
     const [sortBy, setSortBy] = useState('dueDate');
     const [sortOrder, setSortOrder] = useState('asc');
+    const [isMobileSort, setIsMobileSort] = useState(window.innerWidth <= 480);
 
     // Состояния для фильтрации
     const [filters, setFilters] = useState({
@@ -64,7 +65,10 @@ const KanbanBoard = () => {
     }, [projectId, navigate]);
 
     useEffect(() => {
-        const handleResize = () => setIsMobile(window.innerWidth <= 768);
+        const handleResize = () => {
+            setIsMobile(window.innerWidth <= 768);
+            setIsMobileSort(window.innerWidth <= 480);
+        };
         window.addEventListener('resize', handleResize);
         return () => window.removeEventListener('resize', handleResize);
     }, []);
@@ -827,15 +831,33 @@ const KanbanBoard = () => {
                 <div className="kanban-controls-row">
                     <div className="kanban-sort-panel">
                         <span className="sort-label"><i className="fas fa-arrow-up-wide-short"></i> Сортировать:</span>
-                        <button className={`sort-btn ${sortBy === 'dueDate' ? 'active' : ''}`} onClick={() => handleSortChange('dueDate')}>
-                            <i className="fas fa-calendar-alt"></i> Дедлайн {getSortIcon('dueDate')}
-                        </button>
-                        <button className={`sort-btn ${sortBy === 'priority' ? 'active' : ''}`} onClick={() => handleSortChange('priority')}>
-                            <i className="fas fa-chart-line"></i> Важность {getSortIcon('priority')}
-                        </button>
-                        <button className={`sort-btn ${sortBy === 'creator' ? 'active' : ''}`} onClick={() => handleSortChange('creator')}>
-                            <i className="fas fa-user"></i> Создатель {getSortIcon('creator')}
-                        </button>
+                        {isMobileSort ? (
+                            <select
+                                className="form-select sort-select-mobile"
+                                value={sortBy}
+                                onChange={(e) => {
+                                    setSortBy(e.target.value);
+                                    setSortOrder('asc');
+                                }}
+                                style={{ width: 'auto', minWidth: '130px', fontSize: '0.8rem', padding: '6px 10px', borderRadius: '30px' }}
+                            >
+                                <option value="dueDate">По дедлайну</option>
+                                <option value="priority">По важности</option>
+                                <option value="creator">По создателю</option>
+                            </select>
+                        ) : (
+                            <>
+                                <button className={`sort-btn ${sortBy === 'dueDate' ? 'active' : ''}`} onClick={() => handleSortChange('dueDate')}>
+                                    <i className="fas fa-calendar-alt"></i> Дедлайн {getSortIcon('dueDate')}
+                                </button>
+                                <button className={`sort-btn ${sortBy === 'priority' ? 'active' : ''}`} onClick={() => handleSortChange('priority')}>
+                                    <i className="fas fa-chart-line"></i> Важность {getSortIcon('priority')}
+                                </button>
+                                <button className={`sort-btn ${sortBy === 'creator' ? 'active' : ''}`} onClick={() => handleSortChange('creator')}>
+                                    <i className="fas fa-user"></i> Создатель {getSortIcon('creator')}
+                                </button>
+                            </>
+                        )}
                     </div>
 
                     <div className="kanban-filter-panel">

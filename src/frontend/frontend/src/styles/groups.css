@@ -132,3 +132,51 @@
     overflow-y: auto;
     box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
 }
+
+/* Мобильные улучшения для панели групп */
+@media (max-width: 768px) {
+    .groups-panel {
+        display: flex;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding: 8px 12px;
+        margin-bottom: 16px;
+        gap: 8px;
+    }
+
+    .groups-header {
+        display: none;
+    }
+
+    .groups-list {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+    }
+
+    .groups-item {
+        display: inline-flex;
+        white-space: nowrap;
+        padding: 6px 14px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 40px;
+        font-size: 0.8rem;
+    }
+
+    .groups-item--active {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: white;
+    }
+
+    .groups-settings-btn {
+        margin-left: 8px;
+        padding: 2px 6px;
+        font-size: 0.7rem;
+    }
+
+    .groups-item i {
+        margin-right: 4px;
+    }
+}

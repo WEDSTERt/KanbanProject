@@ -30,6 +30,8 @@ const TaskModal = ({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [attachments, setAttachments] = useState([]);
+    const [loadingAttachments, setLoadingAttachments] = useState(false);
 
     const users = assignableUsers || [];
 
@@ -45,6 +47,15 @@ const TaskModal = ({
 
     const [updateTask] = useMutation(UPDATE_TASK);
     const [deleteTask] = useMutation(DELETE_TASK);
+
+    // Загрузка файлов при открытии модального окна
+    useEffect(() => {
+        if (task?.id && attachmentsData?.taskAttachments) {
+            setAttachments(attachmentsData.taskAttachments);
+        } else {
+            setAttachments([]);
+        }
+    }, [attachmentsData, task?.id]);
 
     useEffect(() => {
         if (task) {
@@ -168,6 +179,28 @@ const TaskModal = ({
     };
     const handleCancelDelete = () => setShowDeleteConfirm(false);
 
+    // Функция для удаления файла с обновлением списка
+    const handleDeleteFile = async (fileId) => {
+        try {
+            const token = localStorage.getItem('jwtToken');
+            const response = await fetch(`/api/files/${fileId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                await refetchAttachments();
+            } else {
+                alert('Ошибка при удалении файла');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Ошибка при удалении файла');
+        }
+    };
+
     const customHeader = ({
                               date,
                               changeYear,
@@ -263,9 +296,9 @@ const TaskModal = ({
                     <div className="form-group">
                         <label className="form-label">Важность</label>
                         <div className="form-input" style={{background: '#f8fafc'}}>
-                            {priority === 1 && '🔵 Низкая'}
-                            {priority === 2 && '🟡 Средняя'}
-                            {priority === 3 && '🔴 Высокая'}
+                            {priority === 1 && 'Низкая'}
+                            {priority === 2 && 'Средняя'}
+                            {priority === 3 && 'Высокая'}
                         </div>
                     </div>
                     {task.createdBy && (
@@ -309,9 +342,9 @@ const TaskModal = ({
                     {task && (
                         <div className="form-group">
                             <AttachmentList
-                                attachments={attachmentsData?.taskAttachments || []}
-                                onDelete={refetchAttachments}
-                                canDelete={canEdit && !isViewer}
+                                attachments={attachments}
+                                onDelete={handleDeleteFile}
+                                isEditMode={false}
                             />
                         </div>
                     )}
@@ -485,9 +518,9 @@ const TaskModal = ({
                     {task && (
                         <div className="form-group">
                             <AttachmentList
-                                attachments={attachmentsData?.taskAttachments || []}
-                                onDelete={refetchAttachments}
-                                canDelete={canEdit && !isViewer}
+                                attachments={attachments}
+                                onDelete={handleDeleteFile}
+                                isEditMode={true}
                             />
                             <div className="attachment-upload">
                                 <label className="btn btn--secondary btn--small">

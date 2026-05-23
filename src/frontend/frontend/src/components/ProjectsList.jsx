@@ -12,8 +12,9 @@ const ProjectsList = () => {
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [projectName, setProjectName] = useState('');
 
-    const {loading, error, data, refetch} = useQuery(GET_USER_PROJECTS, {
-        variables: {userId: user.id},
+    const { loading, error, data, refetch } = useQuery(GET_USER_PROJECTS, {
+        variables: { userId: user.id },
+        fetchPolicy: 'network-only', // Не использовать кэш
     });
 
     const [createProject] = useMutation(CREATE_PROJECT);
@@ -24,7 +25,11 @@ const ProjectsList = () => {
             document.body.style.overflow = '';
         };
     }, [showCreateModal]);
-
+    useEffect(() => {
+        if (user) {
+            refetch();
+        }
+    }, [user, refetch]);
     if (loading) return <div className="loading">Загрузка проектов...</div>;
     if (error) return <div className="message-error">Ошибка: {error.message}</div>;
 

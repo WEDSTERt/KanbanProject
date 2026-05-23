@@ -5,7 +5,10 @@ extend type Query {
 }
 
 extend type Mutation {
-    createUser(fullName: String!, email: String!, password: String!): AuthPayload!
+    updateEmailNotifications(emailNotificationsEnabled: Boolean!): User!
+    createUser(fullName: String!, email: String!, password: String!, turnstileToken: String!, clientIp: String): AuthPayload!
+    verifyEmail(token: String!): Boolean!
+    resendVerificationEmail(email: String!): Boolean!
     login(email: String!, password: String!): AuthPayload!
     updateUser(id: ID!, fullName: String, email: String, password: String): User!
     deleteUser(id: ID!): Boolean!
@@ -15,6 +18,8 @@ type User {
     id: ID!
     fullName: String!
     email: String!
+    emailVerified: Boolean!
+    emailNotificationsEnabled: Boolean!
     ownedProjects: [Project!]!
     projectMemberships: [ProjectMember!]!
     subgroupMemberships: [SubgroupMember!]!

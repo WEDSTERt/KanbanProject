@@ -90,3 +90,102 @@
     gap: 12px;
     min-height: 200px;
 }
+
+/* Мобильные улучшения для канбан доски */
+@media (max-width: 1024px) {
+    .kanban-board {
+        flex-wrap: wrap;
+    }
+
+    .kanban-column {
+        min-width: calc(50% - 10px);
+        max-width: calc(50% - 10px);
+    }
+}
+
+@media (max-width: 768px) {
+    .kanban-layout {
+        flex-direction: column;
+    }
+
+    .kanban-container {
+        overflow-x: visible;
+    }
+
+    .kanban-header-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 12px;
+    }
+
+    .kanban-title-area {
+        justify-content: space-between;
+        flex-wrap: wrap;
+    }
+
+    .kanban-title {
+        font-size: 1.3rem;
+    }
+
+    .kanban-controls-row {
+        flex-direction: column;
+        align-items: stretch;
+        gap: 10px;
+    }
+
+    .kanban-board {
+        flex-direction: column;
+        gap: 16px;
+    }
+
+    .kanban-column {
+        min-width: 100%;
+        max-width: 100%;
+        padding: 12px;
+        border-radius: 20px;
+        background: transparent;
+        border: none;
+    }
+
+    .kanban-column-header {
+        background: #f8fafc;
+        padding: 10px 12px;
+        border-radius: 16px;
+        margin-bottom: 8px;
+        border: 1px solid #e2e8f0;
+    }
+
+    .kanban-column-header h3 {
+        font-size: 1rem;
+    }
+
+    .kanban-task-list {
+        gap: 10px;
+    }
+
+    .task-card {
+        border-left-width: 3px;
+    }
+}
+
+@media (max-width: 480px) {
+    .kanban-title {
+        font-size: 1.1rem;
+    }
+}
+
+/* Горизонтальная ориентация на телефонах */
+@media (max-width: 768px) and (orientation: landscape) {
+    .kanban-board {
+        flex-direction: row;
+        overflow-x: auto;
+        gap: 12px;
+    }
+
+    .kanban-column {
+        min-width: 280px;
+        max-width: 280px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+    }
+}
