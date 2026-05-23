@@ -6,6 +6,7 @@ import {useNavigate} from 'react-router-dom';
 import ConfirmModal from './ConfirmModal';
 import {validateFullName, validatePassword} from '../utils/validation';
 
+
 const AccountSettings = () => {
     const {user, loading, login, logout} = useAuth();
     const navigate = useNavigate();
