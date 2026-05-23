@@ -1,6 +1,5 @@
 import {gql} from '@apollo/client';
 
-
 export const UPDATE_USER = gql`
     mutation UpdateUser($id: ID!, $fullName: String, $password: String) {
         updateUser(id: $id, fullName: $fullName, password: $password) {
@@ -66,6 +65,7 @@ export const DELETE_PROJECT = gql`
         deleteProject(id: $id)
     }
 `;
+
 export const CREATE_TASK = gql`
     mutation CreateTask(
         $subgroupId: ID!
@@ -76,6 +76,7 @@ export const CREATE_TASK = gql`
         $value: Int
         $status: TaskStatus
         $assigneeIds: [ID!]
+        $parentTaskId: ID
     ) {
         createTask(
             subgroupId: $subgroupId
@@ -86,6 +87,7 @@ export const CREATE_TASK = gql`
             value: $value
             status: $status
             assigneeIds: $assigneeIds
+            parentTaskId: $parentTaskId
         ) {
             id
             title
@@ -93,6 +95,7 @@ export const CREATE_TASK = gql`
             dueDate
             status
             value
+            parentTaskId
             createdBy { id fullName }
             assignees { id fullName }
         }
@@ -109,6 +112,7 @@ export const UPDATE_TASK = gql`
         $value: Int
         $status: TaskStatus
         $createdByUserId: ID
+        $parentTaskId: ID
     ) {
         updateTask(
             id: $id
@@ -119,6 +123,7 @@ export const UPDATE_TASK = gql`
             value: $value
             status: $status
             createdByUserId: $createdByUserId
+            parentTaskId: $parentTaskId
         ) {
             id
             title
@@ -126,6 +131,7 @@ export const UPDATE_TASK = gql`
             dueDate
             status
             value
+            parentTaskId
             createdBy {
                 id
                 fullName
@@ -139,7 +145,6 @@ export const DELETE_TASK = gql`
         deleteTask(id: $id)
     }
 `;
-
 
 export const CREATE_SUBGROUP = gql`
     mutation CreateSubgroup($projectId: ID!, $name: String!, $creatorUserId: ID!) {
@@ -158,11 +163,13 @@ export const UPDATE_SUBGROUP = gql`
         }
     }
 `;
+
 export const DELETE_USER = gql`
     mutation DeleteUser($id: ID!) {
         deleteUser(id: $id)
     }
 `;
+
 export const DELETE_SUBGROUP = gql`
     mutation DeleteSubgroup($id: ID!) {
         deleteSubgroup(id: $id)
@@ -220,6 +227,7 @@ export const UNASSIGN_USER_FROM_TASK = gql`
         }
     }
 `;
+
 export const LOGIN = gql`
     mutation Login($email: String!, $password: String!) {
         login(email: $email, password: $password) {
@@ -228,20 +236,33 @@ export const LOGIN = gql`
                 id
                 fullName
                 email
+                emailVerified
             }
         }
     }
 `;
 
+// ОБНОВЛЕННЫЙ REGISTER С TURNSTILE TOKEN
 export const REGISTER = gql`
-    mutation CreateUser($fullName: String!, $email: String!, $password: String!) {
-        createUser(fullName: $fullName, email: $email, password: $password) {
+    mutation CreateUser($fullName: String!, $email: String!, $password: String!, $turnstileToken: String!) {
+        createUser(fullName: $fullName, email: $email, password: $password, turnstileToken: $turnstileToken) {
             token
             user {
                 id
                 fullName
                 email
+                emailVerified
             }
+        }
+    }
+`;
+export const UPDATE_EMAIL_NOTIFICATIONS = gql`
+    mutation UpdateEmailNotifications($emailNotificationsEnabled: Boolean!) {
+        updateEmailNotifications(emailNotificationsEnabled: $emailNotificationsEnabled) {
+            id
+            fullName
+            email
+            emailNotificationsEnabled
         }
     }
 `;

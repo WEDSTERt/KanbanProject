@@ -166,3 +166,72 @@
     color: #1e40af;
     margin-left: 8px;
 }
+/* Notification Settings */
+.notification-settings {
+    padding: 4px 0;
+}
+
+.notification-settings h3 {
+    font-size: 1.1rem;
+    margin-bottom: 16px;
+    color: #334155;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+    width: 52px;
+    height: 28px;
+    border-radius: 28px;
+    background-color: #cbd5e1;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: all 0.2s;
+    flex-shrink: 0;
+}
+
+.toggle-switch.active {
+    background-color: #22c55e;
+}
+
+.toggle-switch:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.toggle-switch span {
+    position: absolute;
+    top: 3px;
+    left: 3px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background-color: white;
+    transition: left 0.2s;
+}
+
+.toggle-switch.active span {
+    left: 27px;
+}
+/* Мобильные улучшения для форм */
+@media (max-width: 768px) {
+    .password-row {
+        flex-direction: row;
+        gap: 6px;
+    }
+
+    .password-toggle {
+        padding: 8px;
+        min-width: 44px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .message-error,
+    .message-success {
+        font-size: 0.8rem;
+        padding: 10px 14px;
+        border-radius: 14px;
+    }
+}

@@ -2,8 +2,8 @@ import React, {useState, useEffect} from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import {useQuery, useMutation} from '@apollo/client';
-import {GET_TASK_ATTACHMENTS} from '../graphql/queries';
-import {UPDATE_TASK} from '../graphql/mutations';
+import {GET_TASK_ATTACHMENTS, GET_TASK_SUBTASKS} from '../graphql/queries';
+import {UPDATE_TASK, DELETE_TASK} from '../graphql/mutations';
 import AttachmentList from './AttachmentList';
 import ConfirmModal from './ConfirmModal';
 
@@ -30,6 +30,8 @@ const TaskModal = ({
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
+    const [attachments, setAttachments] = useState([]);
+    const [loadingAttachments, setLoadingAttachments] = useState(false);
 
     const users = assignableUsers || [];
 
@@ -38,7 +40,22 @@ const TaskModal = ({
         skip: !task?.id,
     });
 
+    const {data: subTasksData, refetch: refetchSubTasks} = useQuery(GET_TASK_SUBTASKS, {
+        variables: {taskId: task?.id},
+        skip: !task?.id,
+    });
+
     const [updateTask] = useMutation(UPDATE_TASK);
+    const [deleteTask] = useMutation(DELETE_TASK);
+
+    // Загрузка файлов при открытии модального окна
+    useEffect(() => {
+        if (task?.id && attachmentsData?.taskAttachments) {
+            setAttachments(attachmentsData.taskAttachments);
+        } else {
+            setAttachments([]);
+        }
+    }, [attachmentsData, task?.id]);
 
     useEffect(() => {
         if (task) {
@@ -162,6 +179,28 @@ const TaskModal = ({
     };
     const handleCancelDelete = () => setShowDeleteConfirm(false);
 
+    // Функция для удаления файла с обновлением списка
+    const handleDeleteFile = async (fileId) => {
+        try {
+            const token = localStorage.getItem('jwtToken');
+            const response = await fetch(`/api/files/${fileId}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+
+            if (response.ok) {
+                await refetchAttachments();
+            } else {
+                alert('Ошибка при удалении файла');
+            }
+        } catch (error) {
+            console.error('Ошибка:', error);
+            alert('Ошибка при удалении файла');
+        }
+    };
+
     const customHeader = ({
                               date,
                               changeYear,
@@ -187,7 +226,6 @@ const TaskModal = ({
         </div>
     );
 
-    // Форматирование даты
     const formatDateTime = (dateStr) => {
         if (!dateStr) return '—';
         return new Date(dateStr).toLocaleString('ru', {
@@ -200,6 +238,9 @@ const TaskModal = ({
         });
     };
 
+    const subTasks = subTasksData?.taskSubTasks || [];
+    const completedCount = subTasks.filter(st => st.status === 2).length;
+
     // Режим просмотра
     if (task && !isEditing) {
         return (
@@ -208,7 +249,6 @@ const TaskModal = ({
                     <button className="modal-close" onClick={onClose}>✕</button>
                     <h3>Просмотр задачи</h3>
 
-                    {/* Время создания и обновления */}
                     <div className="task-timestamps">
                         <div className="timestamp-item">
                             <i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}
@@ -256,9 +296,9 @@ const TaskModal = ({
                     <div className="form-group">
                         <label className="form-label">Важность</label>
                         <div className="form-input" style={{background: '#f8fafc'}}>
-                            {priority === 1 && '🔵 Низкая'}
-                            {priority === 2 && '🟡 Средняя'}
-                            {priority === 3 && '🔴 Высокая'}
+                            {priority === 1 && 'Низкая'}
+                            {priority === 2 && 'Средняя'}
+                            {priority === 3 && 'Высокая'}
                         </div>
                     </div>
                     {task.createdBy && (
@@ -275,15 +315,40 @@ const TaskModal = ({
                             {users.filter(u => assigneeIds.includes(u.userId)).map(u => u.user?.fullName).join(', ') || '—'}
                         </div>
                     </div>
+
+                    {/* Блок подзадач в режиме просмотра */}
+                    {task && subTasks.length > 0 && (
+                        <div className="form-group">
+                            <div className="subtasks-container">
+                                <div className="subtasks-header">
+                                    <label className="form-label">
+                                        <i className="fas fa-tasks"></i> Подзадачи
+                                        <span className="subtasks-progress">
+                                            ({completedCount}/{subTasks.length})
+                                        </span>
+                                    </label>
+                                </div>
+                                <ul className="subtasks-list">
+                                    {subTasks.map((st) => (
+                                        <li key={st.id} className={`subtask-item ${st.status === 2 ? 'completed' : ''}`}>
+                                            <span className="subtask-title">{st.title}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </div>
+                        </div>
+                    )}
+
                     {task && (
                         <div className="form-group">
                             <AttachmentList
-                                attachments={attachmentsData?.taskAttachments || []}
-                                onDelete={refetchAttachments}
-                                canDelete={canEdit && !isViewer}
+                                attachments={attachments}
+                                onDelete={handleDeleteFile}
+                                isEditMode={false}
                             />
                         </div>
                     )}
+
                     <div className="modal-actions"
                          style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
                         {canEdit && isCreator && (
@@ -300,14 +365,13 @@ const TaskModal = ({
         );
     }
 
-    // Режим редактирования (новая задача или isEditing == true)
+    // Режим редактирования
     return (
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <button className="modal-close" onClick={onClose}>✕</button>
                 <h3>{task ? 'Редактировать задачу' : 'Новая задача'}</h3>
 
-                {/* Время создания и обновления */}
                 {task && (
                     <div className="task-timestamps">
                         <div className="timestamp-item">
@@ -454,9 +518,9 @@ const TaskModal = ({
                     {task && (
                         <div className="form-group">
                             <AttachmentList
-                                attachments={attachmentsData?.taskAttachments || []}
-                                onDelete={refetchAttachments}
-                                canDelete={canEdit && !isViewer}
+                                attachments={attachments}
+                                onDelete={handleDeleteFile}
+                                isEditMode={true}
                             />
                             <div className="attachment-upload">
                                 <label className="btn btn--secondary btn--small">
