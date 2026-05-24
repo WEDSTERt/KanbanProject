@@ -7,12 +7,11 @@ import {AuthProvider} from './contexts/AuthContext';
 import App from './App';
 import './styles/index.css';
 
-
+// Функция для подавления определённых ошибок в консоли
 (function suppressErrors() {
     const originalError = console.error;
     const originalWarn = console.warn;
     const originalLog = console.log;
-
 
     const ignoredPatterns = [
         'Form submission canceled',
@@ -38,7 +37,8 @@ import './styles/index.css';
         'Cannot determine Turnstile\'s embedded location',
         'Cannot find Widget',
         'Turnstile already has been loaded',
-        'Turnstile has already been rendered'
+        'Turnstile has already been rendered',
+        'An error occurred! For more details, see the full error text'
     ];
 
     // Перехват console.error
@@ -54,7 +54,7 @@ import './styles/index.css';
     console.warn = function(...args) {
         const message = args[0]?.toString() || '';
         if (ignoredPatterns.some(pattern => message.includes(pattern))) {
-            return;q
+            return;
         }
         originalWarn.apply(console, args);
     };
@@ -67,7 +67,7 @@ import './styles/index.css';
         }
     };
 
-    // Перехват ошибок на уровне window (из iframe)
+    // Перехват ошибок на уровне window
     window.addEventListener('error', (e) => {
         const message = e.message || '';
         const filename = e.filename || '';
@@ -89,23 +89,31 @@ import './styles/index.css';
     });
 })();
 
-const init = () => {
-    ReactDOM.createRoot(document.getElementById('root')).render(
-        <React.StrictMode>
-            <ApolloProvider client={client}>
-                <BrowserRouter
-                    future={{
-                        v7_startTransition: true,
-                        v7_relativeSplatPath: true,
-                    }}
-                >
-                    <AuthProvider>
-                        <App/>
-                    </AuthProvider>
-                </BrowserRouter>
-            </ApolloProvider>
-        </React.StrictMode>
-    );
-};
+// Очистка кэша при ошибках Apollo
+window.addEventListener('error', (e) => {
+    const message = e.message || '';
+    if (message.includes('ApolloProvider') || message.includes('client instance')) {
+        console.log('Очистка кэша Apollo...');
+        localStorage.removeItem('apollo-cache-persist');
+        localStorage.removeItem('jwtToken');
+        setTimeout(() => window.location.reload(), 100);
+    }
+});
 
-init();
+// Рендеринг приложения
+ReactDOM.createRoot(document.getElementById('root')).render(
+    <React.StrictMode>
+        <ApolloProvider client={client}>
+            <BrowserRouter
+                future={{
+                    v7_startTransition: true,
+                    v7_relativeSplatPath: true,
+                }}
+            >
+                <AuthProvider>
+                    <App/>
+                </AuthProvider>
+            </BrowserRouter>
+        </ApolloProvider>
+    </React.StrictMode>
+);

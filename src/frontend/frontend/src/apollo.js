@@ -1,48 +1,55 @@
-import {ApolloClient, InMemoryCache, createHttpLink} from '@apollo/client';
-import {setContext} from '@apollo/client/link/context';
+import { ApolloClient, InMemoryCache, createHttpLink, from } from '@apollo/client';
+import { setContext } from '@apollo/client/link/context';
+import { onError } from '@apollo/client/link/error';
 import { persistCache, LocalStorageWrapper } from 'apollo3-cache-persist';
 
-const graphqlUri = import.meta.env.VITE_GRAPHQL_URL || '/graphql';
+const httpLink = createHttpLink({
+    uri: import.meta.env.VITE_GRAPHQL_URL || '/graphql',
+});
 
-const httpLink = createHttpLink({uri: graphqlUri});
-
-const authLink = setContext((_, {headers}) => {
+const authLink = setContext((_, { headers }) => {
     const token = localStorage.getItem('jwtToken');
     return {
         headers: {
             ...headers,
-            authorization: token ? `Bearer ${token}` : '',
-        },
+            authorization: token ? `Bearer ${token}` : "",
+        }
     };
+});
+
+const errorLink = onError(({ graphQLErrors, networkError }) => {
+    if (graphQLErrors) {
+        graphQLErrors.forEach(({ message, locations, path }) => {
+            console.error(`[GraphQL error]: Message: ${message}, Location: ${locations}, Path: ${path}`);
+        });
+    }
+    if (networkError) {
+        console.error(`[Network error]: ${networkError}`);
+    }
 });
 
 const cache = new InMemoryCache({
     typePolicies: {
-        Query: {
-            fields: {
-                tasksBySubgroup: {
-                    merge(existing = [], incoming, { args }) {
-                        // Кэшируем отдельно для каждой подгруппы
-                        return incoming;
-                    }
-                },
-                taskSubTasks: {
-                    merge(existing = [], incoming) {
-                        return incoming;
-                    }
-                },
-                tasksByIds: {
-                    merge(existing = [], incoming) {
-                        return incoming;
-                    }
-                }
-            }
-        },
         Task: {
             keyFields: ['id'],
             fields: {
-                subTasks: {
-                    merge(existing = [], incoming) {
+                tags: {
+                    merge(_, incoming) { return incoming; }
+                },
+                assignees: {
+                    merge(_, incoming) { return incoming; }
+                }
+            }
+        },
+        Query: {
+            fields: {
+                tasksBySubgroup: {
+                    merge(existing = [], incoming = []) {
+                        return incoming;
+                    }
+                },
+                tasksByAssigneeAndProject: {
+                    merge(existing = [], incoming = []) {
                         return incoming;
                     }
                 }
@@ -51,15 +58,33 @@ const cache = new InMemoryCache({
     }
 });
 
-// Асинхронное восстановление кэша из localStorage
-await persistCache({
+// Создаём клиент синхронно
+export const client = new ApolloClient({
+    link: from([errorLink, authLink, httpLink]),
     cache,
-    storage: new LocalStorageWrapper(window.localStorage),
-    maxSize: 5242880, // 5MB (ограничение localStorage)
-    debug: process.env.NODE_ENV === 'development',
+    defaultOptions: {
+        watchQuery: {
+            fetchPolicy: 'cache-and-network',
+            nextFetchPolicy: 'cache-first',
+            errorPolicy: 'all',
+        },
+        query: {
+            fetchPolicy: 'cache-first',
+            errorPolicy: 'all',
+        },
+        mutate: {
+            errorPolicy: 'all',
+        },
+    },
 });
 
-export const client = new ApolloClient({
-    link: authLink.concat(httpLink),
+// Асинхронная инициализация персистенции кэша (не блокирует рендеринг)
+persistCache({
     cache,
+    storage: new LocalStorageWrapper(window.localStorage),
+    trigger: 'write',
+    maxSize: false,
+}).catch(error => {
+    console.error('Error persisting Apollo cache:', error);
+    localStorage.removeItem('apollo-cache-persist');
 });

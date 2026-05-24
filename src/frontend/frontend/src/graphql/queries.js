@@ -97,11 +97,11 @@ export const GET_TASKS_BY_SUBGROUP = gql`
             createdBy { id fullName }
             assignees { id fullName email }
             attachments { id }
+            tags { id name color }
         }
     }
 `;
 
-// ТОЛЬКО ОДИН РАЗ!
 export const GET_CURRENT_USER = gql`
     query GetCurrentUser {
         me {
@@ -132,6 +132,7 @@ export const GET_TASKS_BY_ASSIGNEE = gql`
             subgroupId
             subgroup { id name }
             attachments { id }
+            tags { id name color }
         }
     }
 `;
@@ -154,6 +155,7 @@ export const GET_TASKS_BY_ASSIGNEE_AND_PROJECT = gql`
             subgroupId
             subgroup { id name }
             attachments { id }
+            tags { id name color }
         }
     }
 `;
@@ -175,6 +177,7 @@ export const GET_ALL_SUBTASKS = gql`
                 createdBy { id fullName }
                 assignees { id fullName email }
                 attachments { id }
+                tags { id name color }
             }
         }
     }
@@ -195,6 +198,7 @@ export const GET_TASK_SUBTASKS = gql`
             createdBy { id fullName }
             assignees { id fullName email }
             attachments { id }
+            tags { id name color }
         }
     }
 `;
@@ -208,5 +212,17 @@ export const VERIFY_EMAIL = gql`
 export const RESEND_VERIFICATION = gql`
     mutation ResendVerificationEmail($email: String!) {
         resendVerificationEmail(email: $email)
+    }
+`;
+
+export const GET_TAGS = gql`
+    query GetTags($projectId: ID!) {
+        tags(projectId: $projectId) {
+            id
+            name
+            color
+            projectId
+            createdAt
+        }
     }
 `;

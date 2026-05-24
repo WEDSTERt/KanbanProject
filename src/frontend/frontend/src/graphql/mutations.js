@@ -98,6 +98,7 @@ export const CREATE_TASK = gql`
             parentTaskId
             createdBy { id fullName }
             assignees { id fullName }
+            tags { id name color }
         }
     }
 `;
@@ -136,6 +137,7 @@ export const UPDATE_TASK = gql`
                 id
                 fullName
             }
+            tags { id name color }
         }
     }
 `;
@@ -242,7 +244,6 @@ export const LOGIN = gql`
     }
 `;
 
-// ОБНОВЛЕННЫЙ REGISTER С TURNSTILE TOKEN
 export const REGISTER = gql`
     mutation CreateUser($fullName: String!, $email: String!, $password: String!, $turnstileToken: String!) {
         createUser(fullName: $fullName, email: $email, password: $password, turnstileToken: $turnstileToken) {
@@ -256,6 +257,7 @@ export const REGISTER = gql`
         }
     }
 `;
+
 export const UPDATE_EMAIL_NOTIFICATIONS = gql`
     mutation UpdateEmailNotifications($emailNotificationsEnabled: Boolean!) {
         updateEmailNotifications(emailNotificationsEnabled: $emailNotificationsEnabled) {
@@ -266,11 +268,109 @@ export const UPDATE_EMAIL_NOTIFICATIONS = gql`
         }
     }
 `;
+
 export const UPDATE_PROJECT_NOTIFICATIONS = gql`
     mutation UpdateProjectNotifications($projectId: ID!, $notificationsEnabled: Boolean!) {
         updateProjectNotifications(projectId: $projectId, notificationsEnabled: $notificationsEnabled) {
             id
             notificationsEnabled
         }
+    }
+`;
+
+// ============ TAGS ============
+export const GET_TAGS = gql`
+    query GetTags($projectId: ID!) {
+        tags(projectId: $projectId) {
+            id
+            name
+            color
+            projectId
+            createdAt
+        }
+    }
+`;
+
+export const CREATE_TAG = gql`
+    mutation CreateTag($projectId: ID!, $name: String!, $color: String) {
+        createTag(projectId: $projectId, name: $name, color: $color) {
+            id
+            name
+            color
+        }
+    }
+`;
+
+export const UPDATE_TAG = gql`
+    mutation UpdateTag($id: ID!, $name: String, $color: String) {
+        updateTag(id: $id, name: $name, color: $color) {
+            id
+            name
+            color
+        }
+    }
+`;
+
+export const DELETE_TAG = gql`
+    mutation DeleteTag($id: ID!) {
+        deleteTag(id: $id)
+    }
+`;
+
+export const ADD_TAG_TO_TASK = gql`
+    mutation AddTagToTask($taskId: ID!, $tagId: ID!) {
+        addTagToTask(taskId: $taskId, tagId: $tagId) {
+            id
+            tags {
+                id
+                name
+                color
+            }
+        }
+    }
+`;
+
+export const REMOVE_TAG_FROM_TASK = gql`
+    mutation RemoveTagFromTask($taskId: ID!, $tagId: ID!) {
+        removeTagFromTask(taskId: $taskId, tagId: $tagId) {
+            id
+            tags {
+                id
+                name
+                color
+            }
+        }
+    }
+`;
+
+export const ADD_MULTIPLE_TAGS_TO_TASK = gql`
+    mutation AddMultipleTagsToTask($taskId: ID!, $tagIds: [ID!]!) {
+        addMultipleTagsToTask(taskId: $taskId, tagIds: $tagIds) {
+            id
+            tags {
+                id
+                name
+                color
+            }
+        }
+    }
+`;
+
+export const SET_TASK_TAGS = gql`
+    mutation SetTaskTags($taskId: ID!, $tagIds: [ID!]!) {
+        setTaskTags(taskId: $taskId, tagIds: $tagIds) {
+            id
+            tags {
+                id
+                name
+                color
+            }
+        }
+    }
+`;
+
+export const DELETE_TAG_FROM_PROJECT = gql`
+    mutation DeleteTagFromProject($tagId: ID!, $projectId: ID!) {
+        deleteTagFromProject(tagId: $tagId, projectId: $projectId)
     }
 `;

@@ -59,6 +59,9 @@ public class Task {
     @Column(name = "parent_task_id", insertable = false, updatable = false)
     private Long parentTaskId;
 
+    @Column(name = "overdue_notified", nullable = false)
+    private Boolean overdueNotified = false;
+
     @OneToMany(mappedBy = "parentTask", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<Task> subTasks = new ArrayList<>();
@@ -76,6 +79,14 @@ public class Task {
     @JsonIgnore
     private List<User> assignees = new ArrayList<>();
 
+    @ManyToMany(fetch = FetchType.LAZY, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @JoinTable(
+            name = "task_tags",
+            joinColumns = @JoinColumn(name = "task_id"),
+            inverseJoinColumns = @JoinColumn(name = "tag_id")
+    )
+    private List<Tag> tags = new ArrayList<>();
+
     @Transient
     private Integer subTasksCount;
 
@@ -89,6 +100,7 @@ public class Task {
         this.createdBy = createdBy;
         this.createdByUserId = createdBy.getId();
         this.parentTaskId = 0L;
+        this.overdueNotified = false;
     }
 
     // Геттеры и сеттеры
@@ -153,6 +165,11 @@ public class Task {
         this.parentTaskId = parentTaskId != null ? parentTaskId : 0L;
     }
 
+    public Boolean getOverdueNotified() { return overdueNotified; }
+    public void setOverdueNotified(Boolean overdueNotified) {
+        this.overdueNotified = overdueNotified != null ? overdueNotified : false;
+    }
+
     public List<Task> getSubTasks() { return subTasks; }
     public void setSubTasks(List<Task> subTasks) { this.subTasks = subTasks; }
 
@@ -161,6 +178,9 @@ public class Task {
 
     public List<Attachment> getAttachments() { return attachments; }
     public void setAttachments(List<Attachment> attachments) { this.attachments = attachments; }
+
+    public List<Tag> getTags() { return tags; }
+    public void setTags(List<Tag> tags) { this.tags = tags; }
 
     public Integer getSubTasksCount() { return subTasksCount; }
     public void setSubTasksCount(Integer subTasksCount) { this.subTasksCount = subTasksCount; }

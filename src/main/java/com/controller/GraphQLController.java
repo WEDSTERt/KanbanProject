@@ -6,6 +6,7 @@ import com.service.ProjectService;
 import com.service.SubgroupService;
 import com.service.TaskService;
 import com.service.UserService;
+import com.service.TagService;
 import org.springframework.data.domain.Page;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -15,6 +16,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -27,17 +29,29 @@ public class GraphQLController {
     private final SubgroupService subgroupService;
     private final TaskService taskService;
     private final JwtUtil jwtUtil;
+    private final TagService tagService;
 
     public GraphQLController(UserService userService,
                              ProjectService projectService,
                              SubgroupService subgroupService,
                              TaskService taskService,
-                             JwtUtil jwtUtil) {
+                             JwtUtil jwtUtil,
+                             TagService tagService) {
         this.userService = userService;
         this.projectService = projectService;
         this.subgroupService = subgroupService;
         this.taskService = taskService;
         this.jwtUtil = jwtUtil;
+        this.tagService = tagService;
+    }
+
+    private User getCurrentUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof UserDetails userDetails) {
+            Long userId = Long.parseLong(userDetails.getUsername());
+            return userService.findById(userId).orElse(null);
+        }
+        return null;
     }
 
     // ---------- QUERY ----------
@@ -81,7 +95,6 @@ public class GraphQLController {
         return taskService.findById(id).orElse(null);
     }
 
-    // НОВЫЙ QUERY: получение нескольких задач по ID
     @QueryMapping
     public List<Task> tasksByIds(@Argument List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
@@ -110,7 +123,6 @@ public class GraphQLController {
         return taskService.getAttachmentsByTask(taskId);
     }
 
-    // НОВЫЙ QUERY: получение подзадач для задачи
     @QueryMapping
     public List<Task> taskSubTasks(@Argument Long taskId) {
         return taskService.findSubTasks(taskId);
@@ -126,14 +138,45 @@ public class GraphQLController {
         return null;
     }
 
+    // ============ TAG QUERIES ============
+    @QueryMapping
+    public List<Tag> tags(@Argument Long projectId) {
+        return tagService.getTagsByProject(projectId);
+    }
+
     // ---------- MUTATION ----------
     @MutationMapping
     public AuthPayload createUser(@Argument String fullName,
                                   @Argument String email,
-                                  @Argument String password) {
-        User user = userService.createUser(fullName, email, password);
+                                  @Argument String password,
+                                  @Argument String turnstileToken,
+                                  @Argument String clientIp) {
+
+        System.out.println("📝 === CREATE USER ===");
+        System.out.println("Full name: " + fullName);
+        System.out.println("Email: " + email);
+        System.out.println("Turnstile token: " + (turnstileToken != null ? turnstileToken.substring(0, Math.min(30, turnstileToken.length())) + "..." : "null"));
+        System.out.println("Client IP from param: " + clientIp);
+
+        String ip = (clientIp != null && !clientIp.isEmpty()) ? clientIp : "0.0.0.0";
+        System.out.println("Real client IP: " + ip);
+
+        User user = userService.createUser(fullName, email, password, turnstileToken, ip);
         String token = jwtUtil.generateToken(user.getId(), user.getEmail());
+
+        System.out.println("✅ User created successfully: " + email);
         return new AuthPayload(token, user);
+    }
+
+    @MutationMapping
+    public Boolean verifyEmail(@Argument String token) {
+        return userService.verifyEmail(token);
+    }
+
+    @MutationMapping
+    public Boolean resendVerificationEmail(@Argument String email) {
+        userService.resendVerificationEmail(email);
+        return true;
     }
 
     @MutationMapping
@@ -160,6 +203,15 @@ public class GraphQLController {
     }
 
     @MutationMapping
+    public User updateEmailNotifications(@Argument Boolean emailNotificationsEnabled) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return userService.updateEmailNotifications(currentUser.getId(), emailNotificationsEnabled);
+    }
+
+    @MutationMapping
     public Project createProject(@Argument String name,
                                  @Argument Long ownerUserId) {
         return projectService.createProject(name, ownerUserId);
@@ -180,7 +232,8 @@ public class GraphQLController {
     public ProjectMember addProjectMember(@Argument Long projectId,
                                           @Argument Long userId,
                                           @Argument RoleProject role) {
-        return projectService.addProjectMember(projectId, userId, role);
+        User currentUser = getCurrentUser();
+        return projectService.addProjectMemberWithNotification(projectId, userId, role, currentUser);
     }
 
     @MutationMapping
@@ -192,6 +245,15 @@ public class GraphQLController {
     @MutationMapping
     public boolean removeProjectMember(@Argument Long id) {
         return projectService.removeProjectMember(id);
+    }
+
+    @MutationMapping
+    public ProjectMember updateProjectNotifications(@Argument Long projectId, @Argument Boolean notificationsEnabled) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return projectService.updateProjectNotifications(projectId, currentUser.getId(), notificationsEnabled);
     }
 
     @MutationMapping
@@ -216,7 +278,8 @@ public class GraphQLController {
     public SubgroupMember addSubgroupMember(@Argument Long subgroupId,
                                             @Argument Long userId,
                                             @Argument RoleSubgroup role) {
-        return subgroupService.addSubgroupMember(subgroupId, userId, role);
+        User currentUser = getCurrentUser();
+        return subgroupService.addSubgroupMemberWithNotification(subgroupId, userId, role, currentUser);
     }
 
     @MutationMapping
@@ -254,8 +317,9 @@ public class GraphQLController {
                            @Argument TaskStatus status,
                            @Argument Long createdByUserId,
                            @Argument Long parentTaskId) {
-        return taskService.updateTask(id, subgroupId, title, description,
-                dueDate, value, status, createdByUserId, parentTaskId);
+        User currentUser = getCurrentUser();
+        return taskService.updateTaskWithChanges(id, subgroupId, title, description,
+                dueDate, value, status, createdByUserId, parentTaskId, currentUser);
     }
 
     @MutationMapping
@@ -266,7 +330,8 @@ public class GraphQLController {
     @MutationMapping
     public Task assignUserToTask(@Argument Long taskId,
                                  @Argument Long userId) {
-        return taskService.assignUserToTask(taskId, userId);
+        User currentUser = getCurrentUser();
+        return taskService.assignUserToTaskWithNotification(taskId, userId, currentUser);
     }
 
     @MutationMapping
@@ -278,12 +343,99 @@ public class GraphQLController {
     @MutationMapping
     public Task setTaskAssignees(@Argument Long taskId,
                                  @Argument List<Long> userIds) {
-        return taskService.setTaskAssignees(taskId, userIds);
+        User currentUser = getCurrentUser();
+        return taskService.setTaskAssigneesWithNotification(taskId, userIds, currentUser);
     }
+
+    // ============ TAG MUTATIONS ============
+    @MutationMapping
+    public Tag createTag(@Argument Long projectId, @Argument String name, @Argument String color) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return tagService.createTag(projectId, name, color);
+    }
+
+    @MutationMapping
+    public Tag updateTag(@Argument Long id, @Argument String name, @Argument String color) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return tagService.updateTag(id, name, color);
+    }
+
+    @MutationMapping
+    public Boolean deleteTag(@Argument Long id) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        tagService.deleteTag(id);
+        return true;
+    }
+
+    @MutationMapping
+    public Task addTagToTask(@Argument Long taskId, @Argument Long tagId) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return tagService.addTagToTask(taskId, tagId);
+    }
+
+    @MutationMapping
+    public Task addMultipleTagsToTask(@Argument Long taskId, @Argument List<Long> tagIds) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return tagService.addMultipleTagsToTask(taskId, tagIds);
+    }
+
+    @MutationMapping
+    public Task removeTagFromTask(@Argument Long taskId, @Argument Long tagId) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return tagService.removeTagFromTask(taskId, tagId);
+    }
+
+    @MutationMapping
+    public Task setTaskTags(@Argument Long taskId, @Argument List<Long> tagIds) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        return tagService.setTaskTags(taskId, tagIds);
+    }
+
+    @MutationMapping
+    public Boolean deleteTagFromProject(@Argument Long tagId, @Argument Long projectId) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new RuntimeException("User not authenticated");
+        }
+        Project project = projectService.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        ProjectMember member = project.getMembers().stream()
+                .filter(m -> m.getUserId().equals(currentUser.getId()))
+                .findFirst()
+                .orElse(null);
+
+        if (member == null || (member.getRole() != RoleProject.OWNER && member.getRole() != RoleProject.ADMIN)) {
+            throw new RuntimeException("You don't have permission to delete tags in this project");
+        }
+
+        tagService.deleteTag(tagId);
+        return true;
+    }
+
 
     // ============ SCHEMA MAPPINGS ============
 
-    // User mappings
     @SchemaMapping(typeName = "User", field = "ownedProjects")
     public List<Project> ownedProjects(User user) {
         return projectService.findProjectsByOwner(user.getId());
@@ -309,7 +461,6 @@ public class GraphQLController {
         return taskService.findTasksByAssignee(user.getId());
     }
 
-    // Project mappings
     @SchemaMapping(typeName = "Project", field = "owner")
     public User projectOwner(Project project) {
         return project.getOwner();
@@ -325,7 +476,6 @@ public class GraphQLController {
         return subgroupService.findSubgroupsByProject(project.getId());
     }
 
-    // ProjectMember mappings
     @SchemaMapping(typeName = "ProjectMember", field = "project")
     public Project memberProject(ProjectMember pm) {
         return pm.getProject();
@@ -336,7 +486,11 @@ public class GraphQLController {
         return pm.getUser();
     }
 
-    // Subgroup mappings
+    @SchemaMapping(typeName = "ProjectMember", field = "notificationsEnabled")
+    public Boolean projectMemberNotificationsEnabled(ProjectMember pm) {
+        return pm.getNotificationsEnabled();
+    }
+
     @SchemaMapping(typeName = "Subgroup", field = "project")
     public Project subgroupProject(Subgroup subgroup) {
         return subgroup.getProject();
@@ -352,7 +506,6 @@ public class GraphQLController {
         return taskService.findTasksBySubgroup(subgroup.getId());
     }
 
-    // SubgroupMember mappings
     @SchemaMapping(typeName = "SubgroupMember", field = "subgroup")
     public Subgroup memberSubgroup(SubgroupMember sm) {
         return sm.getSubgroup();
@@ -363,7 +516,6 @@ public class GraphQLController {
         return sm.getUser();
     }
 
-    // Task mappings
     @SchemaMapping(typeName = "Task", field = "subgroup")
     public Subgroup taskSubgroup(Task task) {
         return task.getSubgroup();
@@ -389,19 +541,24 @@ public class GraphQLController {
         return task.getAttachments();
     }
 
-    // ParentTask mapping для получения родительской задачи
     @SchemaMapping(typeName = "Task", field = "parentTask")
     public Task taskParentTask(Task task) {
         return task.getParentTask();
     }
+
     @SchemaMapping(typeName = "Task", field = "subTasksCount")
     public Integer taskSubTasksCount(Task task) {
         return taskService.countSubTasksByParentId(task.getId());
     }
-    // SubTasks mapping для получения подзадач
+
     @SchemaMapping(typeName = "Task", field = "subTasks")
     public List<Task> taskSubTasksResolver(Task task) {
         return taskService.findSubTasks(task.getId());
+    }
+
+    @SchemaMapping(typeName = "Task", field = "tags")
+    public List<Tag> taskTags(Task task) {
+        return task.getTags();
     }
 
     @QueryMapping
@@ -410,6 +567,7 @@ public class GraphQLController {
                                                @Argument int size) {
         return taskService.findTasksBySubgroupWithPagination(subgroupId, page, size);
     }
+
     @QueryMapping
     public List<Task> tasksByAssigneeAndProject(@Argument Long userId, @Argument Long projectId) {
         return taskService.findTasksByAssigneeAndProject(userId, projectId);

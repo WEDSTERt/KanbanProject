@@ -189,3 +189,98 @@
         border: 1px solid #e2e8f0;
     }
 }
+.context-menu {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    min-width: 220px;
+    padding: 8px 0;
+    z-index: 10000;
+}
+
+.context-menu-item {
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.85rem;
+    color: #1e293b;
+}
+
+.context-menu-item:hover {
+    background: #f1f5f9;
+}
+
+.context-menu-divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 8px 0;
+}
+
+.context-menu-subtask {
+    padding: 8px 16px;
+}
+
+.context-menu-subtask-form {
+    display: flex;
+    gap: 8px;
+}
+
+.context-menu-subtask-form input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    outline: none;
+}
+
+.context-menu-subtask-form input:focus {
+    border-color: #3b82f6;
+}
+
+.context-menu-subtask-form button {
+    background: #3b82f6;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    white-space: nowrap;
+}
+
+.context-menu-subtask-form button:hover {
+    background: #2563eb;
+}
+
+.context-menu-tags {
+    padding: 8px 16px;
+}
+
+.context-menu-tags-title {
+    font-size: 0.7rem;
+    color: #64748b;
+    margin-bottom: 8px;
+}
+
+.context-menu-tags-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.context-menu-tag-btn {
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 0.7rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.context-menu-tag-btn:hover {
+    transform: scale(1.05);
+    opacity: 0.9;
+}

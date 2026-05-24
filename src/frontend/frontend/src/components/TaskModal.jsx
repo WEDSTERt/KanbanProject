@@ -2,8 +2,8 @@ import React, {useState, useEffect} from 'react';
 import DatePicker from 'react-datepicker';
 import 'react-datepicker/dist/react-datepicker.css';
 import {useQuery, useMutation} from '@apollo/client';
-import {GET_TASK_ATTACHMENTS, GET_TASK_SUBTASKS} from '../graphql/queries';
-import {UPDATE_TASK, DELETE_TASK} from '../graphql/mutations';
+import {GET_TASK_ATTACHMENTS, GET_TASK_SUBTASKS, GET_TAGS} from '../graphql/queries';
+import {UPDATE_TASK, DELETE_TASK, CREATE_TAG, ADD_TAG_TO_TASK, REMOVE_TAG_FROM_TASK, ADD_MULTIPLE_TAGS_TO_TASK, SET_TASK_TAGS, DELETE_TAG_FROM_PROJECT} from '../graphql/mutations';
 import AttachmentList from './AttachmentList';
 import ConfirmModal from './ConfirmModal';
 
@@ -17,7 +17,9 @@ const TaskModal = ({
                        isCreator,
                        canEdit = true,
                        isViewer = false,
-                       onClose
+                       onClose,
+                       projectId,
+                       refetchProjectTags
                    }) => {
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
@@ -31,7 +33,11 @@ const TaskModal = ({
     const [isSaving, setIsSaving] = useState(false);
     const [isEditing, setIsEditing] = useState(false);
     const [attachments, setAttachments] = useState([]);
-    const [loadingAttachments, setLoadingAttachments] = useState(false);
+    const [selectedTagIds, setSelectedTagIds] = useState([]);
+    const [newTagName, setNewTagName] = useState('');
+    const [newTagColor, setNewTagColor] = useState('#3b82f6');
+    const [showCreateTag, setShowCreateTag] = useState(false);
+    const [deleteConfirm, setDeleteConfirm] = useState({isOpen: false, tagId: null, tagName: '', isProjectDelete: false});
 
     const users = assignableUsers || [];
 
@@ -45,10 +51,21 @@ const TaskModal = ({
         skip: !task?.id,
     });
 
+    const {data: tagsData, refetch: refetchTags} = useQuery(GET_TAGS, {
+        variables: {projectId: projectId},
+        skip: !projectId,
+    });
+
     const [updateTask] = useMutation(UPDATE_TASK);
     const [deleteTask] = useMutation(DELETE_TASK);
+    const [createTag] = useMutation(CREATE_TAG);
+    const [addTagToTask] = useMutation(ADD_TAG_TO_TASK);
+    const [removeTagFromTask] = useMutation(REMOVE_TAG_FROM_TASK);
+    const [setTaskTags] = useMutation(SET_TASK_TAGS);
+    const [deleteTagFromProject] = useMutation(DELETE_TAG_FROM_PROJECT);
 
-    // Загрузка файлов при открытии модального окна
+    const availableTags = tagsData?.tags || [];
+
     useEffect(() => {
         if (task?.id && attachmentsData?.taskAttachments) {
             setAttachments(attachmentsData.taskAttachments);
@@ -56,12 +73,24 @@ const TaskModal = ({
             setAttachments([]);
         }
     }, [attachmentsData, task?.id]);
+    useEffect(() => {
+        if (task?.tags) {
+            const tagIds = task.tags.map(t => t.id);
+            console.log('Updating selectedTagIds from task.tags:', tagIds);
+            setSelectedTagIds(tagIds);
+        }
+    }, [task?.tags]);
+    useEffect(() => {
+        console.log('selectedTagIds changed:', selectedTagIds);
+    }, [selectedTagIds]);
 
     useEffect(() => {
         if (task) {
             setTitle(task.title || '');
             setDescription(task.description || '');
             setDueDate(task.dueDate ? new Date(task.dueDate) : null);
+
+            // Преобразуем числовой статус в строку для select
             let rawStatus = task.status;
             if (typeof rawStatus === 'number') {
                 rawStatus = rawStatus === 0 ? 'TODO' : rawStatus === 1 ? 'IN_PROGRESS' : 'REVIEW';
@@ -70,6 +99,7 @@ const TaskModal = ({
                 if (rawStatus === 'INPROGRESS') rawStatus = 'IN_PROGRESS';
             }
             setStatus(rawStatus === 'TODO' || rawStatus === 'IN_PROGRESS' || rawStatus === 'REVIEW' ? rawStatus : 'TODO');
+
             setPriority(task.value || 2);
             setAssigneeIds(task.assignees?.map(a => a.id) || []);
             setCreatorId(task.createdBy?.id || null);
@@ -85,10 +115,14 @@ const TaskModal = ({
             setIsEditing(true);
         }
     }, [task, initialAssigneeIds]);
+    useEffect(() => {
+        setSelectedTagIds(task?.tags?.map(t => t.id) || []);
+    }, [task]);
 
     const handleStatusChange = async (newStatus) => {
         if (!task || isViewer) return;
         try {
+            // newStatus уже строка из select
             await updateTask({
                 variables: {
                     id: task.id,
@@ -109,26 +143,32 @@ const TaskModal = ({
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!title.trim()) {
-            alert('Введите название задачи');
-            return;
-        }
+        if (!title.trim()) { alert('Введите название задачи'); return; }
         if (isSaving) return;
         setIsSaving(true);
         try {
             let dueDateISO = null;
             if (dueDate) {
-                if (dueDate < new Date()) {
-                    alert('Нельзя установить дедлайн в прошлом');
-                    return;
-                }
+                if (dueDate < new Date()) { alert('Нельзя установить дедлайн в прошлом'); return; }
                 dueDateISO = dueDate.toISOString();
             }
+            let statusValue = status;
+            if (typeof statusValue === 'number') {
+                statusValue = statusValue === 0 ? 'TODO' : statusValue === 1 ? 'IN_PROGRESS' : 'REVIEW';
+            }
+            statusValue = statusValue.toUpperCase();
+            if (statusValue === 'INPROGRESS') statusValue = 'IN_PROGRESS';
+
+            // ✅ Сохраняем теги перед сохранением задачи
+            if (task?.id) {
+                await handleSaveTags();
+            }
+
             await onSave({
                 title: title.trim(),
                 description: description.trim() || null,
                 dueDate: dueDateISO,
-                status,
+                status: statusValue,
                 value: parseInt(priority),
                 assigneeIds,
                 creatorId,
@@ -136,7 +176,7 @@ const TaskModal = ({
             onClose();
         } catch (err) {
             console.error(err);
-            alert('Ошибка сохранения');
+            alert('Ошибка сохранения: ' + err.message);
         } finally {
             setIsSaving(false);
         }
@@ -179,17 +219,13 @@ const TaskModal = ({
     };
     const handleCancelDelete = () => setShowDeleteConfirm(false);
 
-    // Функция для удаления файла с обновлением списка
     const handleDeleteFile = async (fileId) => {
         try {
             const token = localStorage.getItem('jwtToken');
             const response = await fetch(`/api/files/${fileId}`, {
                 method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
+                headers: { 'Authorization': `Bearer ${token}` }
             });
-
             if (response.ok) {
                 await refetchAttachments();
             } else {
@@ -201,15 +237,130 @@ const TaskModal = ({
         }
     };
 
-    const customHeader = ({
-                              date,
-                              changeYear,
-                              changeMonth,
-                              decreaseMonth,
-                              increaseMonth,
-                              prevMonthButtonDisabled,
-                              nextMonthButtonDisabled
-                          }) => (
+    const handleCreateTag = async () => {
+        if (!newTagName.trim()) return;
+        try {
+            const result = await createTag({
+                variables: {
+                    projectId: projectId,
+                    name: newTagName.trim(),
+                    color: newTagColor
+                }
+            });
+            setNewTagName('');
+            setNewTagColor('#3b82f6');
+            setShowCreateTag(false);
+            await refetchTags();
+            if (refetchProjectTags) refetchProjectTags();
+            if (task?.id && result.data?.createTag?.id) {
+                setSelectedTagIds(prev => [...prev, result.data.createTag.id]);
+                await addTagToTask({ variables: { taskId: task.id, tagId: result.data.createTag.id } });
+            }
+        } catch (err) {
+            alert('Ошибка создания тега: ' + err.message);
+        }
+    };
+
+    // Клик на тег — добавить/удалить из задачи
+    const handleToggleTag = (tagId) => {
+        console.log('Toggling tag:', tagId);
+        console.log('Current selectedTagIds:', selectedTagIds);
+
+        setSelectedTagIds(prev => {
+            const newSelected = prev.includes(tagId)
+                ? prev.filter(id => id !== tagId)
+                : [...prev, tagId];
+            console.log('New selectedTagIds:', newSelected);
+            return newSelected;
+        });
+    };
+    // Клик на крест — удалить тег из проекта
+    const handleDeleteTagFromProject = (tagId, tagName) => {
+        setDeleteConfirm({isOpen: true, tagId, tagName, isProjectDelete: true});
+    };
+
+    const confirmDeleteTagFromProject = async () => {
+        console.log("🗑️ Deleting tag from project:", deleteConfirm.tagId);
+
+        if (!deleteConfirm.tagId) {
+            console.error("No tag ID!");
+            setDeleteConfirm({isOpen: false, tagId: null, tagName: '', isProjectDelete: false});
+            return;
+        }
+
+        try {
+            await deleteTagFromProject({
+                variables: {
+                    tagId: deleteConfirm.tagId,
+                    projectId: projectId
+                }
+            });
+
+            // Удаляем тег из selectedTagIds
+            setSelectedTagIds(prev => prev.filter(id => id !== deleteConfirm.tagId));
+
+            // Если тег был на этой задаче, удаляем его из task.tags
+            if (task?.tags) {
+                const updatedTags = task.tags.filter(t => t.id !== deleteConfirm.tagId);
+            }
+
+            setDeleteConfirm({isOpen: false, tagId: null, tagName: '', isProjectDelete: false});
+            await refetchTags();
+            if (refetchProjectTags) {
+                await refetchProjectTags();
+            }
+            console.log("✅ Tag deleted from project");
+
+        } catch (err) {
+            console.error('❌ Ошибка удаления тега:', err);
+            alert('Ошибка удаления тега: ' + err.message);
+            setDeleteConfirm({isOpen: false, tagId: null, tagName: '', isProjectDelete: false});
+        }
+    };
+
+
+    const handleSaveTags = async () => {
+        if (!task?.id) return;
+        try {
+            const currentTagIds = task.tags?.map(t => t.id) || [];
+            const toRemove = currentTagIds.filter(id => !selectedTagIds.includes(id));
+            const toAdd = selectedTagIds.filter(id => !currentTagIds.includes(id));
+
+            for (const tagId of toRemove) {
+                await removeTagFromTask({
+                    variables: { taskId: task.id, tagId },
+                    update: (cache, { data }) => {
+                        if (data?.removeTagFromTask) {
+                            cache.modify({
+                                id: cache.identify({ __typename: 'Task', id: task.id }),
+                                fields: { tags() { return data.removeTagFromTask.tags; } }
+                            });
+                        }
+                    }
+                });
+            }
+            for (const tagId of toAdd) {
+                await addTagToTask({
+                    variables: { taskId: task.id, tagId },
+                    update: (cache, { data }) => {
+                        if (data?.addTagToTask) {
+                            cache.modify({
+                                id: cache.identify({ __typename: 'Task', id: task.id }),
+                                fields: { tags() { return data.addTagToTask.tags; } }
+                            });
+                        }
+                    }
+                });
+            }
+
+            await refetchTags();
+            if (refetchProjectTags) await refetchProjectTags();
+        } catch (err) {
+            console.error('Ошибка сохранения тегов:', err);
+        }
+    };
+
+    const customHeader = ({ date, changeYear, changeMonth, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => (
         <div className="custom-datepicker-header">
             <button onClick={decreaseMonth} disabled={prevMonthButtonDisabled}>{"<"}</button>
             <select value={date.getFullYear()} onChange={({target: {value}}) => changeYear(parseInt(value))}>
@@ -268,6 +419,27 @@ const TaskModal = ({
                             {task.description || '—'}
                         </div>
                     </div>
+
+                    {/* Теги в режиме просмотра */}
+                    {task.tags && task.tags.length > 0 && (
+                        <div className="form-group">
+                            <label className="form-label"><i className="fas fa-tags"></i> Теги</label>
+                            <div className="form-input" style={{background: '#f8fafc', display: 'flex', flexWrap: 'wrap', gap: '8px'}}>
+                                {task.tags.map(tag => (
+                                    <span key={tag.id} style={{
+                                        backgroundColor: tag.color,
+                                        color: 'white',
+                                        padding: '4px 12px',
+                                        borderRadius: '20px',
+                                        fontSize: '0.8rem'
+                                    }}>
+                                        {tag.name}
+                                    </span>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="form-group">
                         <label className="form-label">Дедлайн (дата и время)</label>
                         <div className="form-input" style={{background: '#f8fafc'}}>
@@ -316,16 +488,13 @@ const TaskModal = ({
                         </div>
                     </div>
 
-                    {/* Блок подзадач в режиме просмотра */}
                     {task && subTasks.length > 0 && (
                         <div className="form-group">
                             <div className="subtasks-container">
                                 <div className="subtasks-header">
                                     <label className="form-label">
                                         <i className="fas fa-tasks"></i> Подзадачи
-                                        <span className="subtasks-progress">
-                                            ({completedCount}/{subTasks.length})
-                                        </span>
+                                        <span className="subtasks-progress">({completedCount}/{subTasks.length})</span>
                                     </label>
                                 </div>
                                 <ul className="subtasks-list">
@@ -349,8 +518,7 @@ const TaskModal = ({
                         </div>
                     )}
 
-                    <div className="modal-actions"
-                         style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
+                    <div className="modal-actions" style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
                         {canEdit && isCreator && (
                             <button type="button" className="btn" onClick={() => setIsEditing(true)}>
                                 <i className="fas fa-edit"></i> Редактировать
@@ -405,6 +573,82 @@ const TaskModal = ({
                             rows="5"
                         />
                     </div>
+
+                    {/* Теги в режиме редактирования */}
+                    <div className="form-group">
+                        <label className="form-label"><i className="fas fa-tags"></i> Теги</label>
+                        <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                            {availableTags.map((tag) => {
+                                const isSelected = selectedTagIds.includes(tag.id);
+                                return (
+                                    <div key={`modal-tag-${tag.id}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleToggleTag(tag.id)}
+                                            title="Нажмите, чтобы добавить/удалить из задачи"
+                                            style={{
+                                                backgroundColor: isSelected ? tag.color : 'transparent',
+                                                color: isSelected ? 'white' : tag.color,
+                                                border: `1px solid ${tag.color}`,
+                                                borderRadius: '20px',
+                                                padding: '4px 12px',
+                                                fontSize: '0.8rem',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {tag.name}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteTagFromProject(tag.id, tag.name)}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: '#ef4444',
+                                                cursor: 'pointer',
+                                                fontSize: '0.7rem',
+                                                padding: '4px'
+                                            }}
+                                            title="Удалить тег из проекта"
+                                        >
+                                            <i className="fas fa-times-circle"></i>
+                                        </button>
+                                    </div>
+                                );
+                            })}
+                            <button
+                                type="button"
+                                className="btn btn--secondary btn--small"
+                                onClick={() => setShowCreateTag(!showCreateTag)}
+                            >
+                                <i className="fas fa-plus"></i> Новый тег
+                            </button>
+                        </div>
+
+                        {showCreateTag && (
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+                                <input
+                                    type="text"
+                                    className="form-input"
+                                    placeholder="Название тега"
+                                    value={newTagName}
+                                    onChange={(e) => setNewTagName(e.target.value)}
+                                    style={{ flex: 1 }}
+                                />
+                                <input
+                                    type="color"
+                                    value={newTagColor}
+                                    onChange={(e) => setNewTagColor(e.target.value)}
+                                    style={{ width: '50px', height: '38px', borderRadius: '8px' }}
+                                />
+                                <button type="button" className="btn" onClick={handleCreateTag}>
+                                    <i className="fas fa-check"></i>
+                                </button>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="form-group">
                         <label className="form-label" htmlFor="task-due">Дедлайн (дата и время)</label>
                         <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
@@ -486,9 +730,7 @@ const TaskModal = ({
                         </div>
                     )}
                     <fieldset className="form-group">
-                        <legend className="form-label"><i className="fas fa-user-friends"></i> Исполнители (только
-                            участники текущей подгруппы)
-                        </legend>
+                        <legend className="form-label"><i className="fas fa-user-friends"></i> Исполнители (только участники текущей подгруппы)</legend>
                         <div className="assignees-checkbox-list">
                             {users
                                 .filter(member => {
@@ -536,8 +778,7 @@ const TaskModal = ({
                             </div>
                         </div>
                     )}
-                    <div className="modal-actions"
-                         style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
+                    <div className="modal-actions" style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
                         {task && (
                             <button type="button" className="btn btn--secondary" onClick={() => setIsEditing(false)}>
                                 <i className="fas fa-arrow-left"></i> Назад
@@ -560,6 +801,15 @@ const TaskModal = ({
                 message="Вы действительно хотите удалить эту задачу? Это действие необратимо."
                 onConfirm={handleConfirmDelete}
                 onCancel={handleCancelDelete}
+            />
+            <ConfirmModal
+                isOpen={deleteConfirm.isOpen && deleteConfirm.isProjectDelete}
+                title="Удаление тега из проекта"
+                message={`Вы действительно хотите удалить тег "${deleteConfirm.tagName}" из проекта? Это удалит тег отовсюду.`}
+                onConfirm={confirmDeleteTagFromProject}
+                onCancel={() => setDeleteConfirm({isOpen: false, tagId: null, tagName: '', isProjectDelete: false})}
+                confirmText="Удалить"
+                confirmStyle="btn--danger"
             />
         </div>
     );

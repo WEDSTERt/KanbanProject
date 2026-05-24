@@ -1,9 +1,9 @@
 /* eslint-disable no-unused-vars */
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useReducer} from 'react';
 import {useNavigate, useSearchParams} from 'react-router-dom';
 import {useQuery, useMutation, useApolloClient} from '@apollo/client';
-import {GET_PROJECT_DETAILS, GET_TASKS_BY_SUBGROUP, GET_TASKS_BY_ASSIGNEE_AND_PROJECT, GET_ALL_SUBTASKS} from '../graphql/queries';
-import {UPDATE_TASK, DELETE_TASK, CREATE_TASK, SET_TASK_ASSIGNEES} from '../graphql/mutations';
+import {GET_PROJECT_DETAILS, GET_TASKS_BY_SUBGROUP, GET_TASKS_BY_ASSIGNEE_AND_PROJECT, GET_ALL_SUBTASKS, GET_TAGS} from '../graphql/queries';
+import {UPDATE_TASK, DELETE_TASK, CREATE_TASK, SET_TASK_ASSIGNEES, CREATE_TAG, ADD_TAG_TO_TASK, REMOVE_TAG_FROM_TASK, DELETE_TAG_FROM_PROJECT} from '../graphql/mutations';
 import {useAuth} from '../contexts/AuthContext';
 import SubgroupsPanel from './SubgroupsPanel';
 import TaskModal from './TaskModal';
@@ -31,38 +31,53 @@ const KanbanBoard = () => {
     const [viewMode, setViewMode] = useState('kanban');
     const [highlightedTask, setHighlightedTask] = useState(null);
 
-    // Состояния для подзадач на карточках
+    const [selectedTagFilters, setSelectedTagFilters] = useState([]);
+    const [showTagFilter, setShowTagFilter] = useState(false);
+
     const [expandedTaskId, setExpandedTaskId] = useState(null);
     const [subTasksCache, setSubTasksCache] = useState({});
     const [loadingSubTasks, setLoadingSubTasks] = useState({});
     const [contextMenuTaskId, setContextMenuTaskId] = useState(null);
+    const [contextMenuTask, setContextMenuTask] = useState(null);
     const [showContextMenu, setShowContextMenu] = useState(false);
     const [contextMenuPosition, setContextMenuPosition] = useState({ x: 0, y: 0 });
+    const [newTagName, setNewTagName] = useState('');
+    const [newTagColor, setNewTagColor] = useState('#3b82f6');
     const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
-
-    // Кэш для задач по группам
+    const [showCreateTag, setShowCreateTag] = useState(false);
+    const [refreshContextMenu, setRefreshContextMenu] = useState(0);
     const [cachedTasks, setCachedTasks] = useState({});
 
-    // Состояния для сортировки
     const [sortBy, setSortBy] = useState('dueDate');
     const [sortOrder, setSortOrder] = useState('asc');
     const [isMobileSort, setIsMobileSort] = useState(window.innerWidth <= 480);
 
-    // Состояния для фильтрации
     const [filters, setFilters] = useState({
         priority: [],
         dateFrom: null,
         dateTo: null,
-        assignee: null
+        assignee: null,
+        tags: []
     });
     const [showFilterModal, setShowFilterModal] = useState(false);
+    const [deleteTagConfirm, setDeleteTagConfirm] = useState({isOpen: false, tagId: null, tagName: ''});
+
 
     const [createTask] = useMutation(CREATE_TASK);
     const [updateTask] = useMutation(UPDATE_TASK);
     const [deleteTask] = useMutation(DELETE_TASK);
     const [setTaskAssignees] = useMutation(SET_TASK_ASSIGNEES);
+    const [createTag] = useMutation(CREATE_TAG);
+    const [addTagToTask] = useMutation(ADD_TAG_TO_TASK);
+    const [removeTagFromTask] = useMutation(REMOVE_TAG_FROM_TASK);
+    const [deleteTagFromProject] = useMutation(DELETE_TAG_FROM_PROJECT);
 
-    // Эффект для подсветки задачи
+    const { data: tagsData, refetch: refetchTags } = useQuery(GET_TAGS, {
+        variables: { projectId },
+        skip: !projectId,
+    });
+    const availableTags = tagsData?.tags || [];
+
     useEffect(() => {
         if (highlightTaskId) {
             setHighlightedTask(highlightTaskId);
@@ -86,7 +101,12 @@ const KanbanBoard = () => {
     useEffect(() => {
         if (!projectId) navigate('/');
     }, [projectId, navigate]);
-
+    useEffect(() => {
+        if (projectId) {
+            console.log('Loading tags for project:', projectId);
+            refetchTags();
+        }
+    }, [projectId, refetchTags]);
     useEffect(() => {
         const handleResize = () => {
             setIsMobile(window.innerWidth <= 768);
@@ -97,7 +117,10 @@ const KanbanBoard = () => {
     }, []);
 
     useEffect(() => {
-        const handleClickOutside = () => setShowContextMenu(false);
+        const handleClickOutside = () => {
+            setShowContextMenu(false);
+            setShowCreateTag(false);
+        };
         document.addEventListener('click', handleClickOutside);
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
@@ -137,6 +160,32 @@ const KanbanBoard = () => {
         }
     }, [tasksData, myTasksData, activeSubgroupId]);
 
+    // Синхронизация contextMenuTask при обновлении данных
+    useEffect(() => {
+        if (contextMenuTask && contextMenuTask.id && showContextMenu) {
+            let updatedTask = null;
+
+            if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
+                updatedTask = myTasksData.tasksByAssigneeAndProject.find(t => t.id === contextMenuTask.id);
+            } else if (tasksData?.tasksBySubgroup) {
+                updatedTask = tasksData.tasksBySubgroup.find(t => t.id === contextMenuTask.id);
+            }
+
+            if (updatedTask && updatedTask.tags) {
+                const currentTagIds = contextMenuTask.tags?.map(t => t.id).sort().join(',');
+                const newTagIds = updatedTask.tags.map(t => t.id).sort().join(',');
+
+                if (currentTagIds !== newTagIds) {
+                    setContextMenuTask(prev => ({
+                        ...prev,
+                        tags: [...updatedTask.tags]
+                    }));
+                    setRefreshContextMenu(prev => prev + 1);
+                }
+            }
+        }
+    }, [myTasksData, tasksData, activeSubgroupId, contextMenuTask?.id, showContextMenu]);
+
     const fetchSubTasksForTask = useCallback(async (taskId, force = false) => {
         if (!force && subTasksCache[taskId]) return;
 
@@ -174,6 +223,7 @@ const KanbanBoard = () => {
         }
     }, [expandedTaskId, subTasksCache, fetchSubTasksForTask]);
 
+    // Добавление подзадачи
     const handleAddSubTaskFromMenu = async (taskId) => {
         if (!newSubTaskTitle.trim()) return;
         try {
@@ -205,19 +255,163 @@ const KanbanBoard = () => {
         }
     };
 
-    const handleToggleSubTaskComplete = async (taskId, subTaskId, currentStatus) => {
-        const newStatus = currentStatus === 2 ? 'TODO' : 'REVIEW';
-        await updateTask({
-            variables: { id: subTaskId, status: newStatus }
-        });
-        await fetchSubTasksForTask(taskId, true);
-        await refetchCurrentTasks();
+    // Функция для добавления тега к задаче
+    const handleAddTagToTask = async (taskId, tagId) => {
+        try {
+            const result = await addTagToTask({
+                variables: { taskId, tagId }
+            });
+
+            if (result?.data?.addTagToTask) {
+                setContextMenuTask(prev => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        tags: [...(result.data.addTagToTask.tags || [])]
+                    };
+                });
+                setRefreshContextMenu(prev => prev + 1);
+            }
+
+            await refetchCurrentTasks();
+        } catch (err) {
+            console.error('Ошибка добавления тега:', err);
+            alert('Ошибка добавления тега: ' + err.message);
+        }
     };
 
-    const handleDeleteSubTask = async (taskId, subTaskId) => {
-        await deleteTask({ variables: { id: subTaskId } });
-        await fetchSubTasksForTask(taskId, true);
-        await refetchCurrentTasks();
+    const handleRemoveTagFromTask = async (taskId, tagId) => {
+        try {
+            const result = await removeTagFromTask({
+                variables: { taskId, tagId }
+            });
+
+            if (result?.data?.removeTagFromTask) {
+                setContextMenuTask(prev => {
+                    if (!prev) return prev;
+                    return {
+                        ...prev,
+                        tags: [...(result.data.removeTagFromTask.tags || [])]
+                    };
+                });
+                setRefreshContextMenu(prev => prev + 1);
+            }
+
+            await refetchCurrentTasks();
+        } catch (err) {
+            console.error('Ошибка удаления тега:', err);
+            alert('Ошибка удаления тега: ' + err.message);
+        }
+    };
+
+    // Функция для создания и добавления нового тега
+    const handleCreateAndAddTag = async (taskId) => {
+        if (!newTagName.trim()) return;
+        try {
+            const tagResult = await createTag({
+                variables: {
+                    projectId: projectId,
+                    name: newTagName.trim(),
+                    color: newTagColor
+                }
+            });
+            const newTagId = tagResult.data.createTag.id;
+
+            const addResult = await addTagToTask({
+                variables: { taskId, tagId: newTagId }
+            });
+
+            if (addResult?.data?.addTagToTask) {
+                setContextMenuTask(prev => ({
+                    ...prev,
+                    tags: [...(addResult.data.addTagToTask.tags || [])]
+                }));
+                setRefreshContextMenu(prev => prev + 1);
+            }
+
+            setNewTagName('');
+            setNewTagColor('#3b82f6');
+            setShowCreateTag(false);
+            await refetchCurrentTasks();
+            await refetchTags();
+        } catch (err) {
+            console.error('Ошибка создания и добавления тега:', err);
+            alert('Ошибка: ' + err.message);
+        }
+    };
+
+    const handleDeleteTagFromProject = (tagId, tagName) => {
+        setDeleteTagConfirm({isOpen: true, tagId, tagName});
+    };
+
+    const confirmDeleteTagFromProject = async () => {
+        if (!deleteTagConfirm.tagId) return;
+        try {
+            await deleteTagFromProject({
+                variables: {
+                    tagId: deleteTagConfirm.tagId,
+                    projectId: projectId
+                },
+                update: (cache) => {
+                    cache.evict({ fieldName: 'tags' });
+                    cache.evict({ fieldName: 'tasksBySubgroup' });
+                    cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
+                    cache.gc();
+                }
+            });
+            setDeleteTagConfirm({isOpen: false, tagId: null, tagName: ''});
+
+            await refetchTags();
+            await refetchCurrentTasks();
+            setShowContextMenu(false);
+        } catch (err) {
+            console.error('Ошибка удаления тега:', err);
+            alert('Ошибка удаления тега: ' + err.message);
+            setDeleteTagConfirm({isOpen: false, tagId: null, tagName: ''});
+        }
+    };
+
+    const openContextMenu = (e, task) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        // Получаем актуальную задачу из данных Apollo
+        let actualTask = null;
+
+        if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
+            actualTask = myTasksData.tasksByAssigneeAndProject.find(t => t.id === task.id);
+        } else if (tasksData?.tasksBySubgroup) {
+            actualTask = tasksData.tasksBySubgroup.find(t => t.id === task.id);
+        }
+
+        // Если не нашли в данных, используем переданную задачу
+        if (!actualTask) {
+            actualTask = task;
+        }
+
+        setContextMenuTaskId(actualTask.id);
+        setContextMenuTask({
+            ...actualTask,
+            tags: actualTask.tags ? [...actualTask.tags] : []
+        });
+
+        setContextMenuPosition({ x: e.clientX, y: e.clientY });
+        setShowContextMenu(true);
+        setNewTagName('');
+        setNewTagColor('#3b82f6');
+        setNewSubTaskTitle('');
+        setShowCreateTag(false);
+    };
+
+    const handleContextMenuDelete = async () => {
+        if (contextMenuTaskId) {
+            await deleteTask({ variables: { id: contextMenuTaskId } });
+            client.cache.evict({ fieldName: 'tasksBySubgroup' });
+            client.cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
+            client.cache.gc();
+            await refetchCurrentTasks();
+        }
+        setShowContextMenu(false);
     };
 
     useEffect(() => {
@@ -244,8 +438,10 @@ const KanbanBoard = () => {
             priority: [],
             dateFrom: null,
             dateTo: null,
-            assignee: null
+            assignee: null,
+            tags: []
         });
+        setSelectedTagFilters([]);
         setExpandedTaskId(null);
         setSubTasksCache({});
     };
@@ -302,6 +498,12 @@ const KanbanBoard = () => {
         if (filters.assignee) {
             filtered = filtered.filter(task =>
                 task.assignees?.some(a => a.id === filters.assignee)
+            );
+        }
+
+        if (filters.tags && filters.tags.length > 0) {
+            filtered = filtered.filter(task =>
+                task.tags?.some(tag => filters.tags.includes(tag.id))
             );
         }
 
@@ -424,6 +626,7 @@ const KanbanBoard = () => {
         if (filters.priority.length > 0) count++;
         if (filters.dateFrom || filters.dateTo) count++;
         if (filters.assignee) count++;
+        if (filters.tags.length > 0) count++;
         return count;
     };
 
@@ -448,8 +651,21 @@ const KanbanBoard = () => {
         setFilters(prev => ({ ...prev, assignee: e.target.value || null }));
     };
 
+    const handleTagFilterToggle = (tagId) => {
+        setFilters(prev => ({
+            ...prev,
+            tags: prev.tags.includes(tagId)
+                ? prev.tags.filter(id => id !== tagId)
+                : [...prev.tags, tagId]
+        }));
+        setSelectedTagFilters(prev =>
+            prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
+        );
+    };
+
     const resetFilters = () => {
-        setFilters({ priority: [], dateFrom: null, dateTo: null, assignee: null });
+        setFilters({ priority: [], dateFrom: null, dateTo: null, assignee: null, tags: [] });
+        setSelectedTagFilters([]);
     };
 
     let targetSubgroupForAssign = null;
@@ -491,6 +707,14 @@ const KanbanBoard = () => {
     const handleSaveTask = async (taskData) => {
         try {
             const formattedDueDate = taskData.dueDate ? new Date(taskData.dueDate).toISOString() : null;
+
+            let statusValue = taskData.status;
+            if (typeof statusValue === 'number') {
+                statusValue = statusValue === 0 ? 'TODO' : statusValue === 1 ? 'IN_PROGRESS' : 'REVIEW';
+            }
+            statusValue = statusValue?.toUpperCase();
+            if (statusValue === 'INPROGRESS') statusValue = 'IN_PROGRESS';
+
             if (editingTask) {
                 await updateTask({
                     variables: {
@@ -499,7 +723,7 @@ const KanbanBoard = () => {
                         description: taskData.description || null,
                         dueDate: formattedDueDate,
                         value: taskData.value,
-                        status: taskData.status,
+                        status: statusValue,
                     },
                 });
                 if (taskData.assigneeIds) {
@@ -532,7 +756,7 @@ const KanbanBoard = () => {
                         description: taskData.description || null,
                         dueDate: formattedDueDate,
                         value: taskData.value || 0,
-                        status: taskData.status || 'TODO',
+                        status: statusValue,
                         assigneeIds,
                         parentTaskId: null
                     },
@@ -606,22 +830,6 @@ const KanbanBoard = () => {
         return sortOrder === 'asc' ? <i className="fas fa-sort-up"></i> : <i className="fas fa-sort-down"></i>;
     };
 
-    const openContextMenu = (e, taskId) => {
-        e.preventDefault();
-        e.stopPropagation();
-        setContextMenuTaskId(taskId);
-        setContextMenuPosition({ x: e.clientX, y: e.clientY });
-        setShowContextMenu(true);
-        setNewSubTaskTitle('');
-    };
-
-    const handleContextMenuDelete = async () => {
-        if (contextMenuTaskId) {
-            await handleDeleteTask(contextMenuTaskId);
-        }
-        setShowContextMenu(false);
-    };
-
     const FilterModal = () => (
         <div className="modal-overlay" onClick={() => setShowFilterModal(false)}>
             <div className="modal-content filter-modal" onClick={(e) => e.stopPropagation()}>
@@ -682,6 +890,33 @@ const KanbanBoard = () => {
                             ))}
                         </select>
                     </div>
+                    <div className="filter-divider"></div>
+                    <div className="filter-section">
+                        <div className="filter-section-title"><i className="fas fa-tags"></i> Теги</div>
+                        <div className="filter-options">
+                            {availableTags.map((tag, idx) => (
+                                <label
+                                    key={`filter-tag-${tag.id}-${idx}`}
+                                    className={`filter-option ${filters.tags.includes(tag.id) ? 'active' : ''}`}
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={filters.tags.includes(tag.id)}
+                                        onChange={() => handleTagFilterToggle(tag.id)}
+                                    />
+                                    <span style={{
+                                        backgroundColor: tag.color,
+                                        padding: '2px 8px',
+                                        borderRadius: '12px',
+                                        color: 'white',
+                                        fontSize: '0.75rem'
+                                    }}>
+                                        {tag.name}
+                                    </span>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
                 </div>
                 <div className="filter-modal-actions">
                     <button className="btn btn--secondary" onClick={resetFilters}><i className="fas fa-eraser"></i> Сбросить все</button>
@@ -696,7 +931,7 @@ const KanbanBoard = () => {
         const dueWarningColor = getTaskDueDateColor(subTask);
         const childSubTasks = subTasksCache[subTask.id] || [];
         const completedSubCount = childSubTasks.filter(st => st.status === 2).length;
-        const isExpanded = expandedTaskId === subTask.id;
+        const isExpandedSub = expandedTaskId === subTask.id;
         const isLoading = loadingSubTasks[subTask.id];
 
         const subTaskStatus = normalizeStatus(subTask.status);
@@ -732,7 +967,7 @@ const KanbanBoard = () => {
                             </span>
                         </div>
                         {!isViewer && activeSubgroupId !== 'my-tasks' && (
-                            <button className="subtask-menu-btn" onClick={(e) => openContextMenu(e, subTask.id)}>
+                            <button className="subtask-menu-btn" onClick={(e) => openContextMenu(e, subTask)}>
                                 <i className="fas fa-ellipsis-v"></i>
                             </button>
                         )}
@@ -783,12 +1018,12 @@ const KanbanBoard = () => {
                 <div className="task-card-footer subtask-footer">
                     {childSubTasks.length > 0 && (
                         <button className="task-expand-btn subtask-expand-btn" onClick={(e) => { e.stopPropagation(); toggleExpandTask(subTask.id); }}>
-                            <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i> {childSubTasks.length} подзадач
+                            <i className={`fas fa-chevron-${isExpandedSub ? 'up' : 'down'}`}></i> {childSubTasks.length} подзадач
                         </button>
                     )}
                 </div>
 
-                {isExpanded && (
+                {isExpandedSub && (
                     <div className="task-subtasks-expanded subtask-subtasks-expanded" onClick={(e) => e.stopPropagation()}>
                         {isLoading ? <div className="subtask-loading">Загрузка...</div> : childSubTasks.map(nestedSubTask => (
                             <SubTaskCard key={nestedSubTask.id} subTask={nestedSubTask} level={level + 1} />
@@ -893,7 +1128,9 @@ const KanbanBoard = () => {
                             <div key={status} className="kanban-column" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, status)}>
                                 <div className="kanban-column-header">
                                     <h3 style={{borderLeftColor: statusColors[status]}}>{statusLabels[status]}</h3>
-                                    <span className="kanban-task-count">{tasksByStatus[status].length}</span>
+                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                        <span className="kanban-task-count">{tasksByStatus[status].length}</span>
+                                    </div>
                                 </div>
                                 <div className="kanban-task-list">
                                     {tasksByStatus[status].map((task) => {
@@ -902,14 +1139,14 @@ const KanbanBoard = () => {
                                         const subTasksCount = task.subTasksCount || 0;
                                         const currentSubTasks = subTasksCache[task.id] || [];
                                         const completedSubCount = currentSubTasks.filter(st => st.status === 2).length;
-                                        const isExpanded = expandedTaskId === task.id;
+                                        const isExpandedTask = expandedTaskId === task.id;
                                         const isLoadingSubTasks = loadingSubTasks[task.id];
 
                                         return (
                                             <div
                                                 key={task.id}
                                                 id={`task-${task.id}`}
-                                                className={`task-card ${isExpanded ? 'expanded' : ''} ${highlightedTask === task.id ? 'task-highlighted' : ''}`}
+                                                className={`task-card ${isExpandedTask ? 'expanded' : ''} ${highlightedTask === task.id ? 'task-highlighted' : ''}`}
                                                 style={getTaskCardStyle(task)}
                                                 draggable={!isViewer}
                                                 onDragStart={(e) => handleDragStart(e, task.id, status)}
@@ -922,11 +1159,32 @@ const KanbanBoard = () => {
                                                             {subTasksCount > 0 && <span className="subtasks-badge">{completedSubCount}/{subTasksCount}</span>}
                                                         </div>
                                                         {!isViewer && activeSubgroupId !== 'my-tasks' && (
-                                                            <button className="task-menu-btn-top" onClick={(e) => openContextMenu(e, task.id)}>
+                                                            <button className="task-menu-btn-top" onClick={(e) => openContextMenu(e, task)}>
                                                                 <i className="fas fa-ellipsis-v"></i>
                                                             </button>
                                                         )}
                                                     </div>
+
+                                                    {task.tags && task.tags.length > 0 && (
+                                                        <div className="task-tags" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                                                            {task.tags.map((tag, idx) => (
+                                                                <span
+                                                                    key={`${task.id}-tag-${tag.id}-${idx}`}
+                                                                    style={{
+                                                                        backgroundColor: tag.color || '#3b82f6',
+                                                                        color: 'white',
+                                                                        padding: '2px 8px',
+                                                                        borderRadius: '12px',
+                                                                        fontSize: '0.65rem',
+                                                                        whiteSpace: 'nowrap'
+                                                                    }}
+                                                                >
+                                                                    {tag.name}
+                                                                </span>
+                                                            ))}
+                                                        </div>
+                                                    )}
+
                                                     <div className="task-bottom-row">
                                                         <div className={`task-priority priority-${task.value || 2}`}>
                                                             {task.value === 1 && <>Низкая</>}
@@ -944,7 +1202,7 @@ const KanbanBoard = () => {
                                                         </div>
                                                     </div>
                                                     <div className="task-assignees">
-                                                        {task.assignees?.slice(0, 3).map(a => (
+                                                        {task.assignees?.map(a => (
                                                             <div key={a.id} className="assignee-wrapper">
                                                                 <span className="assignee-name"><i className="fas fa-user"></i> {a.fullName}</span>
                                                                 <span className="assignee-tooltip">{a.email}</span>
@@ -956,11 +1214,11 @@ const KanbanBoard = () => {
                                                 <div className="task-card-footer">
                                                     {subTasksCount > 0 && (
                                                         <button className="task-expand-btn" onClick={(e) => { e.stopPropagation(); toggleExpandTask(task.id); }}>
-                                                            <i className={`fas fa-chevron-${isExpanded ? 'up' : 'down'}`}></i> {subTasksCount} подзадач
+                                                            <i className={`fas fa-chevron-${isExpandedTask ? 'up' : 'down'}`}></i> {subTasksCount} подзадач
                                                         </button>
                                                     )}
                                                 </div>
-                                                {isExpanded && (
+                                                {isExpandedTask && (
                                                     <div className="task-subtasks-expanded" onClick={(e) => e.stopPropagation()}>
                                                         {isLoadingSubTasks ? <div className="subtask-loading">Загрузка подзадач...</div> : currentSubTasks.map(subTask => (
                                                             <SubTaskCard key={subTask.id} subTask={subTask} level={1} />
@@ -990,23 +1248,161 @@ const KanbanBoard = () => {
                     canEdit={!isViewer && (editingTask?.createdBy?.id === user.id || canEditProject)}
                     isViewer={isViewer}
                     onClose={handleCloseTaskModal}
+                    projectId={projectId}
+                    refetchProjectTags={refetchTags}
                 />
             )}
 
             <ConfirmModal isOpen={deleteConfirm.isOpen} title="Удаление задачи" message="Вы действительно хотите удалить эту задачу? Это действие необратимо." onConfirm={confirmDeleteTask} onCancel={() => setDeleteConfirm({isOpen: false, taskId: null})} />
 
-            {showContextMenu && (
-                <div className="context-menu" style={{ position: 'fixed', top: contextMenuPosition.y, left: contextMenuPosition.x, zIndex: 10000 }} onClick={(e) => e.stopPropagation()}>
-                    <div className="context-menu-item" onClick={handleContextMenuDelete}><i className="fas fa-trash-alt"></i> Удалить задачу</div>
+            {/* Контекстное меню с подзадачами и тегами */}
+            {showContextMenu && contextMenuTask && (
+                <div
+                    key={refreshContextMenu}
+                    className="context-menu"
+                    style={{ position: 'fixed', top: contextMenuPosition.y, left: contextMenuPosition.x, zIndex: 10000 }}
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <div className="context-menu-item" onClick={handleContextMenuDelete}>
+                        <i className="fas fa-trash-alt"></i> Удалить задачу
+                    </div>
+
+                    <div className="context-menu-divider"></div>
+
+                    {/* Блок добавления подзадачи */}
                     <div className="context-menu-subtask">
                         <div className="context-menu-subtask-form">
-                            <input type="text" placeholder="Название подзадачи..." value={newSubTaskTitle} onChange={(e) => setNewSubTaskTitle(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && handleAddSubTaskFromMenu(contextMenuTaskId)} autoFocus />
-                            <button onClick={() => handleAddSubTaskFromMenu(contextMenuTaskId)}>Добавить</button>
+                            <input
+                                type="text"
+                                placeholder="Название подзадачи..."
+                                value={newSubTaskTitle}
+                                onChange={(e) => setNewSubTaskTitle(e.target.value)}
+                                onKeyPress={(e) => e.key === 'Enter' && handleAddSubTaskFromMenu(contextMenuTaskId)}
+                                autoFocus
+                            />
+                            <button onClick={() => handleAddSubTaskFromMenu(contextMenuTaskId)}>Добавить подзадачу</button>
+                        </div>
+                    </div>
+
+                    <div className="context-menu-divider"></div>
+
+                    {/* Блок тегов */}
+                    <div style={{ padding: '8px 16px' }}>
+                        <div style={{ fontWeight: '500', marginBottom: '8px', fontSize: '0.8rem', color: '#1e293b' }}>
+                            <i className="fas fa-tags"></i> Теги
+                        </div>
+                        <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                            {availableTags.map(tag => {
+                                const taskTags = contextMenuTask?.tags || [];
+                                const isTagOnTask = taskTags.some(t => t.id === tag.id);
+
+                                return (
+                                    <div key={`context-tag-${tag.id}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (isTagOnTask) {
+                                                    handleRemoveTagFromTask(contextMenuTask.id, tag.id);
+                                                } else {
+                                                    handleAddTagToTask(contextMenuTask.id, tag.id);
+                                                }
+                                            }}
+                                            style={{
+                                                backgroundColor: isTagOnTask ? tag.color : 'transparent',
+                                                color: isTagOnTask ? 'white' : tag.color,
+                                                border: `1px solid ${tag.color}`,
+                                                borderRadius: '20px',
+                                                padding: '4px 12px',
+                                                fontSize: '0.8rem',
+                                                cursor: 'pointer',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {tag.name}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => handleDeleteTagFromProject(tag.id, tag.name)}
+                                            style={{
+                                                background: 'none',
+                                                border: 'none',
+                                                color: '#ef4444',
+                                                cursor: 'pointer',
+                                                fontSize: '0.7rem',
+                                                padding: '4px'
+                                            }}
+                                            title="Удалить тег из проекта"
+                                        >
+                                            <i className="fas fa-times-circle"></i>
+                                        </button>
+                                    </div>
+                                );
+                            })}
+
+                            {!showCreateTag ? (
+                                <button
+                                    type="button"
+                                    className="btn btn--secondary btn--small"
+                                    onClick={() => setShowCreateTag(true)}
+                                    style={{
+                                        background: '#f1f5f9',
+                                        border: 'none',
+                                        borderRadius: '20px',
+                                        padding: '4px 12px',
+                                        fontSize: '0.75rem',
+                                        cursor: 'pointer'
+                                    }}
+                                >
+                                    <i className="fas fa-plus"></i> Новый тег
+                                </button>
+                            ) : (
+                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                    <input
+                                        type="text"
+                                        className="form-input"
+                                        placeholder="Название тега"
+                                        value={newTagName}
+                                        onChange={(e) => setNewTagName(e.target.value)}
+                                        style={{ flex: 1, padding: '4px 8px', fontSize: '0.75rem', width: '100px' }}
+                                        autoFocus
+                                    />
+                                    <input
+                                        type="color"
+                                        value={newTagColor}
+                                        onChange={(e) => setNewTagColor(e.target.value)}
+                                        style={{ width: '30px', height: '30px', borderRadius: '6px', cursor: 'pointer' }}
+                                    />
+                                    <button
+                                        type="button"
+                                        className="btn"
+                                        onClick={() => handleCreateAndAddTag(contextMenuTask.id)}
+                                        style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                                    >
+                                        <i className="fas fa-check"></i>
+                                    </button>
+                                    <button
+                                        type="button"
+                                        className="btn btn--secondary"
+                                        onClick={() => setShowCreateTag(false)}
+                                        style={{ padding: '4px 8px', fontSize: '0.7rem' }}
+                                    >
+                                        <i className="fas fa-times"></i>
+                                    </button>
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
             )}
-
+            <ConfirmModal
+                isOpen={deleteTagConfirm.isOpen}
+                title="Удаление тега из проекта"
+                message={`Вы действительно хотите удалить тег "${deleteTagConfirm.tagName}" из проекта? Это удалит тег отовсюду.`}
+                onConfirm={confirmDeleteTagFromProject}
+                onCancel={() => setDeleteTagConfirm({isOpen: false, tagId: null, tagName: ''})}
+                confirmText="Удалить"
+                confirmStyle="btn--danger"
+            />
             {isMobile && showMobileGroups && (
                 <div className="mobile-groups-modal" onClick={() => setShowMobileGroups(false)}>
                     <div onClick={(e) => e.stopPropagation()}>
