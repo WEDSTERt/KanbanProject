@@ -20,15 +20,18 @@ public class SubgroupService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final SubgroupMemberRepository subgroupMemberRepository;
+    private final EmailNotificationService emailNotificationService;
 
     public SubgroupService(SubgroupRepository subgroupRepository,
                            ProjectRepository projectRepository,
                            UserRepository userRepository,
-                           SubgroupMemberRepository subgroupMemberRepository) {
+                           SubgroupMemberRepository subgroupMemberRepository,
+                           EmailNotificationService emailNotificationService) {
         this.subgroupRepository = subgroupRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.subgroupMemberRepository = subgroupMemberRepository;
+        this.emailNotificationService = emailNotificationService;
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails"}, allEntries = true)
@@ -88,6 +91,26 @@ public class SubgroupService {
             throw new RuntimeException("User already member of this subgroup");
         }
         SubgroupMember sm = new SubgroupMember(subgroup, user, role != null ? role : RoleSubgroup.MEMBER);
+        return subgroupMemberRepository.save(sm);
+    }
+
+    @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
+    @Transactional
+    public SubgroupMember addSubgroupMemberWithNotification(Long subgroupId, Long userId, RoleSubgroup role, User addedBy) {
+        Subgroup subgroup = subgroupRepository.findById(subgroupId)
+                .orElseThrow(() -> new RuntimeException("Subgroup not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (subgroupMemberRepository.existsBySubgroupIdAndUserId(subgroupId, userId)) {
+            throw new RuntimeException("User already member of this subgroup");
+        }
+        SubgroupMember sm = new SubgroupMember(subgroup, user, role != null ? role : RoleSubgroup.MEMBER);
+
+        // Отправляем уведомление
+        if (addedBy != null && !addedBy.getId().equals(userId)) {
+            emailNotificationService.notifyUserAddedToSubgroup(subgroup, user, addedBy, role != null ? role.name() : "MEMBER");
+        }
+
         return subgroupMemberRepository.save(sm);
     }
 

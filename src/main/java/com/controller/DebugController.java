@@ -4,6 +4,7 @@ import com.entity.*;
 import com.repository.*;
 import com.service.*;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.CacheManager;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -42,6 +43,12 @@ public class DebugController {
     @Autowired
     private ProjectService projectService;
 
+    @Value("${app.verification.ttl.hours:24}")
+    private int verificationTtlHours;
+
+    @Value("${app.verification.auto-delete.enabled:true}")
+    private boolean autoDeleteEnabled;
+
     // ============ ОБЩАЯ ИНФОРМАЦИЯ ============
 
     @GetMapping("/info")
@@ -72,6 +79,25 @@ public class DebugController {
     @GetMapping("/users/email/{email}")
     public Optional<User> getUserByEmail(@PathVariable String email) {
         return userRepository.findByEmail(email);
+    }
+
+    @GetMapping("/users/unverified/count")
+    public Map<String, Object> getUnverifiedUsersCount() {
+        Map<String, Object> result = new HashMap<>();
+        long count = userRepository.countUnverifiedUsers();
+        result.put("unverifiedCount", count);
+        result.put("autoDeleteEnabled", autoDeleteEnabled);
+        result.put("ttlHours", verificationTtlHours);
+        return result;
+    }
+
+    @DeleteMapping("/users/unverified/cleanup")
+    public Map<String, Object> cleanupUnverifiedUsers() {
+        int deletedCount = userService.manuallyDeleteExpiredUsers();
+        Map<String, Object> result = new HashMap<>();
+        result.put("deletedCount", deletedCount);
+        result.put("message", "Удалено " + deletedCount + " неподтвержденных аккаунтов");
+        return result;
     }
 
     // ============ ПРОЕКТЫ ============
@@ -147,11 +173,9 @@ public class DebugController {
     public Map<String, Object> testProjectsForUser(@PathVariable Long userId) {
         Map<String, Object> result = new HashMap<>();
 
-        // Проверяем через репозиторий напрямую
         List<Project> ownedViaRepo = projectRepository.findByOwnerUserId(userId);
         List<Project> memberViaRepo = projectRepository.findProjectsByMemberUserId(userId);
 
-        // Проверяем через сервис (с кэшем)
         List<Project> ownedViaService = projectService.findProjectsByOwner(userId);
         List<Project> memberViaService = projectService.findProjectsByMember(userId);
 
@@ -170,7 +194,6 @@ public class DebugController {
     public Map<String, Object> testRawSQL(@PathVariable Long userId) {
         Map<String, Object> result = new HashMap<>();
 
-        // Симулируем прямой SQL запрос через JPA
         List<Map<String, Object>> projects = new ArrayList<>();
         for (Project p : projectRepository.findAll()) {
             for (ProjectMember pm : p.getMembers()) {
@@ -221,11 +244,8 @@ public class DebugController {
         return "Cache '" + cacheName + "' not found!";
     }
 
-    // ============ ОЧИСТКА КЭША ПРИНУДИТЕЛЬНО (для кэшированных методов) ============
-
     @PostMapping("/refresh/member-projects/{userId}")
     public String refreshMemberProjects(@PathVariable Long userId) {
-        // Очищаем кэш projects для этого userId
         cacheManager.getCache("projects").evict(userId);
         return "Cache for userId " + userId + " cleared! Now call findProjectsByMember again.";
     }

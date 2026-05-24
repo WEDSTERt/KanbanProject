@@ -21,13 +21,16 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final EmailNotificationService emailNotificationService;
 
     public ProjectService(ProjectRepository projectRepository,
                           UserRepository userRepository,
-                          ProjectMemberRepository projectMemberRepository) {
+                          ProjectMemberRepository projectMemberRepository,
+                          EmailNotificationService emailNotificationService) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectMemberRepository = projectMemberRepository;
+        this.emailNotificationService = emailNotificationService;
     }
 
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
@@ -91,13 +94,40 @@ public class ProjectService {
 
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
+    public ProjectMember addProjectMemberWithNotification(Long projectId, Long userId, RoleProject role, User addedBy) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new RuntimeException("Project not found"));
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+        if (projectMemberRepository.existsByProjectIdAndUserId(projectId, userId)) {
+            throw new RuntimeException("User already member of this project");
+        }
+        ProjectMember pm = new ProjectMember(project, user, role != null ? role : RoleProject.VIEWER);
+
+        // Отправляем уведомление
+        if (addedBy != null && !addedBy.getId().equals(userId)) {
+            emailNotificationService.notifyUserAddedToProject(project, user, addedBy, role != null ? role.name() : "VIEWER");
+        }
+
+        return projectMemberRepository.save(pm);
+    }
+
+    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
+    @Transactional
     public ProjectMember updateProjectMember(Long memberId, RoleProject role) {
         ProjectMember pm = projectMemberRepository.findById(memberId)
                 .orElseThrow(() -> new RuntimeException("Project member not found"));
         pm.setRole(role);
         return projectMemberRepository.save(pm);
     }
-
+    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
+    @Transactional
+    public ProjectMember updateProjectNotifications(Long projectId, Long userId, Boolean notificationsEnabled) {
+        ProjectMember pm = projectMemberRepository.findByProjectIdAndUserId(projectId, userId)
+                .orElseThrow(() -> new RuntimeException("Project member not found"));
+        pm.setNotificationsEnabled(notificationsEnabled);
+        return projectMemberRepository.save(pm);
+    }
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public boolean removeProjectMember(Long memberId) {

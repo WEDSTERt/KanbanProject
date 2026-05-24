@@ -59,6 +59,9 @@ public class Task {
     @Column(name = "parent_task_id", insertable = false, updatable = false)
     private Long parentTaskId;
 
+    @Column(name = "overdue_notified", nullable = false)
+    private Boolean overdueNotified = false;
+
     @OneToMany(mappedBy = "parentTask", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<Task> subTasks = new ArrayList<>();
@@ -89,6 +92,7 @@ public class Task {
         this.createdBy = createdBy;
         this.createdByUserId = createdBy.getId();
         this.parentTaskId = 0L;
+        this.overdueNotified = false;
     }
 
     // Геттеры и сеттеры
@@ -151,6 +155,11 @@ public class Task {
     public Long getParentTaskId() { return parentTaskId; }
     public void setParentTaskId(Long parentTaskId) {
         this.parentTaskId = parentTaskId != null ? parentTaskId : 0L;
+    }
+
+    public Boolean getOverdueNotified() { return overdueNotified; }
+    public void setOverdueNotified(Boolean overdueNotified) {
+        this.overdueNotified = overdueNotified != null ? overdueNotified : false;
     }
 
     public List<Task> getSubTasks() { return subTasks; }
