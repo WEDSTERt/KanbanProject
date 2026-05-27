@@ -1,0 +1,8 @@
+{
+  "dependencies": {
+    "apollo-upload-client": "^17.0.0",
+    "extract-files": "^13.0.0",
+    "react-window": "^1.8.10",
+    "react-virtualized-auto-sizer": "^1.0.20"
+  }
+}

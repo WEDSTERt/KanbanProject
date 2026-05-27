@@ -1,8 +1,13 @@
 schema {
     query: Query
     mutation: Mutation
+    subscription: Subscription
 }
+
+scalar Long
 
 type Query
 
 type Mutation
+
+type Subscription

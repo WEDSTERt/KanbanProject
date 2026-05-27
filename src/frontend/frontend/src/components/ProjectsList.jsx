@@ -1,23 +1,44 @@
-import React, {useState, useEffect} from 'react';
-import {createPortal} from 'react-dom';
-import {useQuery, useMutation} from '@apollo/client';
-import {useNavigate} from 'react-router-dom';
-import {GET_USER_PROJECTS} from '../graphql/queries';
-import {CREATE_PROJECT} from '../graphql/mutations';
-import {useAuth} from '../contexts/AuthContext';
+import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
+import { useQuery, useMutation, useSubscription } from '@apollo/client';
+import { useNavigate } from 'react-router-dom';
+import { GET_USER_PROJECTS } from '../graphql/queries';
+import { CREATE_PROJECT } from '../graphql/mutations';
+import { PROJECT_UPDATED_SUBSCRIPTION } from '../graphql/subscriptions';
+import { useAuth } from '../contexts/AuthContext';
 
 const ProjectsList = () => {
-    const {user} = useAuth();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [projectName, setProjectName] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
+    const fileInputRef = useRef(null);
 
+    // Query с polling каждые 5 секунд
     const { loading, error, data, refetch } = useQuery(GET_USER_PROJECTS, {
         variables: { userId: user.id },
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'cache-and-network',
+        pollInterval: 5000, // Poll every 5 seconds for auto-updates
     });
 
     const [createProject] = useMutation(CREATE_PROJECT);
+
+    // 🔄 Подписка на обновления проектов (если WebSocket работает)
+    const { data: projectUpdateData, error: subscriptionError } = useSubscription(PROJECT_UPDATED_SUBSCRIPTION, {
+        skip: !user,
+        onError: (err) => {
+            console.warn('⚠️ Project subscription error (using polling):', err.message);
+        },
+    });
+
+    // Обновить список проектов когда пришло обновление через subscription
+    useEffect(() => {
+        if (projectUpdateData?.projectUpdated) {
+            console.log('📨 Project updated via subscription:', projectUpdateData.projectUpdated);
+            refetch();
+        }
+    }, [projectUpdateData, refetch]);
 
     useEffect(() => {
         document.body.style.overflow = showCreateModal ? 'hidden' : '';
@@ -43,7 +64,7 @@ const ProjectsList = () => {
         e.preventDefault();
         if (!projectName.trim()) return;
         try {
-            await createProject({variables: {name: projectName, ownerUserId: user.id}});
+            await createProject({ variables: { name: projectName, ownerUserId: user.id } });
             setShowCreateModal(false);
             setProjectName('');
             refetch();
@@ -58,6 +79,36 @@ const ProjectsList = () => {
 
     const handleOpenSettings = (projectId) => {
         navigate(`/settings?projectId=${projectId}`);
+    };
+
+    const handleImportProject = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        setIsImporting(true);
+        try {
+            const formData = new FormData();
+            formData.append('file', file);
+            const token = localStorage.getItem('jwtToken');
+            const response = await fetch('/api/import/project', {
+                method: 'POST',
+                headers: { Authorization: `Bearer ${token}` },
+                body: formData,
+            });
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Import failed');
+            }
+            const importedProject = await response.json();
+            alert(`Проект "${importedProject.name}" успешно импортирован`);
+            await refetch();
+            navigate(`/board?projectId=${importedProject.id}&subgroupId=my-tasks`);
+        } catch (err) {
+            console.error(err);
+            alert('Ошибка импорта проекта: ' + err.message);
+        } finally {
+            setIsImporting(false);
+            event.target.value = '';
+        }
     };
 
     const modalOverlayStyle = {
@@ -89,7 +140,7 @@ const ProjectsList = () => {
                             required
                         />
                     </div>
-                    <div className="flex-row" style={{justifyContent: 'flex-end', gap: '8px', marginTop: '16px'}}>
+                    <div className="flex-row" style={{ justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
                         <button type="button" className="btn btn--secondary" onClick={() => setShowCreateModal(false)}>
                             <i className="fas fa-times"></i> Отмена
                         </button>
@@ -103,23 +154,91 @@ const ProjectsList = () => {
         document.body
     );
 
+    const boardButtonStyle = {
+        background: '#5568d3',
+        fontWeight: 600,
+        fontSize: '15px',
+        padding: '12px 20px',
+        transition: 'all 0.3s ease',
+        border: 'none',
+        borderRadius: '8px',
+        color: 'white',
+        cursor: 'pointer',
+        flex: 1,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px'
+    };
+
+    const settingsButtonStyle = {
+        background: '#6c757d',
+        fontWeight: 600,
+        fontSize: '15px',
+        padding: '12px 16px',
+        transition: 'all 0.3s ease',
+        border: 'none',
+        borderRadius: '8px',
+        color: 'white',
+        cursor: 'pointer',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: '8px'
+    };
+
+    const handleBoardMouseEnter = (e) => {
+        e.target.style.transform = 'translateY(-2px)';
+        e.target.style.background = '#4556c0';
+    };
+
+    const handleBoardMouseLeave = (e) => {
+        e.target.style.transform = 'translateY(0)';
+        e.target.style.background = '#5568d3';
+    };
+
+    const handleSettingsMouseEnter = (e) => {
+        e.target.style.transform = 'translateY(-2px)';
+        e.target.style.background = '#5a626d';
+    };
+
+    const handleSettingsMouseLeave = (e) => {
+        e.target.style.transform = 'translateY(0)';
+        e.target.style.background = '#6c757d';
+    };
+
     return (
         <>
-            <div className="flex-row" style={{justifyContent: 'space-between', alignItems: 'center'}}>
-                <h2><i className="fas fa-folder-open"></i> Мои проекты</h2>
-                <button className="btn" onClick={() => setShowCreateModal(true)}>
-                    <i className="fas fa-plus"></i> Создать проект
-                </button>
+            <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <h2 style={{ margin: 0 }}><i className="fas fa-folder-open"></i> Мои прfоекты</h2>
+                <div className="flex-row" style={{ gap: '12px' }}>
+                    <button className="btn" onClick={() => setShowCreateModal(true)}>
+                        <i className="fas fa-plus"></i> Создать проект
+                    </button>
+                    <button
+                        className="btn btn--secondary"
+                        onClick={() => fileInputRef.current.click()}
+                        disabled={isImporting}
+                    >
+                        <i className="fas fa-upload"></i> {isImporting ? 'Импорт...' : 'Импорт проекта'}
+                    </button>
+                    <input
+                        type="file"
+                        ref={fileInputRef}
+                        accept=".zip"
+                        style={{ display: 'none' }}
+                        onChange={handleImportProject}
+                    />
+                </div>
             </div>
             {projects.length === 0 ? (
-                <p>У вас пока нет проектов. Нажмите «Создать проект».</p>
+                <p>У вас пока нет проектов. Нажмите «Создать проект» или «Импорт проекта».</p>
             ) : (
                 <div className="grid-2">
                     {projects.map((proj) => {
                         const isOwner = proj.owner.id === user.id;
                         const memberEntry = proj.members.find(m => m.userId === user.id);
                         const role = memberEntry?.role || (isOwner ? 'OWNER' : 'MEMBER');
-                        // Кнопка настроек видна для всех участников (OWNER, ADMIN, MEMBER)
                         const canViewSettings = role === 'OWNER' || role === 'ADMIN' || role === 'MEMBER';
 
                         return (
@@ -128,14 +247,22 @@ const ProjectsList = () => {
                                 <p><i className="fas fa-crown"></i> Владелец: {proj.owner.fullName}</p>
                                 <p><i className="fas fa-users"></i> Участников: {proj.members.length}</p>
                                 <p><i className="fas fa-tag"></i> Ваша роль: {role === 'OWNER' ? 'Владелец' : role === 'ADMIN' ? 'Администратор' : role === 'MEMBER' ? 'Участник' : 'Наблюдатель'}</p>
-                                <div className="flex-row mt-4">
-                                    <button className="btn btn--secondary btn--small"
-                                            onClick={() => handleOpenBoard(proj.id)}>
+                                <div className="flex-row mt-4" style={{ gap: '12px' }}>
+                                    <button
+                                        style={boardButtonStyle}
+                                        onClick={() => handleOpenBoard(proj.id)}
+                                        onMouseEnter={handleBoardMouseEnter}
+                                        onMouseLeave={handleBoardMouseLeave}
+                                    >
                                         <i className="fas fa-chalkboard"></i> Открыть доску
                                     </button>
                                     {canViewSettings && (
-                                        <button className="btn btn--small"
-                                                onClick={() => handleOpenSettings(proj.id)}>
+                                        <button
+                                            style={settingsButtonStyle}
+                                            onClick={() => handleOpenSettings(proj.id)}
+                                            onMouseEnter={handleSettingsMouseEnter}
+                                            onMouseLeave={handleSettingsMouseLeave}
+                                        >
                                             <i className="fas fa-cog"></i> Настройки
                                         </button>
                                     )}
@@ -145,7 +272,7 @@ const ProjectsList = () => {
                     })}
                 </div>
             )}
-            {showCreateModal && <Modal/>}
+            {showCreateModal && <Modal />}
         </>
     );
 };

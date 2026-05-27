@@ -1,0 +1,460 @@
+/* Settings & Forms Improvements */
+
+/* Account Settings */
+.account-settings-container {
+    max-width: 600px;
+}
+
+.account-settings-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    padding: 32px;
+    position: relative;
+}
+
+.account-settings-card h2 {
+    font-size: 26px;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 28px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.account-settings-card h2 i {
+    color: #667eea;
+    font-size: 28px;
+}
+
+/* Form Groups with better spacing */
+.account-settings-card .form-group {
+    margin-bottom: 20px;
+}
+
+.account-settings-card .form-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #1e293b;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.account-settings-card .form-input {
+    width: 100%;
+    padding: 11px 14px;
+    border: 2px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 13px;
+    transition: all 0.2s ease;
+    background: #f8fafc;
+}
+
+.account-settings-card .form-input:focus {
+    outline: none;
+    border-color: #667eea;
+    background: white;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.account-settings-card .form-input:hover:not(:focus) {
+    border-color: #cbd5e1;
+}
+
+/* Password row styling */
+.password-row {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.password-row .form-input {
+    padding-right: 44px;
+    width: 100%;
+}
+
+.password-toggle {
+    position: absolute;
+    right: 12px;
+    background: none;
+    border: none;
+    color: #64748b;
+    cursor: pointer;
+    font-size: 16px;
+    padding: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: color 0.2s ease;
+}
+
+.password-toggle:hover {
+    color: #667eea;
+}
+
+/* Form Actions */
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.form-actions .btn {
+    flex: 1;
+    padding: 12px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.form-actions .btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+/* Project Card */
+.project-card {
+    background: white;
+    border: 2px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    cursor: pointer;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.project-card:hover {
+    border-color: #667eea;
+    box-shadow: 0 12px 32px rgba(102, 126, 234, 0.2);
+    transform: translateY(-6px);
+}
+
+.project-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 12px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.project-card h3 i {
+    color: #667eea;
+    font-size: 20px;
+}
+
+.project-card p {
+    font-size: 13px;
+    color: #64748b;
+    margin: 6px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.project-card p i {
+    color: #94a3b8;
+    width: 16px;
+    text-align: center;
+}
+
+.mt-4 {
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid #e2e8f0;
+}
+
+.project-card .flex-row {
+    display: flex;
+    gap: 10px;
+    margin-top: auto;
+}
+
+/* Grid for projects */
+.grid-2 {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 20px;
+    margin-top: 20px;
+}
+
+/* Task Card */
+.task-card,
+.task-item {
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 12px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.task-card:hover,
+.task-item:hover {
+    border-color: #667eea;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.15);
+    background: #f8fbff;
+}
+
+.task-card h4,
+.task-item h4 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #0f172a;
+    margin: 0 0 8px 0;
+}
+
+.task-card p,
+.task-item p {
+    font-size: 12px;
+    color: #64748b;
+    margin: 4px 0;
+}
+
+/* Task Modal / Edit */
+.modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    padding: 28px;
+    max-width: 500px;
+    width: 90%;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    position: relative;
+}
+
+.modal-content h3 {
+    font-size: 20px;
+    font-weight: 700;
+    color: #0f172a;
+    margin: 0 0 20px 0;
+    border: none;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.modal-content h3 i {
+    color: #667eea;
+    font-size: 24px;
+}
+
+.modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: none;
+    border: none;
+    font-size: 24px;
+    cursor: pointer;
+    color: #94a3b8;
+    transition: color 0.2s ease;
+    padding: 8px;
+}
+
+.modal-close:hover {
+    color: #1e293b;
+}
+
+.modal-close--settings {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    background: none;
+    border: none;
+    font-size: 28px;
+    cursor: pointer;
+    color: #94a3b8;
+    transition: color 0.2s ease;
+    z-index: 10;
+    padding: 8px;
+}
+
+.modal-close--settings:hover {
+    color: #1e293b;
+}
+
+/* Messages */
+.message-success {
+    padding: 12px 16px;
+    background: #dcfce7;
+    border-left: 4px solid #22c55e;
+    border-radius: 6px;
+    color: #166534;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.message-error {
+    padding: 12px 16px;
+    background: #fee2e2;
+    border-left: 4px solid #ef4444;
+    border-radius: 6px;
+    color: #991b1b;
+    font-size: 13px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* Buttons */
+.btn {
+    padding: 10px 16px;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-family: inherit;
+}
+
+.btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn--primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.btn--secondary {
+    background: #f1f5f9;
+    color: #1e293b;
+    border: 2px solid #e2e8f0;
+}
+
+.btn--secondary:hover:not(:disabled) {
+    background: #e2e8f0;
+    border-color: #cbd5e1;
+}
+
+.btn--danger {
+    background: #fecaca;
+    color: #991b1b;
+    border: 2px solid #fca5a5;
+}
+
+.btn--danger:hover:not(:disabled) {
+    background: #fca5a5;
+    border-color: #f87171;
+}
+
+.btn--small {
+    padding: 8px 12px;
+    font-size: 12px;
+}
+
+/* Flex row */
+.flex-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Divider */
+.divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 24px 0;
+}
+
+/* Info message */
+.info-message {
+    padding: 12px 16px;
+    background: #f0fdf4;
+    border-left: 4px solid #22c55e;
+    border-radius: 6px;
+    color: #166534;
+    font-size: 13px;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .account-settings-card {
+        padding: 20px;
+    }
+
+    .modal-content {
+        padding: 20px;
+    }
+
+    .grid-2 {
+        grid-template-columns: 1fr;
+    }
+
+    .form-actions {
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 480px) {
+    .account-settings-card {
+        padding: 16px;
+    }
+
+    .account-settings-card h2 {
+        font-size: 20px;
+        margin-bottom: 20px;
+    }
+
+    .modal-content {
+        padding: 16px;
+        width: 95%;
+    }
+
+    .btn {
+        padding: 9px 12px;
+        font-size: 12px;
+    }
+
+    .form-input {
+        font-size: 12px;
+    }
+}

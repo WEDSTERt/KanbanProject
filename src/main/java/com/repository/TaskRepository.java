@@ -51,13 +51,11 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT t FROM Task t JOIN t.assignees a WHERE a.id = :userId")
     List<Task> findByAssigneesId(@Param("userId") Long userId);
 
-    // ИСПРАВЛЕНО: загружаем ТОЛЬКО assignees, БЕЗ tags
     @Query("SELECT DISTINCT t FROM Task t " +
             "LEFT JOIN FETCH t.assignees " +
             "WHERE t.subgroupId = :subgroupId AND (t.parentTaskId IS NULL OR t.parentTaskId = 0)")
     List<Task> findRootTasksBySubgroup(@Param("subgroupId") Long subgroupId);
 
-    // НОВЫЙ МЕТОД: загружаем tags отдельно
     @Query("SELECT DISTINCT t FROM Task t " +
             "LEFT JOIN FETCH t.tags " +
             "WHERE t.id IN :taskIds")
@@ -93,4 +91,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "AND (t.parentTaskId IS NULL OR t.parentTaskId = 0)")
     List<Task> findRootTasksByAssigneeAndProject(@Param("userId") Long userId,
                                                  @Param("projectId") Long projectId);
+
+    @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.subgroup sg LEFT JOIN FETCH sg.project p WHERE t.id = :taskId")
+    Optional<Task> findByIdWithSubgroupAndProject(@Param("taskId") Long taskId);
 }

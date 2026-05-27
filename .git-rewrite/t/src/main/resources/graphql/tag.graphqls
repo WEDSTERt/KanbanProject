@@ -1,0 +1,26 @@
+extend type Query {
+    tags(projectId: ID!): [Tag!]!
+}
+
+extend type Mutation {
+    createTag(projectId: ID!, name: String!, color: String): Tag!
+    updateTag(id: ID!, name: String, color: String): Tag!
+    deleteTag(id: ID!): Boolean!
+    addTagToTask(taskId: ID!, tagId: ID!): Task!
+    addMultipleTagsToTask(taskId: ID!, tagIds: [ID!]!): Task!
+    removeTagFromTask(taskId: ID!, tagId: ID!): Task!
+    setTaskTags(taskId: ID!, tagIds: [ID!]!): Task!
+    deleteTagFromProject(tagId: ID!, projectId: ID!): Boolean!
+}
+
+extend type Task {
+    tags: [Tag!]!
+}
+
+type Tag {
+    id: ID!
+    name: String!
+    color: String!
+    projectId: ID!
+    createdAt: DateTime
+}

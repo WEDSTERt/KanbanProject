@@ -1,0 +1,44 @@
+/* Навигация (шапка) */
+.app-navbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: white;
+    padding: 12px 24px;
+    border-radius: 60px;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.02);
+    margin-bottom: 30px;
+    border: 1px solid #e2e8f0;
+}
+
+.app-logo {
+    font-weight: 700;
+    font-size: 1.5rem;
+    color: #2563eb;
+    letter-spacing: -0.02em;
+}
+
+.app-nav-links {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+}
+
+.app-nav-links a {
+    text-decoration: none;
+    color: #334155;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.app-nav-links a:hover {
+    color: #2563eb;
+}
+
+.app-user-info {
+    background: #f8fafc;
+    padding: 6px 16px;
+    border-radius: 40px;
+    font-size: 0.9rem;
+    border: 1px solid #e2e8f0;
+}

@@ -1,0 +1,34 @@
+extend type Query {
+    project(id: ID!): Project
+    projectsByOwner(ownerUserId: ID!): [Project!]!
+    projectsByMember(userId: ID!): [Project!]!
+}
+
+extend type Mutation {
+    createProject(name: String!, ownerUserId: ID!): Project!
+    updateProject(id: ID!, name: String): Project!
+    deleteProject(id: ID!): Boolean!
+    addProjectMember(projectId: ID!, userId: ID!, role: RoleProject): ProjectMember!
+    updateProjectMember(id: ID!, role: RoleProject): ProjectMember!
+    removeProjectMember(id: ID!): Boolean!
+    updateProjectNotifications(projectId: ID!, notificationsEnabled: Boolean!): ProjectMember!
+}
+
+type Project {
+    id: ID!
+    name: String!
+    owner: User!
+    ownerUserId: ID!
+    members: [ProjectMember!]!
+    subgroups: [Subgroup!]!
+}
+
+type ProjectMember {
+    id: ID!
+    project: Project!
+    projectId: ID!
+    user: User!
+    userId: ID!
+    role: RoleProject
+    notificationsEnabled: Boolean!
+}

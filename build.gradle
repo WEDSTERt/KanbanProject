@@ -31,6 +31,7 @@ dependencies {
     implementation 'com.graphql-java:graphql-java-extended-scalars:21.0'
     implementation 'org.springframework.boot:spring-boot-starter-security'
     implementation 'org.springframework.boot:spring-boot-starter-web'
+    implementation 'org.springframework.boot:spring-boot-starter-websocket'
     runtimeOnly 'org.postgresql:postgresql'
     implementation 'org.springframework.security:spring-security-crypto'
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
@@ -38,11 +39,18 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-impl:0.12.6'
     runtimeOnly 'io.jsonwebtoken:jjwt-jackson:0.12.6'
-    // Для HTTP запросов к Cloudflare API
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
-
-    // Java Mail Sender для отправки писем
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+    
+    // Google Calendar API
+    implementation 'com.google.apis:google-api-services-calendar:v3-rev411-1.25.0'
+    implementation 'com.google.http-client:google-http-client-jackson2:1.43.3'
+    implementation 'com.google.api-client:google-api-client:1.35.2'
+    
+    // Flyway для миграций
+    implementation 'org.flywaydb:flyway-core'
+    
+    // .env файл поддержка
+    implementation 'io.github.cdimascio:dotenv-java:3.0.0'
 }
-
-

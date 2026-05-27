@@ -1,0 +1,31 @@
+extend type Query {
+    subgroup(id: ID!): Subgroup
+    subgroupsByProject(projectId: ID!): [Subgroup!]!
+}
+
+extend type Mutation {
+    createSubgroup(projectId: ID!, name: String!, creatorUserId: ID!): Subgroup!
+    updateSubgroup(id: ID!, name: String): Subgroup!
+    deleteSubgroup(id: ID!): Boolean!
+    addSubgroupMember(subgroupId: ID!, userId: ID!, role: RoleSubgroup): SubgroupMember!
+    updateSubgroupMember(id: ID!, role: RoleSubgroup): SubgroupMember!
+    removeSubgroupMember(id: ID!): Boolean!
+}
+
+type Subgroup {
+    id: ID!
+    name: String!
+    project: Project!
+    projectId: ID!
+    members: [SubgroupMember!]!
+    tasks: [Task!]!
+}
+
+type SubgroupMember {
+    id: ID!
+    subgroup: Subgroup!
+    subgroupId: ID!
+    user: User!
+    userId: ID!
+    role: RoleSubgroup
+}

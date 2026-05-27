@@ -9,6 +9,9 @@
     cursor: pointer;
     transition: all 0.15s;
     border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .btn--secondary {
@@ -30,6 +33,11 @@
 .btn:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+}
+
+.btn:active {
+    transform: scale(0.98);
+    opacity: 0.9;
 }
 
 /* Карточки и формы */
@@ -134,11 +142,20 @@
     color: #64748b;
     transition: color 0.15s;
     width: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
 }
 
 .password-toggle:hover {
     background: none;
     color: #2563eb;
+}
+
+.password-toggle:active {
+    transform: scale(0.95);
 }
 
 /* Сообщения */
@@ -148,6 +165,7 @@
     padding: 12px 18px;
     border-radius: 16px;
     margin-top: 16px;
+    line-height: 1.5;
 }
 
 .message-success {
@@ -156,6 +174,7 @@
     padding: 12px 18px;
     border-radius: 16px;
     margin-top: 16px;
+    line-height: 1.5;
 }
 
 .badge-role {
@@ -166,6 +185,7 @@
     color: #1e40af;
     margin-left: 8px;
 }
+
 /* Notification Settings */
 .notification-settings {
     padding: 4px 0;
@@ -188,6 +208,8 @@
     position: relative;
     transition: all 0.2s;
     flex-shrink: 0;
+    min-width: 52px;
+    min-height: 28px;
 }
 
 .toggle-switch.active {
@@ -213,25 +235,150 @@
 .toggle-switch.active span {
     left: 27px;
 }
+
 /* Мобильные улучшения для форм */
 @media (max-width: 768px) {
     .password-row {
         flex-direction: row;
         gap: 6px;
+        align-items: center;
+    }
+
+    .password-row .form-input {
+        flex: 1;
+        min-height: 40px;
     }
 
     .password-toggle {
         padding: 8px;
         min-width: 44px;
+        min-height: 44px;
         display: flex;
         align-items: center;
         justify-content: center;
+        background: #f1f5f9;
+        border: 1px solid #cbd5e1;
+        border-radius: 10px;
+        color: #64748b;
+        transition: all 0.15s;
+    }
+
+    .password-toggle:active {
+        background: #e2e8f0;
+        color: #1e293b;
     }
 
     .message-error,
     .message-success {
         font-size: 0.8rem;
         padding: 10px 14px;
-        border-radius: 14px;
+        border-radius: 12px;
+        line-height: 1.4;
+    }
+
+    .form-group {
+        margin-bottom: 12px;
+    }
+
+    .form-label {
+        font-size: 0.8rem;
+        font-weight: 500;
+        margin-bottom: 6px;
+    }
+
+    .form-input,
+    .form-select {
+        min-height: 40px;
+        font-size: 16px;
+        padding: 10px 12px;
+        border-radius: 10px;
+    }
+
+    .form-textarea {
+        min-height: 80px;
+        font-size: 16px;
+        padding: 10px 12px;
+        border-radius: 10px;
+    }
+
+    .btn {
+        min-height: 44px;
+        font-size: 0.85rem;
+        padding: 10px 16px;
+    }
+
+    .btn--small {
+        min-height: 36px;
+        padding: 6px 12px;
+        font-size: 0.75rem;
+    }
+
+    .card {
+        padding: 14px;
+        border-radius: 16px;
+        margin-bottom: 12px;
+    }
+
+    .card h2 {
+        font-size: 1.1rem;
+        margin-bottom: 12px;
+    }
+
+    .toggle-switch {
+        min-width: 48px;
+        width: 48px;
+        height: 26px;
+    }
+
+    .toggle-switch span {
+        width: 20px;
+        height: 20px;
+    }
+
+    .toggle-switch.active span {
+        left: 24px;
+    }
+}
+
+/* Очень маленькие экраны */
+@media (max-width: 480px) {
+    .btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        min-height: 40px;
+        border-radius: 16px;
+    }
+
+    .btn--small {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+        min-height: 32px;
+    }
+
+    .card {
+        padding: 10px;
+        border-radius: 12px;
+        margin-bottom: 10px;
+    }
+
+    .form-input,
+    .form-select {
+        min-height: 36px;
+        padding: 8px 10px;
+        border-radius: 8px;
+        font-size: 14px;
+    }
+
+    .form-textarea {
+        min-height: 70px;
+        padding: 8px 10px;
+        border-radius: 8px;
+    }
+
+    .message-error,
+    .message-success {
+        padding: 8px 10px;
+        font-size: 0.75rem;
+        border-radius: 10px;
     }
 }

@@ -2,11 +2,7 @@ package com.controller;
 
 import com.config.JwtUtil;
 import com.entity.*;
-import com.service.ProjectService;
-import com.service.SubgroupService;
-import com.service.TaskService;
-import com.service.UserService;
-import com.service.TagService;
+import com.service.*;
 import org.springframework.data.domain.Page;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -16,10 +12,13 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Controller;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
 import java.util.List;
+import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
+import reactor.core.publisher.Flux;
 
 @Controller
 public class GraphQLController {
@@ -30,19 +29,21 @@ public class GraphQLController {
     private final TaskService taskService;
     private final JwtUtil jwtUtil;
     private final TagService tagService;
+    private final NotificationService notificationService;
 
     public GraphQLController(UserService userService,
                              ProjectService projectService,
                              SubgroupService subgroupService,
                              TaskService taskService,
                              JwtUtil jwtUtil,
-                             TagService tagService) {
+                             TagService tagService, NotificationService notificationService) {
         this.userService = userService;
         this.projectService = projectService;
         this.subgroupService = subgroupService;
         this.taskService = taskService;
         this.jwtUtil = jwtUtil;
         this.tagService = tagService;
+        this.notificationService = notificationService;
     }
 
     private User getCurrentUser() {
@@ -572,4 +573,12 @@ public class GraphQLController {
     public List<Task> tasksByAssigneeAndProject(@Argument Long userId, @Argument Long projectId) {
         return taskService.findTasksByAssigneeAndProject(userId, projectId);
     }
+    @SubscriptionMapping
+    public Flux<com.dto.NotificationDTO> notificationCreated(@Argument Long userId) {
+        return Flux.from(notificationService.getUserSink(userId).asFlux());
+    }
 }
+
+
+
+

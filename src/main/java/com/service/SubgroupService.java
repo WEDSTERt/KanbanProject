@@ -105,13 +105,18 @@ public class SubgroupService {
             throw new RuntimeException("User already member of this subgroup");
         }
         SubgroupMember sm = new SubgroupMember(subgroup, user, role != null ? role : RoleSubgroup.MEMBER);
+        SubgroupMember saved = subgroupMemberRepository.save(sm);
 
-        // Отправляем уведомление
+        // Отправляем уведомление внутри транзакции
         if (addedBy != null && !addedBy.getId().equals(userId)) {
-            emailNotificationService.notifyUserAddedToSubgroup(subgroup, user, addedBy, role != null ? role.name() : "MEMBER");
+            try {
+                emailNotificationService.notifyUserAddedToSubgroup(subgroup, user, addedBy, role != null ? role.name() : "MEMBER");
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to send notification: " + e.getMessage());
+            }
         }
 
-        return subgroupMemberRepository.save(sm);
+        return saved;
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
@@ -127,7 +132,21 @@ public class SubgroupService {
     @Transactional
     public boolean removeSubgroupMember(Long memberId) {
         if (subgroupMemberRepository.existsById(memberId)) {
+            SubgroupMember member = subgroupMemberRepository.findById(memberId)
+                    .orElseThrow(() -> new RuntimeException("Subgroup member not found"));
+            
+            Subgroup subgroup = member.getSubgroup();
+            User removedUser = member.getUser();
+            
             subgroupMemberRepository.deleteById(memberId);
+            
+            // Отправляем уведомление об удалении из группы
+            try {
+                emailNotificationService.notifyUserRemovedFromSubgroup(subgroup, removedUser);
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to send removal notification: " + e.getMessage());
+            }
+            
             return true;
         }
         return false;

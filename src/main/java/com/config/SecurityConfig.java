@@ -1,13 +1,13 @@
 package com.config;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
@@ -20,10 +20,15 @@ import java.util.List;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private static final Logger logger = LoggerFactory.getLogger(SecurityConfig.class);
 
-    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter,
+                          OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.oAuth2LoginSuccessHandler = oAuth2LoginSuccessHandler;
     }
 
     @Bean
@@ -31,19 +36,32 @@ public class SecurityConfig {
         http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
-
-                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/graphql", "/api/auth/**", "/graphiql", "/static/**", "/graphql-test.html", "/debug/**", "/debug-panel.html", "/api/auth/verify-turnstile").permitAll()
+                        .requestMatchers(
+                                "/graphql", "/graphql/ws", "/api/auth/**", "/graphiql", "/static/**", "/graphql-test.html",
+                                "/debug/**", "/debug-panel.html", "/api/auth/verify-turnstile",
+                                "/oauth2/**", "/login/oauth2/code/**", "/api/import/**", "/api/export/**",
+                                "/oauth2-redirect", "/login", "/register", "/verify-email"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
+                .oauth2Login(oauth2 -> oauth2
+                        .successHandler(oAuth2LoginSuccessHandler)
+                        .failureHandler((request, response, exception) -> {
+                            logger.error("OAuth2 login failed: {}", exception.getMessage());
+                            response.sendRedirect("/login?error=" + exception.getMessage());
+                        })
+                )
+                .exceptionHandling(exception -> exception
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            logger.error("Authentication error: {}", authException.getMessage());
+                            response.sendRedirect("/login?error=unauthorized");
+                        })
+                )
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
-        return http.build();
-    }
 
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return http.build();
     }
 
     @Bean
@@ -51,14 +69,11 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(List.of(
                 "http://localhost:3000",
-                "https://screamingly-big-brocket.cloudpub.ru",
+                "http://localhost:5173",
                 "https://kanbandocky.ru",
-                "http://192.168.20.131:3000",
-                "http://192.168.55.20:3000",
-                "http://10.228.252.143:3000",
-                "http://192.168.70.42:3000"
+                "https://pitilessly-tidy-louse.cloudpub.ru",
+                "https://pitifully-holy-turbot.cloudpub.ru"
         ));
-
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("*"));

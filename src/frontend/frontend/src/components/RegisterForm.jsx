@@ -5,6 +5,7 @@ import {REGISTER} from '../graphql/mutations';
 import {useAuth} from '../contexts/AuthContext';
 import {validateFullName, validatePassword} from '../utils/validation';
 import { Turnstile } from '@marsidev/react-turnstile';
+import '../styles/auth-form.css';
 
 const RegisterForm = () => {
     const [fullName, setFullName] = useState('');
@@ -22,11 +23,9 @@ const RegisterForm = () => {
     const turnstileRef = useRef(null);
 
     const [registerMutation] = useMutation(REGISTER);
-    // Используем тестовый ключ для разработки
-    //const siteKey = '1x00000000000000000000AA';
     const siteKey = '0x4AAAAAADSqCIC_dJTMGNYv';
+
     const handleTurnstileSuccess = (token) => {
-        console.log("✅ Turnstile success, token:", token.substring(0, 20) + "...");
         setTurnstileToken(token);
         setIsVerified(true);
         setLocalError('');
@@ -36,7 +35,6 @@ const RegisterForm = () => {
     };
 
     const handleTurnstileError = () => {
-        console.error("❌ Turnstile error");
         setTurnstileToken(null);
         setIsVerified(false);
         setShouldHide(false);
@@ -44,7 +42,6 @@ const RegisterForm = () => {
     };
 
     const handleTurnstileExpire = () => {
-        console.warn("⚠️ Turnstile expired");
         setTurnstileToken(null);
         setIsVerified(false);
         setShouldHide(false);
@@ -53,9 +50,6 @@ const RegisterForm = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log("=== SUBMIT ===");
-        console.log("Turnstile token present:", !!turnstileToken);
-
         setValidationError('');
         setLocalError('');
 
@@ -116,127 +110,161 @@ const RegisterForm = () => {
 
     if (registrationSuccess) {
         return (
-            <div className="card" style={{ maxWidth: 500, margin: '40px auto', textAlign: 'center' }}>
-                <div style={{ margin: '24px 0' }}>
-                    <i className="fas fa-check-circle" style={{ fontSize: '64px', color: '#22c55e' }}></i>
-                </div>
-                <h2>Регистрация завершена!</h2>
-                <p style={{ margin: '20px 0', color: '#4b5563' }}>
-                    На адрес <strong>{registeredEmail}</strong> отправлено письмо с ссылкой для подтверждения.
-                    Пожалуйста, проверьте свою почту и перейдите по ссылке, чтобы активировать аккаунт.
-                </p>
-                <div style={{
-                    backgroundColor: '#f3f4f6',
-                    padding: '12px',
-                    borderRadius: '8px',
-                    margin: '20px 0',
-                    fontSize: '14px',
-                    color: '#6b7280'
-                }}>
-                    <i className="fas fa-envelope"></i> Письмо может задержаться на несколько минут. Проверьте папку "Спам".
-                </div>
-                <div className="flex-row" style={{ justifyContent: 'center', gap: '16px', marginTop: '24px' }}>
-                    <Link to="/login">
-                        <button className="btn">
-                            <i className="fas fa-sign-in-alt"></i> Перейти ко входу
-                        </button>
-                    </Link>
-                    <Link to="/">
-                        <button className="btn btn--secondary">
-                            <i className="fas fa-home"></i> На главную
-                        </button>
-                    </Link>
+            <div className="auth-container">
+                <div className="auth-card">
+                    <div className="success-icon">
+                        <i className="fas fa-check-circle"></i>
+                    </div>
+                    <h2 className="success-title">Регистрация завершена!</h2>
+                    <p className="success-message">
+                        На адрес <strong>{registeredEmail}</strong> отправлено письмо с ссылкой для подтверждения.
+                    </p>
+                    <div className="success-hint">
+                        <i className="fas fa-envelope"></i>
+                        <span>Письмо может задержаться на несколько минут. Проверьте папку "Спам".</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '12px', flexDirection: 'column', marginTop: '24px' }}>
+                        <Link to="/login" style={{ textDecoration: 'none' }}>
+                            <button className="btn btn-primary btn-large">
+                                <i className="fas fa-sign-in-alt"></i> Перейти ко входу
+                            </button>
+                        </Link>
+                        <Link to="/" style={{ textDecoration: 'none' }}>
+                            <button className="btn btn-secondary btn-large">
+                                <i className="fas fa-home"></i> На главную
+                            </button>
+                        </Link>
+                    </div>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="card" style={{maxWidth: 460, margin: '40px auto'}}>
-            <h2><i className="fas fa-user-plus"></i> Создать аккаунт</h2>
-            <form onSubmit={handleSubmit}>
-                <div className="form-group">
-                    <label className="form-label" htmlFor="reg-fullname">Имя и фамилия</label>
-                    <input
-                        className="form-input"
-                        type="text"
-                        id="reg-fullname"
-                        placeholder="Иван Иванов"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        required
-                    />
+        <div className="auth-container">
+            <div className="auth-card">
+                <div className="auth-header">
+                    <div className="auth-logo">
+                        <i className="fas fa-user-plus"></i>
+                    </div>
+                    <h1>Создать аккаунт</h1>
+                    <p className="auth-subtitle">Присоединитесь к Kanban Docky</p>
                 </div>
-                <div className="form-group">
-                    <label className="form-label" htmlFor="reg-email">Email</label>
-                    <input
-                        className="form-input"
-                        type="email"
-                        id="reg-email"
-                        placeholder="ivan@example.com"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
-                </div>
-                <div className="form-group">
-                    <label className="form-label" htmlFor="reg-password">Пароль</label>
-                    <div className="password-row">
+
+                <form onSubmit={handleSubmit} className="auth-form">
+                    <div className="form-group">
+                        <label className="form-label" htmlFor="reg-fullname">
+                            <i className="fas fa-user"></i> Имя и фамилия
+                        </label>
                         <input
                             className="form-input"
-                            type={showPassword ? 'text' : 'password'}
-                            id="reg-password"
-                            placeholder="••••••••"
-                            value={password}
-                            onChange={(e) => setPassword(e.target.value)}
+                            type="text"
+                            id="reg-fullname"
+                            placeholder="Иван Иванов"
+                            value={fullName}
+                            onChange={(e) => setFullName(e.target.value)}
+                            required
+                            autoFocus
+                        />
+                    </div>
+
+                    <div className="form-group">
+                        <label className="form-label" htmlFor="reg-email">
+                            <i className="fas fa-envelope"></i> Email
+                        </label>
+                        <input
+                            className="form-input"
+                            type="email"
+                            id="reg-email"
+                            placeholder="your@email.com"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
                             required
                         />
-                        <button
-                            type="button"
-                            className="password-toggle"
-                            onClick={() => setShowPassword(!showPassword)}
-                        >
-                            <i className={showPassword ? 'fas fa-eye' : 'fas fa-eye-slash'}></i>
-                        </button>
                     </div>
-                </div>
 
-                {!shouldHide && (
-                    <div className="form-group" style={{ display: 'flex', justifyContent: 'center', minHeight: '90px' }}>
-                        <Turnstile
-                            ref={turnstileRef}
-                            siteKey={siteKey}
-                            onSuccess={handleTurnstileSuccess}
-                            onError={handleTurnstileError}
-                            onExpire={handleTurnstileExpire}
-                            options={{
-                                size: 'normal',
-                                theme: 'light',
-                                language: 'ru',
-                                csp: true
-                            }}
-                        />
+                    <div className="form-group">
+                        <label className="form-label" htmlFor="reg-password">
+                            <i className="fas fa-lock"></i> Пароль
+                        </label>
+                        <div className="password-input-wrapper">
+                            <input
+                                className="form-input"
+                                type={showPassword ? 'text' : 'password'}
+                                id="reg-password"
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="password-toggle-btn"
+                                onClick={() => setShowPassword(!showPassword)}
+                                title={showPassword ? 'Скрыть пароль' : 'Показать пароль'}
+                            >
+                                <i className={showPassword ? 'fas fa-eye' : 'fas fa-eye-slash'}></i>
+                            </button>
+                        </div>
                     </div>
-                )}
 
-                {validationError && <div className="message-error">{validationError}</div>}
-                {localError && <div className="message-error">{localError}</div>}
+                    {!shouldHide && (
+                        <div className="form-group turnstile-wrapper">
+                            <Turnstile
+                                ref={turnstileRef}
+                                siteKey={siteKey}
+                                onSuccess={handleTurnstileSuccess}
+                                onError={handleTurnstileError}
+                                onExpire={handleTurnstileExpire}
+                                options={{
+                                    size: 'normal',
+                                    theme: 'light',
+                                    language: 'ru',
+                                    csp: true
+                                }}
+                            />
+                        </div>
+                    )}
 
-                <div className="flex-row">
+                    {validationError && (
+                        <div className="error-message">
+                            <i className="fas fa-exclamation-circle"></i>
+                            <span>{validationError}</span>
+                        </div>
+                    )}
+
+                    {localError && (
+                        <div className="error-message">
+                            <i className="fas fa-exclamation-circle"></i>
+                            <span>{localError}</span>
+                        </div>
+                    )}
+
                     <button
                         type="submit"
-                        className="btn"
+                        className="btn btn-primary btn-large"
                         disabled={isSubmitting || !turnstileToken}
                     >
-                        {isSubmitting ? 'Регистрация...' : <><i className="fas fa-user-plus"></i> Зарегистрироваться</>}
+                        {isSubmitting ? (
+                            <>
+                                <i className="fas fa-spinner fa-spin"></i> Регистрация...
+                            </>
+                        ) : (
+                            <>
+                                <i className="fas fa-user-plus"></i> Зарегистрироваться
+                            </>
+                        )}
                     </button>
-                    <Link to="/login">
-                        <button type="button" className="btn btn--secondary">
-                            <i className="fas fa-times"></i> Отмена
-                        </button>
-                    </Link>
+                </form>
+
+                <div className="auth-footer">
+                    <p>Уже есть аккаунт?
+                        <Link to="/login" className="auth-link">
+                            Войти
+                        </Link>
+                    </p>
                 </div>
-            </form>
+            </div>
         </div>
     );
 };

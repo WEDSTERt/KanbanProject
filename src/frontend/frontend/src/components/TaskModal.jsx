@@ -1,9 +1,7 @@
-import React, {useState, useEffect} from 'react';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
-import {useQuery, useMutation} from '@apollo/client';
-import {GET_TASK_ATTACHMENTS, GET_TASK_SUBTASKS, GET_TAGS} from '../graphql/queries';
-import {UPDATE_TASK, DELETE_TASK, CREATE_TAG, ADD_TAG_TO_TASK, REMOVE_TAG_FROM_TASK, ADD_MULTIPLE_TAGS_TO_TASK, SET_TASK_TAGS, DELETE_TAG_FROM_PROJECT} from '../graphql/mutations';
+import React, { useState, useEffect } from 'react';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
+import { GET_TASK_ATTACHMENTS, GET_TASK_SUBTASKS, GET_TAGS } from '../graphql/queries';
+import { UPDATE_TASK, DELETE_TASK, CREATE_TAG, ADD_TAG_TO_TASK, REMOVE_TAG_FROM_TASK, DELETE_TAG_FROM_PROJECT, SET_TASK_ASSIGNEES } from '../graphql/mutations';
 import AttachmentList from './AttachmentList';
 import ConfirmModal from './ConfirmModal';
 
@@ -19,11 +17,14 @@ const TaskModal = ({
                        isViewer = false,
                        onClose,
                        projectId,
-                       refetchProjectTags
+                       refetchProjectTags,
+                       refetchCurrentTasks,
                    }) => {
+    const client = useApolloClient();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
     const [dueDate, setDueDate] = useState(null);
+    const [dueDateInput, setDueDateInput] = useState('');
     const [status, setStatus] = useState('TODO');
     const [priority, setPriority] = useState(2);
     const [assigneeIds, setAssigneeIds] = useState([]);
@@ -37,77 +38,70 @@ const TaskModal = ({
     const [newTagName, setNewTagName] = useState('');
     const [newTagColor, setNewTagColor] = useState('#3b82f6');
     const [showCreateTag, setShowCreateTag] = useState(false);
-    const [deleteConfirm, setDeleteConfirm] = useState({isOpen: false, tagId: null, tagName: '', isProjectDelete: false});
 
     const users = assignableUsers || [];
 
-    const {data: attachmentsData, refetch: refetchAttachments} = useQuery(GET_TASK_ATTACHMENTS, {
-        variables: {taskId: task?.id},
+    const { data: attachmentsData, refetch: refetchAttachments } = useQuery(GET_TASK_ATTACHMENTS, {
+        variables: { taskId: task?.id },
         skip: !task?.id,
     });
-
-    const {data: subTasksData, refetch: refetchSubTasks} = useQuery(GET_TASK_SUBTASKS, {
-        variables: {taskId: task?.id},
+    const { data: subTasksData, refetch: refetchSubTasks } = useQuery(GET_TASK_SUBTASKS, {
+        variables: { taskId: task?.id },
         skip: !task?.id,
     });
-
-    const {data: tagsData, refetch: refetchTags} = useQuery(GET_TAGS, {
-        variables: {projectId: projectId},
+    const { data: tagsData, refetch: refetchTags } = useQuery(GET_TAGS, {
+        variables: { projectId },
         skip: !projectId,
+        fetchPolicy: 'network-only',
     });
+    const availableTags = tagsData?.tags || [];
 
     const [updateTask] = useMutation(UPDATE_TASK);
     const [deleteTask] = useMutation(DELETE_TASK);
     const [createTag] = useMutation(CREATE_TAG);
     const [addTagToTask] = useMutation(ADD_TAG_TO_TASK);
     const [removeTagFromTask] = useMutation(REMOVE_TAG_FROM_TASK);
-    const [setTaskTags] = useMutation(SET_TASK_TAGS);
     const [deleteTagFromProject] = useMutation(DELETE_TAG_FROM_PROJECT);
-
-    const availableTags = tagsData?.tags || [];
+    const [setTaskAssignees] = useMutation(SET_TASK_ASSIGNEES);
 
     useEffect(() => {
-        if (task?.id && attachmentsData?.taskAttachments) {
-            setAttachments(attachmentsData.taskAttachments);
-        } else {
-            setAttachments([]);
-        }
+        if (task?.id && attachmentsData?.taskAttachments) setAttachments(attachmentsData.taskAttachments);
+        else setAttachments([]);
     }, [attachmentsData, task?.id]);
+
     useEffect(() => {
-        if (task?.tags) {
-            const tagIds = task.tags.map(t => t.id);
-            console.log('Updating selectedTagIds from task.tags:', tagIds);
-            setSelectedTagIds(tagIds);
-        }
-    }, [task?.tags]);
-    useEffect(() => {
-        console.log('selectedTagIds changed:', selectedTagIds);
-    }, [selectedTagIds]);
+        if (task?.tags) setSelectedTagIds(task.tags.map((t) => t.id));
+    }, [task]);
 
     useEffect(() => {
         if (task) {
             setTitle(task.title || '');
             setDescription(task.description || '');
             setDueDate(task.dueDate ? new Date(task.dueDate) : null);
-
-            // Преобразуем числовой статус в строку для select
-            let rawStatus = task.status;
-            if (typeof rawStatus === 'number') {
-                rawStatus = rawStatus === 0 ? 'TODO' : rawStatus === 1 ? 'IN_PROGRESS' : 'REVIEW';
-            } else if (typeof rawStatus === 'string') {
-                rawStatus = rawStatus.toUpperCase();
-                if (rawStatus === 'INPROGRESS') rawStatus = 'IN_PROGRESS';
+            if (task.dueDate) {
+                const date = new Date(task.dueDate);
+                const year = date.getFullYear();
+                const month = String(date.getMonth() + 1).padStart(2, '0');
+                const day = String(date.getDate()).padStart(2, '0');
+                const hours = String(date.getHours()).padStart(2, '0');
+                const minutes = String(date.getMinutes()).padStart(2, '0');
+                setDueDateInput(`${year}-${month}-${day}T${hours}:${minutes}`);
+            } else {
+                setDueDateInput('');
             }
-            setStatus(rawStatus === 'TODO' || rawStatus === 'IN_PROGRESS' || rawStatus === 'REVIEW' ? rawStatus : 'TODO');
-
+            let rawStatus = task.status;
+            if (typeof rawStatus === 'number') rawStatus = rawStatus === 0 ? 'TODO' : rawStatus === 1 ? 'IN_PROGRESS' : 'REVIEW';
+            else if (typeof rawStatus === 'string') rawStatus = rawStatus.toUpperCase().replace('INPROGRESS', 'IN_PROGRESS');
+            setStatus(['TODO', 'IN_PROGRESS', 'REVIEW'].includes(rawStatus) ? rawStatus : 'TODO');
             setPriority(task.value || 2);
-            setAssigneeIds(task.assignees?.map(a => a.id) || []);
+            setAssigneeIds(task.assignees?.map((a) => a.id) || []);
             setCreatorId(task.createdBy?.id || null);
             setIsEditing(false);
         } else {
             setTitle('');
             setDescription('');
             setDueDate(null);
+            setDueDateInput('');
             setStatus('TODO');
             setPriority(2);
             setAssigneeIds(initialAssigneeIds || []);
@@ -115,77 +109,100 @@ const TaskModal = ({
             setIsEditing(true);
         }
     }, [task, initialAssigneeIds]);
-    useEffect(() => {
-        setSelectedTagIds(task?.tags?.map(t => t.id) || []);
-    }, [task]);
 
     const handleStatusChange = async (newStatus) => {
         if (!task || isViewer) return;
         try {
-            // newStatus уже строка из select
-            await updateTask({
-                variables: {
-                    id: task.id,
-                    status: newStatus,
-                },
-            });
+            await updateTask({ variables: { id: task.id, status: newStatus } });
             setStatus(newStatus);
-            if (onSave) onSave({status: newStatus});
+            if (onSave) onSave({ status: newStatus });
         } catch (err) {
-            console.error('Ошибка обновления статуса:', err);
+            console.error(err);
             alert('Ошибка обновления статуса');
         }
     };
 
     const setCurrentDateTime = () => {
-        setDueDate(new Date());
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        setDueDateInput(`${year}-${month}-${day}T${hours}:${minutes}`);
+        setDueDate(now);
+    };
+
+    const handleDueDateChange = (e) => {
+        const value = e.target.value;
+        setDueDateInput(value);
+        if (value) {
+            setDueDate(new Date(value));
+        } else {
+            setDueDate(null);
+        }
     };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!title.trim()) { alert('Введите название задачи'); return; }
+        if (!title.trim()) return alert('Введите название');
         if (isSaving) return;
         setIsSaving(true);
         try {
-            let dueDateISO = null;
+            let dueISO = null;
             if (dueDate) {
-                if (dueDate < new Date()) { alert('Нельзя установить дедлайн в прошлом'); return; }
-                dueDateISO = dueDate.toISOString();
+                if (dueDate < new Date()) return alert('Нельзя установить дедлайн в прошлом');
+                dueISO = dueDate.toISOString();
             }
-            let statusValue = status;
-            if (typeof statusValue === 'number') {
-                statusValue = statusValue === 0 ? 'TODO' : statusValue === 1 ? 'IN_PROGRESS' : 'REVIEW';
-            }
-            statusValue = statusValue.toUpperCase();
-            if (statusValue === 'INPROGRESS') statusValue = 'IN_PROGRESS';
-
-            // ✅ Сохраняем теги перед сохранением задачи
-            if (task?.id) {
-                await handleSaveTags();
-            }
+            let statusVal = status;
+            if (typeof statusVal === 'number') statusVal = statusVal === 0 ? 'TODO' : statusVal === 1 ? 'IN_PROGRESS' : 'REVIEW';
+            statusVal = statusVal.toUpperCase().replace('INPROGRESS', 'IN_PROGRESS');
 
             await onSave({
                 title: title.trim(),
                 description: description.trim() || null,
-                dueDate: dueDateISO,
-                status: statusValue,
+                dueDate: dueISO,
+                status: statusVal,
                 value: parseInt(priority),
                 assigneeIds,
                 creatorId,
             });
+            if (refetchCurrentTasks) await refetchCurrentTasks();
             onClose();
         } catch (err) {
             console.error(err);
-            alert('Ошибка сохранения: ' + err.message);
+            alert('Ошибка: ' + err.message);
         } finally {
             setIsSaving(false);
         }
     };
 
-    const handleAssigneeToggle = (userId) => {
-        setAssigneeIds(prev =>
-            prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
-        );
+    const handleAssigneeToggle = async (userId) => {
+        // Calculate new assignee list
+        const newIds = assigneeIds.includes(userId) 
+            ? assigneeIds.filter((id) => id !== userId) 
+            : [...assigneeIds, userId];
+        
+        // Immediate UI update
+        setAssigneeIds(newIds);
+        
+        // Immediate save if editing existing task
+        if (task && task.id) {
+            try {
+                await setTaskAssignees({ variables: { taskId: task.id, userIds: newIds } });
+                // Clear Apollo cache to force refetch
+                client.cache.evict({ fieldName: 'tasksBySubgroup' });
+                client.cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
+                client.cache.gc();
+                // Refetch to get fresh data
+                if (refetchCurrentTasks) await refetchCurrentTasks();
+            } catch (err) {
+                console.error('Ошибка обновления исполнителей:', err);
+                alert('Ошибка: ' + err.message);
+                // Revert change on error
+                setAssigneeIds(assigneeIds);
+            }
+        }
     };
 
     const handleFileUpload = async (e) => {
@@ -196,15 +213,14 @@ const TaskModal = ({
         formData.append('file', file);
         try {
             const token = localStorage.getItem('jwtToken');
-            const response = await fetch(`/api/files/upload/${task.id}`, {
+            const res = await fetch(`/api/files/upload/${task.id}`, {
                 method: 'POST',
-                headers: {Authorization: token ? `Bearer ${token}` : ''},
+                headers: { Authorization: token ? `Bearer ${token}` : '' },
                 body: formData,
             });
-            if (!response.ok) throw new Error('Upload failed');
+            if (!res.ok) throw new Error();
             await refetchAttachments();
         } catch (err) {
-            console.error(err);
             alert('Ошибка загрузки файла');
         } finally {
             setUploading(false);
@@ -212,185 +228,71 @@ const TaskModal = ({
         }
     };
 
-    const handleDeleteClick = () => setShowDeleteConfirm(true);
-    const handleConfirmDelete = () => {
-        if (task && onDeleteTask) onDeleteTask(task.id);
-        setShowDeleteConfirm(false);
-    };
-    const handleCancelDelete = () => setShowDeleteConfirm(false);
-
     const handleDeleteFile = async (fileId) => {
         try {
             const token = localStorage.getItem('jwtToken');
-            const response = await fetch(`/api/files/${fileId}`, {
-                method: 'DELETE',
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (response.ok) {
-                await refetchAttachments();
-            } else {
-                alert('Ошибка при удалении файла');
-            }
-        } catch (error) {
-            console.error('Ошибка:', error);
-            alert('Ошибка при удалении файла');
+            const res = await fetch(`/api/files/${fileId}`, { method: 'DELETE', headers: { Authorization: `Bearer ${token}` } });
+            if (res.ok) await refetchAttachments();
+            else alert('Ошибка удаления');
+        } catch (err) {
+            console.error(err);
+            alert('Ошибка');
         }
     };
 
     const handleCreateTag = async () => {
         if (!newTagName.trim()) return;
         try {
-            const result = await createTag({
-                variables: {
-                    projectId: projectId,
-                    name: newTagName.trim(),
-                    color: newTagColor
-                }
-            });
+            await createTag({ variables: { projectId: parseInt(projectId), name: newTagName.trim(), color: newTagColor } });
             setNewTagName('');
             setNewTagColor('#3b82f6');
             setShowCreateTag(false);
             await refetchTags();
             if (refetchProjectTags) refetchProjectTags();
-            if (task?.id && result.data?.createTag?.id) {
-                setSelectedTagIds(prev => [...prev, result.data.createTag.id]);
-                await addTagToTask({ variables: { taskId: task.id, tagId: result.data.createTag.id } });
-            }
         } catch (err) {
             alert('Ошибка создания тега: ' + err.message);
         }
     };
 
-    // Клик на тег — добавить/удалить из задачи
-    const handleToggleTag = (tagId) => {
-        console.log('Toggling tag:', tagId);
-        console.log('Current selectedTagIds:', selectedTagIds);
-
-        setSelectedTagIds(prev => {
-            const newSelected = prev.includes(tagId)
-                ? prev.filter(id => id !== tagId)
-                : [...prev, tagId];
-            console.log('New selectedTagIds:', newSelected);
-            return newSelected;
-        });
-    };
-    // Клик на крест — удалить тег из проекта
-    const handleDeleteTagFromProject = (tagId, tagName) => {
-        setDeleteConfirm({isOpen: true, tagId, tagName, isProjectDelete: true});
-    };
-
-    const confirmDeleteTagFromProject = async () => {
-        console.log("🗑️ Deleting tag from project:", deleteConfirm.tagId);
-
-        if (!deleteConfirm.tagId) {
-            console.error("No tag ID!");
-            setDeleteConfirm({isOpen: false, tagId: null, tagName: '', isProjectDelete: false});
-            return;
-        }
-
-        try {
-            await deleteTagFromProject({
-                variables: {
-                    tagId: deleteConfirm.tagId,
-                    projectId: projectId
-                }
-            });
-
-            // Удаляем тег из selectedTagIds
-            setSelectedTagIds(prev => prev.filter(id => id !== deleteConfirm.tagId));
-
-            // Если тег был на этой задаче, удаляем его из task.tags
-            if (task?.tags) {
-                const updatedTags = task.tags.filter(t => t.id !== deleteConfirm.tagId);
-            }
-
-            setDeleteConfirm({isOpen: false, tagId: null, tagName: '', isProjectDelete: false});
-            await refetchTags();
-            if (refetchProjectTags) {
-                await refetchProjectTags();
-            }
-            console.log("✅ Tag deleted from project");
-
-        } catch (err) {
-            console.error('❌ Ошибка удаления тега:', err);
-            alert('Ошибка удаления тега: ' + err.message);
-            setDeleteConfirm({isOpen: false, tagId: null, tagName: '', isProjectDelete: false});
-        }
-    };
-
-
-    const handleSaveTags = async () => {
+    const handleToggleTag = async (tagId) => {
         if (!task?.id) return;
         try {
-            const currentTagIds = task.tags?.map(t => t.id) || [];
-            const toRemove = currentTagIds.filter(id => !selectedTagIds.includes(id));
-            const toAdd = selectedTagIds.filter(id => !currentTagIds.includes(id));
-
-            for (const tagId of toRemove) {
-                await removeTagFromTask({
-                    variables: { taskId: task.id, tagId },
-                    update: (cache, { data }) => {
-                        if (data?.removeTagFromTask) {
-                            cache.modify({
-                                id: cache.identify({ __typename: 'Task', id: task.id }),
-                                fields: { tags() { return data.removeTagFromTask.tags; } }
-                            });
-                        }
-                    }
-                });
+            if (selectedTagIds.includes(tagId)) {
+                await removeTagFromTask({ variables: { taskId: parseInt(task.id), tagId: parseInt(tagId) } });
+                setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+            } else {
+                await addTagToTask({ variables: { taskId: parseInt(task.id), tagId: parseInt(tagId) } });
+                setSelectedTagIds((prev) => [...prev, tagId]);
             }
-            for (const tagId of toAdd) {
-                await addTagToTask({
-                    variables: { taskId: task.id, tagId },
-                    update: (cache, { data }) => {
-                        if (data?.addTagToTask) {
-                            cache.modify({
-                                id: cache.identify({ __typename: 'Task', id: task.id }),
-                                fields: { tags() { return data.addTagToTask.tags; } }
-                            });
-                        }
-                    }
-                });
-            }
-
             await refetchTags();
-            if (refetchProjectTags) await refetchProjectTags();
+            if (refetchProjectTags) refetchProjectTags();
         } catch (err) {
-            console.error('Ошибка сохранения тегов:', err);
+            console.error(err);
+            alert('Ошибка изменения тега');
         }
     };
 
-    const customHeader = ({ date, changeYear, changeMonth, decreaseMonth, increaseMonth, prevMonthButtonDisabled, nextMonthButtonDisabled }) => (
-        <div className="custom-datepicker-header">
-            <button onClick={decreaseMonth} disabled={prevMonthButtonDisabled}>{"<"}</button>
-            <select value={date.getFullYear()} onChange={({target: {value}}) => changeYear(parseInt(value))}>
-                {Array.from({length: 10}, (_, i) => date.getFullYear() - 5 + i).map(y => (
-                    <option key={y} value={y}>{y}</option>
-                ))}
-            </select>
-            <select value={date.getMonth()} onChange={({target: {value}}) => changeMonth(parseInt(value))}>
-                {Array.from({length: 12}, (_, i) => (
-                    <option key={i} value={i}>{new Date(0, i).toLocaleString('ru', {month: 'long'})}</option>
-                ))}
-            </select>
-            <button onClick={increaseMonth} disabled={nextMonthButtonDisabled}>{">"}</button>
-        </div>
-    );
+    const handleDeleteTagFromProject = async (tagId, tagName) => {
+        if (!window.confirm(`Удалить тег "${tagName}" из проекта?`)) return;
+        try {
+            await deleteTagFromProject({ variables: { tagId: parseInt(tagId), projectId: parseInt(projectId) } });
+            await refetchTags();
+            if (refetchProjectTags) refetchProjectTags();
+            setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+        } catch (err) {
+            alert('Ошибка удаления тега: ' + err.message);
+        }
+    };
 
     const formatDateTime = (dateStr) => {
         if (!dateStr) return '—';
         return new Date(dateStr).toLocaleString('ru', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            second: '2-digit'
+            year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit',
         });
     };
 
     const subTasks = subTasksData?.taskSubTasks || [];
-    const completedCount = subTasks.filter(st => st.status === 2).length;
+    const completedCount = subTasks.filter((st) => st.status === 2).length;
 
     // Режим просмотра
     if (task && !isEditing) {
@@ -399,134 +301,48 @@ const TaskModal = ({
                 <div className="modal-content task-view-modal" onClick={(e) => e.stopPropagation()}>
                     <button className="modal-close" onClick={onClose}>✕</button>
                     <h3>Просмотр задачи</h3>
-
                     <div className="task-timestamps">
-                        <div className="timestamp-item">
-                            <i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}
-                        </div>
-                        <div className="timestamp-item">
-                            <i className="fas fa-edit"></i> Обновлено: {formatDateTime(task.updatedAt)}
-                        </div>
+                        <div><i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}</div>
+                        <div><i className="fas fa-edit"></i> Обновлено: {formatDateTime(task.updatedAt)}</div>
                     </div>
-
-                    <div className="form-group">
-                        <label className="form-label">Название</label>
-                        <div className="form-input" style={{background: '#f8fafc'}}>{task.title}</div>
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Описание</label>
-                        <div className="form-input task-description-view">
-                            {task.description || '—'}
-                        </div>
-                    </div>
-
-                    {/* Теги в режиме просмотра */}
-                    {task.tags && task.tags.length > 0 && (
+                    <div className="form-group"><label>Название</label><div className="form-input" style={{ background: '#f8fafc' }}>{task.title}</div></div>
+                    <div className="form-group"><label>Описание</label><div className="form-input" style={{ background: '#f8fafc', whiteSpace: 'pre-wrap', wordWrap: 'break-word', lineHeight: '1.5', minHeight: '80px' }}>{task.description || '—'}</div></div>
+                    {task.tags?.length > 0 && (
                         <div className="form-group">
-                            <label className="form-label"><i className="fas fa-tags"></i> Теги</label>
-                            <div className="form-input" style={{background: '#f8fafc', display: 'flex', flexWrap: 'wrap', gap: '8px'}}>
-                                {task.tags.map(tag => (
-                                    <span key={tag.id} style={{
-                                        backgroundColor: tag.color,
-                                        color: 'white',
-                                        padding: '4px 12px',
-                                        borderRadius: '20px',
-                                        fontSize: '0.8rem'
-                                    }}>
-                                        {tag.name}
-                                    </span>
+                            <label><i className="fas fa-tags"></i> Теги</label>
+                            <div className="form-input" style={{ background: '#f8fafc', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                {task.tags.map((tag) => (
+                                    <span key={tag.id} style={{ backgroundColor: tag.color, color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem' }}>{tag.name}</span>
                                 ))}
                             </div>
                         </div>
                     )}
-
+                    <div className="form-group"><label>Дедлайн</label><div className="form-input" style={{ background: '#f8fafc' }}>{task.dueDate ? new Date(task.dueDate).toLocaleString() : '—'}</div></div>
                     <div className="form-group">
-                        <label className="form-label">Дедлайн (дата и время)</label>
-                        <div className="form-input" style={{background: '#f8fafc'}}>
-                            {task.dueDate ? new Date(task.dueDate).toLocaleString([], {
-                                year: 'numeric',
-                                month: '2-digit',
-                                day: '2-digit',
-                                hour: '2-digit',
-                                minute: '2-digit'
-                            }) : '—'}
-                        </div>
-                    </div>
-                    <div className="form-group">
-                        <label className="form-label">Статус</label>
-                        <select
-                            className="form-select"
-                            value={status}
-                            onChange={(e) => handleStatusChange(e.target.value)}
-                            disabled={isViewer}
-                        >
+                        <label>Статус</label>
+                        <select className="form-select" style={{background: 'white'}} value={status} onChange={(e) => handleStatusChange(e.target.value)} disabled={isViewer}>
                             <option value="TODO">Создано</option>
                             <option value="IN_PROGRESS">В разработке</option>
                             <option value="REVIEW">Выполнено</option>
                         </select>
                     </div>
-                    <div className="form-group">
-                        <label className="form-label">Важность</label>
-                        <div className="form-input" style={{background: '#f8fafc'}}>
-                            {priority === 1 && 'Низкая'}
-                            {priority === 2 && 'Средняя'}
-                            {priority === 3 && 'Высокая'}
-                        </div>
-                    </div>
+                    <div className="form-group"><label>Важность</label><div className="form-input" style={{ background: '#f8fafc' }}>{priority === 1 ? 'Низкая' : priority === 2 ? 'Средняя' : 'Высокая'}</div></div>
                     {task.createdBy && (
+                        <div className="form-group"><label>Создатель</label><div className="form-input" style={{ background: '#f8fafc' }}><i className="fas fa-user"></i> {task.createdBy.fullName}</div></div>
+                    )}
+                    <div className="form-group"><label>Исполнители</label><div className="form-input" style={{ background: '#f8fafc' }}>{users.filter(u => assigneeIds.includes(u.userId)).map(u => u.user?.fullName).join(', ') || '—'}</div></div>
+                    {subTasks.length > 0 && (
                         <div className="form-group">
-                            <label className="form-label">Создатель</label>
-                            <div className="form-input" style={{background: '#f8fafc'}}>
-                                <i className="fas fa-user"></i> {task.createdBy.fullName}
-                            </div>
+                            <label>Подзадачи ({completedCount}/{subTasks.length})</label>
+                            <ul className="subtasks-list">
+                                {subTasks.map(st => <li key={st.id} className={st.status === 2 ? 'completed' : ''}>{st.title}</li>)}
+                            </ul>
                         </div>
                     )}
-                    <div className="form-group">
-                        <label className="form-label">Исполнители</label>
-                        <div className="form-input" style={{background: '#f8fafc'}}>
-                            {users.filter(u => assigneeIds.includes(u.userId)).map(u => u.user?.fullName).join(', ') || '—'}
-                        </div>
-                    </div>
-
-                    {task && subTasks.length > 0 && (
-                        <div className="form-group">
-                            <div className="subtasks-container">
-                                <div className="subtasks-header">
-                                    <label className="form-label">
-                                        <i className="fas fa-tasks"></i> Подзадачи
-                                        <span className="subtasks-progress">({completedCount}/{subTasks.length})</span>
-                                    </label>
-                                </div>
-                                <ul className="subtasks-list">
-                                    {subTasks.map((st) => (
-                                        <li key={st.id} className={`subtask-item ${st.status === 2 ? 'completed' : ''}`}>
-                                            <span className="subtask-title">{st.title}</span>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </div>
-                        </div>
-                    )}
-
-                    {task && (
-                        <div className="form-group">
-                            <AttachmentList
-                                attachments={attachments}
-                                onDelete={handleDeleteFile}
-                                isEditMode={false}
-                            />
-                        </div>
-                    )}
-
-                    <div className="modal-actions" style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
-                        {canEdit && isCreator && (
-                            <button type="button" className="btn" onClick={() => setIsEditing(true)}>
-                                <i className="fas fa-edit"></i> Редактировать
-                            </button>
-                        )}
-                        <button type="button" className="btn btn--secondary" onClick={onClose}>
-                            <i className="fas fa-times"></i> Закрыть
-                        </button>
+                    <AttachmentList attachments={attachments} onDelete={handleDeleteFile} isEditMode={false} />
+                    <div className="modal-actions">
+                        {canEdit && isCreator && <button className="btn" onClick={() => setIsEditing(true)}><i className="fas fa-edit"></i> Редактировать</button>}
+                        <button className="btn btn--secondary" onClick={onClose}>Закрыть</button>
                     </div>
                 </div>
             </div>
@@ -539,53 +355,33 @@ const TaskModal = ({
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <button className="modal-close" onClick={onClose}>✕</button>
                 <h3>{task ? 'Редактировать задачу' : 'Новая задача'}</h3>
-
                 {task && (
                     <div className="task-timestamps">
-                        <div className="timestamp-item">
-                            <i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}
-                        </div>
-                        <div className="timestamp-item">
-                            <i className="fas fa-edit"></i> Обновлено: {formatDateTime(task.updatedAt)}
-                        </div>
+                        <div><i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}</div>
+                        <div><i className="fas fa-edit"></i> Обновлено: {formatDateTime(task.updatedAt)}</div>
                     </div>
                 )}
-
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
-                        <label className="form-label" htmlFor="task-title">Название *</label>
-                        <input
-                            className="form-input"
-                            type="text"
-                            id="task-title"
-                            value={title}
-                            onChange={(e) => setTitle(e.target.value)}
-                            required
-                        />
+                        <label htmlFor="task-title">Название *</label>
+                        <input className="form-input editable-field" id="task-title" value={title} onChange={(e) => setTitle(e.target.value)} required />
                     </div>
                     <div className="form-group">
-                        <label className="form-label" htmlFor="task-desc">Описание</label>
-                        <textarea
-                            className="form-textarea"
-                            id="task-desc"
-                            value={description}
-                            onChange={(e) => setDescription(e.target.value)}
-                            rows="5"
-                        />
+                        <label htmlFor="task-desc">Описание</label>
+                        <textarea className="form-textarea editable-field" id="task-desc" value={description} onChange={(e) => setDescription(e.target.value)} rows="12" style={{ minHeight: '250px', resize: 'vertical' }} />
                     </div>
 
-                    {/* Теги в режиме редактирования */}
+                    {/* Теги с автопереносом */}
                     <div className="form-group">
-                        <label className="form-label"><i className="fas fa-tags"></i> Теги</label>
-                        <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                        <label><i className="fas fa-tags"></i> Теги</label>
+                        <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px', maxWidth: '100%', overflow: 'hidden' }}>
                             {availableTags.map((tag) => {
                                 const isSelected = selectedTagIds.includes(tag.id);
                                 return (
-                                    <div key={`modal-tag-${tag.id}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <div key={tag.id} style={{ display: 'flex', alignItems: 'center', gap: '4px', maxWidth: 'calc(100% - 8px)' }}>
                                         <button
                                             type="button"
                                             onClick={() => handleToggleTag(tag.id)}
-                                            title="Нажмите, чтобы добавить/удалить из задачи"
                                             style={{
                                                 backgroundColor: isSelected ? tag.color : 'transparent',
                                                 color: isSelected ? 'white' : tag.color,
@@ -594,7 +390,7 @@ const TaskModal = ({
                                                 padding: '4px 12px',
                                                 fontSize: '0.8rem',
                                                 cursor: 'pointer',
-                                                transition: 'all 0.2s'
+                                                whiteSpace: 'nowrap',
                                             }}
                                         >
                                             {tag.name}
@@ -602,106 +398,53 @@ const TaskModal = ({
                                         <button
                                             type="button"
                                             onClick={() => handleDeleteTagFromProject(tag.id, tag.name)}
-                                            style={{
-                                                background: 'none',
-                                                border: 'none',
-                                                color: '#ef4444',
-                                                cursor: 'pointer',
-                                                fontSize: '0.7rem',
-                                                padding: '4px'
-                                            }}
-                                            title="Удалить тег из проекта"
+                                            style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer' }}
                                         >
                                             <i className="fas fa-times-circle"></i>
                                         </button>
                                     </div>
                                 );
                             })}
-                            <button
-                                type="button"
-                                className="btn btn--secondary btn--small"
-                                onClick={() => setShowCreateTag(!showCreateTag)}
-                            >
+                            <button type="button" className="btn btn--secondary btn--small" onClick={() => setShowCreateTag(!showCreateTag)} style={{ whiteSpace: 'nowrap' }}>
                                 <i className="fas fa-plus"></i> Новый тег
                             </button>
                         </div>
-
                         {showCreateTag && (
-                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-                                <input
-                                    type="text"
-                                    className="form-input"
-                                    placeholder="Название тега"
-                                    value={newTagName}
-                                    onChange={(e) => setNewTagName(e.target.value)}
-                                    style={{ flex: 1 }}
-                                />
-                                <input
-                                    type="color"
-                                    value={newTagColor}
-                                    onChange={(e) => setNewTagColor(e.target.value)}
-                                    style={{ width: '50px', height: '38px', borderRadius: '8px' }}
-                                />
-                                <button type="button" className="btn" onClick={handleCreateTag}>
-                                    <i className="fas fa-check"></i>
-                                </button>
+                            <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                                <input type="text" className="form-input" placeholder="Название тега" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} style={{ flex: 1, minWidth: '120px' }} />
+                                <input type="color" value={newTagColor} onChange={(e) => setNewTagColor(e.target.value)} style={{ width: '50px', height: '38px', borderRadius: '8px' }} />
+                                <button type="button" className="btn" onClick={handleCreateTag}><i className="fas fa-check"></i></button>
+                                <button type="button" className="btn btn--secondary" onClick={() => setShowCreateTag(false)}><i className="fas fa-times"></i></button>
                             </div>
                         )}
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label" htmlFor="task-due">Дедлайн (дата и время)</label>
-                        <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
-                            <div style={{flex: 1}}>
-                                <DatePicker
-                                    selected={dueDate}
-                                    onChange={(date) => setDueDate(date)}
-                                    showTimeSelect
-                                    dateFormat="dd.MM.yyyy HH:mm"
-                                    timeFormat="HH:mm"
-                                    timeIntervals={15}
-                                    minDate={new Date()}
-                                    filterTime={(time) => time >= new Date()}
-                                    placeholderText="Выберите дату и время"
-                                    className="form-input"
-                                    isClearable
-                                    customHeader={customHeader}
+                        <label htmlFor="task-due">Дедлайн</label>
+                        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <div style={{ flex: 1 }}>
+                                <input 
+                                    type="datetime-local" 
+                                    id="task-due"
+                                    className="form-input" 
+                                    value={dueDateInput}
+                                    onChange={handleDueDateChange}
                                 />
                             </div>
-                            <button
-                                type="button"
-                                className="btn btn--secondary btn--small"
-                                onClick={setCurrentDateTime}
-                                style={{whiteSpace: 'nowrap'}}
-                            >
-                                <i className="fas fa-clock"></i> Сейчас
-                            </button>
+                            <button type="button" className="btn btn--secondary btn--small" onClick={setCurrentDateTime}><i className="fas fa-clock"></i> Сейчас</button>
                         </div>
-                        <small style={{color: '#64748b', display: 'block', marginTop: '4px'}}>
-                            <i className="fas fa-clock"></i> Можно выбрать только текущую или будущую дату и время.
-                        </small>
                     </div>
                     <div className="form-group">
-                        <label className="form-label" htmlFor="task-status">Статус</label>
-                        <select
-                            className="form-select"
-                            id="task-status"
-                            value={status}
-                            onChange={(e) => setStatus(e.target.value)}
-                        >
+                        <label htmlFor="task-status">Статус</label>
+                        <select className="form-select editable-field" id="task-status" value={status} onChange={(e) => setStatus(e.target.value)}>
                             <option value="TODO">Создано</option>
                             <option value="IN_PROGRESS">В разработке</option>
                             <option value="REVIEW">Выполнено</option>
                         </select>
                     </div>
                     <div className="form-group">
-                        <label className="form-label" htmlFor="task-priority">Важность</label>
-                        <select
-                            className="form-select"
-                            id="task-priority"
-                            value={priority}
-                            onChange={(e) => setPriority(e.target.value)}
-                        >
+                        <label htmlFor="task-priority">Важность</label>
+                        <select className="form-select editable-field" id="task-priority" value={priority} onChange={(e) => setPriority(parseInt(e.target.value))}>
                             <option value="1">Низкая</option>
                             <option value="2">Средняя</option>
                             <option value="3">Высокая</option>
@@ -709,107 +452,51 @@ const TaskModal = ({
                     </div>
                     {task && (
                         <div className="form-group">
-                            <label className="form-label" htmlFor="task-creator">Создатель задачи</label>
-                            <select
-                                className="form-select"
-                                id="task-creator"
-                                value={creatorId || ''}
-                                onChange={(e) => setCreatorId(e.target.value || null)}
-                            >
-                                {users
-                                    .filter(member => {
-                                        const projectMember = assignableUsers?.find(u => u.userId === member.userId);
-                                        return !projectMember || projectMember.role !== 'VIEWER';
-                                    })
-                                    .map(member => (
-                                        <option key={member.userId} value={member.userId}>
-                                            {member.user?.fullName || `Пользователь ${member.userId}`}
-                                        </option>
-                                    ))}
+                            <label htmlFor="task-creator">Создатель задачи</label>
+                            <select className="form-select editable-field" id="task-creator" value={creatorId ? String(creatorId) : ''} onChange={(e) => setCreatorId(e.target.value ? parseInt(e.target.value) : null)}>
+                                <option value="">-- Выберите --</option>
+                                {users.map(member => (
+                                    <option key={member.userId} value={member.userId}>{member.user?.fullName}</option>
+                                ))}
                             </select>
                         </div>
                     )}
                     <fieldset className="form-group">
-                        <legend className="form-label"><i className="fas fa-user-friends"></i> Исполнители (только участники текущей подгруппы)</legend>
-                        <div className="assignees-checkbox-list">
-                            {users
-                                .filter(member => {
-                                    const projectMember = assignableUsers?.find(u => u.userId === member.userId);
-                                    return !projectMember || projectMember.role !== 'VIEWER';
-                                })
-                                .map(member => (
-                                    <label key={member.userId} className="assignees-checkbox-label">
-                                        <input
-                                            type="checkbox"
-                                            checked={assigneeIds.includes(member.userId)}
-                                            onChange={() => handleAssigneeToggle(member.userId)}
-                                        />
-                                        {member.user?.fullName || `Пользователь ${member.userId}`}
-                                    </label>
-                                ))}
+                        <legend>Исполнители</legend>
+                        <div className="assignees-checkbox-list editable-field">
+                            {users.map(member => (
+                                <label key={member.userId}>
+                                    <input type="checkbox" checked={assigneeIds.includes(member.userId)} onChange={() => handleAssigneeToggle(member.userId)} />
+                                    {member.user?.fullName}
+                                </label>
+                            ))}
                         </div>
-                        {users.filter(member => {
-                            const projectMember = assignableUsers?.find(u => u.userId === member.userId);
-                            return !projectMember || projectMember.role !== 'VIEWER';
-                        }).length === 0 && (
-                            <div className="message-error" style={{marginTop: '8px'}}>
-                                Нет доступных исполнителей
-                            </div>
-                        )}
                     </fieldset>
                     {task && (
                         <div className="form-group">
-                            <AttachmentList
-                                attachments={attachments}
-                                onDelete={handleDeleteFile}
-                                isEditMode={true}
-                            />
+                            <AttachmentList attachments={attachments} onDelete={handleDeleteFile} isEditMode={true} />
                             <div className="attachment-upload">
                                 <label className="btn btn--secondary btn--small">
                                     <i className="fas fa-upload"></i> Загрузить файл
-                                    <input
-                                        type="file"
-                                        onChange={handleFileUpload}
-                                        disabled={uploading}
-                                        style={{display: 'none'}}
-                                    />
+                                    <input type="file" onChange={handleFileUpload} disabled={uploading} style={{ display: 'none' }} />
                                 </label>
                                 {uploading && <span className="uploading">Загрузка...</span>}
                             </div>
                         </div>
                     )}
-                    <div className="modal-actions" style={{display: 'flex', gap: '12px', justifyContent: 'center', marginTop: '24px'}}>
-                        {task && (
-                            <button type="button" className="btn btn--secondary" onClick={() => setIsEditing(false)}>
-                                <i className="fas fa-arrow-left"></i> Назад
-                            </button>
-                        )}
-                        {task && !isMyTasksGroup && (
-                            <button type="button" className="btn btn--danger" onClick={handleDeleteClick}>
-                                <i className="fas fa-trash-alt"></i> Удалить задачу
-                            </button>
-                        )}
-                        <button type="submit" className="btn" disabled={isSaving}>
-                            <i className="fas fa-save"></i> Сохранить
-                        </button>
+                    <div className="modal-actions">
+                        {task && <button type="button" className="btn btn--secondary" onClick={() => setIsEditing(false)}>Назад</button>}
+                        {task && !isMyTasksGroup && <button type="button" className="btn btn--danger" onClick={() => setShowDeleteConfirm(true)}>Удалить задачу</button>}
+                        <button type="submit" className="btn" disabled={isSaving}>Сохранить</button>
                     </div>
                 </form>
             </div>
             <ConfirmModal
                 isOpen={showDeleteConfirm}
                 title="Удаление задачи"
-                message="Вы действительно хотите удалить эту задачу? Это действие необратимо."
-                onConfirm={handleConfirmDelete}
-                onCancel={handleCancelDelete}
-            />
-            <ConfirmModal
-                isOpen={deleteConfirm.isOpen && deleteConfirm.isProjectDelete}
-                title="Удаление тега из проекта"
-                message={`Вы действительно хотите удалить тег "${deleteConfirm.tagName}" из проекта? Это удалит тег отовсюду.`}
-                onConfirm={confirmDeleteTagFromProject}
-                onCancel={() => setDeleteConfirm({isOpen: false, tagId: null, tagName: '', isProjectDelete: false})}
-                confirmText="Удалить"
-                confirmStyle="btn--danger"
+                message="Вы уверены?"
+                onConfirm={() => { onDeleteTask(task.id); setShowDeleteConfirm(false); }}
+                onCancel={() => setShowDeleteConfirm(false)}
             />
         </div>
     );

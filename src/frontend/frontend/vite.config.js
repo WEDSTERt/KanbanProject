@@ -9,18 +9,28 @@ export default defineConfig({
         port: 3000,
         allowedHosts: [
             'kanbandocky.ru',
-            'screamingly-big-brocket.cloudpub.ru',
+            'pitilessly-tidy-louse.cloudpub.ru',
             'localhost'
         ],
         proxy: {
             '/graphql': {
-                target: 'https://orally-perceptive-roughy.cloudpub.ru',
+                target: 'https://pitifully-holy-turbot.cloudpub.ru',
                 changeOrigin: true,
                 secure: false,
                 rewrite: (path) => path.replace(/^\/graphql/, '/graphql')
             },
             '/api': {
-                target: 'https://orally-perceptive-roughy.cloudpub.ru',
+                target: 'https://pitifully-holy-turbot.cloudpub.ru',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/oauth2': {
+                target: 'https://pitifully-holy-turbot.cloudpub.ru',
+                changeOrigin: true,
+                secure: false,
+            },
+            '/login/oauth2': {
+                target: 'https://pitifully-holy-turbot.cloudpub.ru',
                 changeOrigin: true,
                 secure: false,
             }

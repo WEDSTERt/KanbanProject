@@ -222,6 +222,18 @@ public class UserService {
     }
 
     @Transactional
+    public User findOrCreateOAuthUser(String email, String fullName, String provider) {
+        return userRepository.findByEmail(email)
+                .orElseGet(() -> {
+                    String randomPassword = UUID.randomUUID().toString();
+                    User newUser = new User(fullName, email, passwordEncoder.encode(randomPassword));
+                    newUser.setEmailVerified(true);
+                    newUser.setEmailNotificationsEnabled(true);
+                    return userRepository.save(newUser);
+                });
+    }
+
+    @Transactional
     public void resendVerificationEmail(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -264,5 +276,17 @@ public class UserService {
             System.out.println("🗑️ Вручную удалено " + count + " неподтвержденных аккаунтов");
         }
         return count;
+    }
+
+    @CacheEvict(value = "users", allEntries = true)
+    @Transactional
+    public User saveUser(User user) {
+        return userRepository.save(user);
+    }
+
+    @Cacheable(value = "users", key = "#email")
+    public User getUserByEmail(String email) {
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }

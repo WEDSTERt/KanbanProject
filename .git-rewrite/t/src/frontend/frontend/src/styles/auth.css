@@ -1,0 +1,122 @@
+/* Стартовая страница */
+.start-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #f0f4ff 0%, #e9eef6 100%);
+    padding: 20px;
+}
+
+.start-card {
+    background: white;
+    padding: 48px 56px;
+    border-radius: 48px;
+    box-shadow: 0 25px 45px -12px rgba(0, 0, 0, 0.25);
+    text-align: center;
+    max-width: 500px;
+    width: 100%;
+}
+
+.start-card h1 {
+    font-size: 2.8rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 16px;
+}
+
+.start-card p {
+    font-size: 1.1rem;
+    color: #475569;
+    margin-bottom: 40px;
+}
+
+.start-buttons {
+    display: flex;
+    gap: 20px;
+    justify-content: center;
+}
+
+.start-buttons .btn-primary,
+.start-buttons .btn-outline {
+    padding: 14px 32px;
+    font-size: 1.1rem;
+    border-radius: 60px;
+    font-weight: 600;
+    transition: all 0.2s;
+    cursor: pointer;
+}
+
+.start-buttons .btn-primary {
+    background: #2563eb;
+    color: white;
+    border: none;
+}
+
+.start-buttons .btn-primary:hover {
+    background: #1d4ed8;
+    transform: translateY(-2px);
+}
+
+.start-buttons .btn-outline {
+    background: white;
+    border: 2px solid #cbd5e1;
+    color: #1e293b;
+}
+
+.start-buttons .btn-outline:hover {
+    border-color: #2563eb;
+    color: #2563eb;
+    transform: translateY(-2px);
+}
+
+/* Настройки профиля */
+.account-settings-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 150px);
+    padding: 20px;
+}
+
+.account-settings-card {
+    max-width: 500px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+.form-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+}
+
+.form-actions button {
+    flex: 1;
+}
+/* Бейдж успешной проверки Turnstile */
+.turnstile-verified-badge {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+    border-radius: 40px;
+    color: #166534;
+    font-size: 0.85rem;
+    font-weight: 500;
+    border: 1px solid #22c55e;
+    width: 100%;
+    max-width: 300px;
+    margin: 0 auto;
+}
+
+.turnstile-verified-badge i {
+    font-size: 1rem;
+    color: #22c55e;
+}
+
+.turnstile-verified-badge span {
+    font-size: 0.85rem;
+}

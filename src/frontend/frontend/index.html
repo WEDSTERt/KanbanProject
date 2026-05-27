@@ -9,13 +9,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
-    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://cdnjs.cloudflare.com;
+    script-src 'self' 'unsafe-eval' 'unsafe-inline' https://challenges.cloudflare.com https://cdnjs.cloudflare.com https://static.cloudflareinsights.com;
+    worker-src 'self' blob:;
     frame-src 'self' https://challenges.cloudflare.com;
-    connect-src 'self' https://challenges.cloudflare.com https://orally-perceptive-roughy.cloudpub.ru https://kanbandocky.ru;
+    child-src 'self' blob:;
+    connect-src 'self' https://challenges.cloudflare.com https://pitifully-holy-turbot.cloudpub.ru https://pitilessly-tidy-louse.cloudpub.ru https://kanbandocky.ru;
     style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com;
     font-src 'self' https://cdnjs.cloudflare.com;
     img-src 'self' data: https:;
-  ">
+">
   <title>Kanban Docky</title>
 </head>
 <body>

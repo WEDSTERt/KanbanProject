@@ -1,4 +1,128 @@
-/* Модальные окна */
+/* ===== EDITABLE FIELD - WHITE BACKGROUND ===== */
+.editable-field {
+    background-color: white !important;
+    border: 1px solid #e2e8f0;
+}
+
+.editable-field:focus,
+.editable-field:focus-visible {
+    background-color: white !important;
+    border-color: #5568d3 !important;
+    outline: none;
+}
+
+.editable-field option {
+    background-color: white;
+    color: #1e293b;
+}
+
+.editable-field option:checked {
+    background-color: #5568d3;
+    color: white;
+}
+
+/* DatePicker white background */
+.react-datepicker__input.editable-field {
+    background-color: white !important;
+}
+
+.react-datepicker {
+    background-color: white !important;
+    font-family: inherit;
+}
+
+.react-datepicker__header {
+    background-color: #5568d3 !important;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.react-datepicker__day--selected {
+    background-color: #5568d3 !important;
+    color: white;
+}
+
+/* ===== DATEPICKER MONDAY FIRST ===== */
+.react-datepicker__day-names {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    padding: 8px 0;
+}
+
+.react-datepicker__week {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    padding: 4px 0;
+}
+
+.react-datepicker__day-name {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    font-weight: 600;
+    color: #5568d3;
+    font-size: 0.75rem;
+    padding: 8px 0;
+    width: 32px;
+    margin: 0 auto;
+}
+
+.react-datepicker__day {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 32px;
+    height: 32px;
+    margin: 0 auto;
+    border-radius: 6px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.react-datepicker__day:hover:not(.react-datepicker__day--outside-month) {
+    background-color: #f1f5f9;
+    cursor: pointer;
+}
+
+.react-datepicker__day--today {
+    border: 2px solid #5568d3;
+    font-weight: 600;
+}
+
+.react-datepicker__day--in-range {
+    background-color: #e0e7ff !important;
+    color: #1e293b;
+}
+
+.react-datepicker__day--outside-month {
+    color: #cbd5e1;
+}
+
+.react-datepicker__time-container {
+    border-left: 1px solid #e2e8f0;
+}
+
+.react-datepicker__time {
+    background-color: white;
+}
+
+.react-datepicker__time-box {
+    background-color: white;
+}
+
+.react-datepicker__time-list-item {
+    color: #1e293b;
+}
+
+.react-datepicker__time-list-item:hover {
+    background-color: #f1f5f9;
+}
+
+.react-datepicker__time-list-item--selected {
+    background-color: #5568d3 !important;
+    color: white;
+}
+
+/* ===== MODAL OVERLAY ===== */
 .modal-overlay {
     position: fixed;
     top: 0;
@@ -12,11 +136,12 @@
     z-index: 9999;
 }
 
+/* ===== MODAL CONTENT ===== */
 .modal-content {
     background: white;
     padding: 24px;
     border-radius: 12px;
-    min-width: 320px;
+    width: 500px;
     max-width: 90%;
     max-height: 90vh;
     overflow-y: auto;
@@ -24,12 +149,14 @@
     position: relative;
     scrollbar-width: none;
     -ms-overflow-style: none;
+    box-sizing: border-box;
 }
 
 .modal-content::-webkit-scrollbar {
     display: none;
 }
 
+/* ===== MODAL CLOSE BUTTON ===== */
 .modal-close {
     position: absolute;
     top: 16px;
@@ -39,12 +166,14 @@
     font-size: 1.2rem;
     cursor: pointer;
     color: #64748b;
+    transition: color 0.2s;
 }
 
 .modal-close:hover {
     color: #ef4444;
 }
 
+/* ===== MODAL CLOSE SETTINGS ===== */
 .modal-close--settings {
     position: absolute;
     top: 20px;
@@ -70,6 +199,7 @@
     border-color: #ef4444;
 }
 
+/* ===== MODAL CONFIRM ===== */
 .modal-confirm {
     max-width: 400px;
     text-align: center;
@@ -80,6 +210,7 @@
     color: #475569;
 }
 
+/* ===== MODAL ACTIONS ===== */
 .modal-actions {
     display: flex;
     gap: 12px;
@@ -87,12 +218,13 @@
     margin-top: 24px;
 }
 
+/* ===== TASK VIEW MODAL ===== */
 .task-view-modal {
-    min-width: 500px;
-    max-width: 80vw;
+    width: 500px;
+    max-width: 90%;
     max-height: 90vh;
     overflow-y: auto;
-    width: auto;
+    box-sizing: border-box;
     scrollbar-width: none;
     -ms-overflow-style: none;
 }
@@ -101,6 +233,7 @@
     display: none;
 }
 
+/* ===== TASK DESCRIPTION VIEW ===== */
 .task-description-view {
     background: #f8fafc;
     white-space: pre-wrap;
@@ -137,7 +270,160 @@
     background: #94a3b8;
 }
 
-/* Дополнительные стили для модальных окон на мобильных */
+/* ===== FIELDSET (ASSIGNEES GROUP) ===== */
+fieldset {
+    border: none;
+    padding: 0;
+    margin: 0;
+}
+
+fieldset.form-group {
+    display: flex;
+    flex-direction: column;
+}
+
+fieldset legend {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1e293b;
+    margin-bottom: 12px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* ===== ASSIGNEES CHECKBOX LIST ===== */
+.assignees-checkbox-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 10px;
+    padding: 12px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    max-width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    box-sizing: border-box;
+}
+
+.assignees-checkbox-list.editable-field {
+    background: white !important;
+}
+
+.assignees-checkbox-list::-webkit-scrollbar {
+    display: none;
+}
+
+.assignees-checkbox-list label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: white;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 14px;
+    color: #1e293b;
+    white-space: nowrap;
+}
+
+.assignees-checkbox-list label:hover {
+    background: #f1f5f9;
+    border-color: #cbd5e1;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.assignees-checkbox-list label input[type="checkbox"] {
+    cursor: pointer;
+    accent-color: #5568d3;
+    width: 18px;
+    height: 18px;
+}
+
+/* ===== TAGS CONTAINER ===== */
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    padding: 12px;
+    min-height: 44px;
+    width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
+/* ===== SUBTASKS LIST ===== */
+.subtasks-list {
+    list-style: none;
+    padding: 12px;
+    margin: 0;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    max-height: 250px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+    box-sizing: border-box;
+}
+
+.subtasks-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.subtasks-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.subtasks-list::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 10px;
+}
+
+.subtasks-list::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* ===== SUBTASK ITEM ===== */
+.subtasks-list li {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: white;
+    border-radius: 6px;
+    margin-bottom: 8px;
+    font-size: 0.85rem;
+    color: #334155;
+    border-left: 3px solid #5568d3;
+    transition: all 0.2s ease;
+}
+
+.subtasks-list li:last-child {
+    margin-bottom: 0;
+}
+
+.subtasks-list li:hover {
+    background: #f1f5f9;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+/* ===== SUBTASK ITEM COMPLETED ===== */
+.subtasks-list li.completed {
+    background: #f0fdf4;
+    border-left-color: #22c55e;
+    color: #64748b;
+    opacity: 0.8;
+}
+
+/* ===== MOBILE RESPONSIVE ===== */
 @media (max-width: 768px) {
     .modal-overlay {
         align-items: flex-end;
@@ -177,5 +463,9 @@
         justify-content: center;
         background: #f1f5f9;
         border-radius: 30px;
+    }
+
+    .assignees-checkbox-list {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
     }
 }

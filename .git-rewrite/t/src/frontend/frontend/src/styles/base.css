@@ -1,0 +1,43 @@
+/* Глобальные сбросы и базовые стили */
+* {
+    box-sizing: border-box;
+    margin: 0;
+}
+
+body {
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: #f1f5f9;
+    color: #0f172a;
+    line-height: 1.5;
+    padding: 20px;
+}
+
+.app-root {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.loading {
+    text-align: center;
+    padding: 40px;
+    font-size: 1.2rem;
+    color: #475569;
+}
+
+/* Вспомогательные классы */
+.divider {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 24px 0;
+}
+
+.flex-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.mt-4 {
+    margin-top: 20px;
+}

@@ -1,0 +1,32 @@
+type Notification {
+    id: ID!
+    userId: Long!
+    type: String!
+    title: String!
+    message: String
+    taskId: Long
+    projectId: Long
+    isRead: Boolean!
+    createdAt: String!
+    readAt: String
+}
+
+extend type Query {
+    notifications(userId: Long!): [Notification!]!
+    unreadNotifications(userId: Long!): [Notification!]!
+    unreadCount(userId: Long!): Int!
+}
+
+extend type Mutation {
+    markNotificationAsRead(userId: Long!, notificationId: Long!): Notification!
+    markAllAsRead(userId: Long!): Boolean!
+    deleteNotification(userId: Long!, notificationId: Long!): Boolean!
+    deleteOldNotifications(userId: Long!): Boolean!
+}
+
+extend type Subscription {
+    taskUpdated: Task!
+    subgroupUpdated(projectId: Long!): Subgroup!
+    projectUpdated: Project!
+    notificationCreated(userId: Long!): Notification!
+}

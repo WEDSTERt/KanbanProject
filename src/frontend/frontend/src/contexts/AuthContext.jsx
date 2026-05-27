@@ -9,10 +9,13 @@ const AuthContext = createContext(undefined);
 export const AuthProvider = ({children}) => {
     const [user, setUser] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [shouldFetch, setShouldFetch] = useState(!!localStorage.getItem('jwtToken'));
+    
     const {data, refetch: refetchUser} = useQuery(GET_CURRENT_USER, {
-        skip: !localStorage.getItem('jwtToken'),
+        skip: !shouldFetch,
         fetchPolicy: 'network-only',
     });
+    
     const [loginMutation] = useMutation(LOGIN);
     const [registerMutation] = useMutation(REGISTER);
     const [updateEmailNotificationsMutation] = useMutation(UPDATE_EMAIL_NOTIFICATIONS);
@@ -81,8 +84,14 @@ export const AuthProvider = ({children}) => {
         localStorage.removeItem('apollo-cache-persist');
         setUser(null);
     };
-
-    return (<AuthContext.Provider value={{user, loading, login, register, logout, updateEmailNotifications, refetchUser}}>
+    
+    const loginWithToken = (token) => {
+        console.log('loginWithToken called with:', token);
+        localStorage.setItem('jwtToken', token);
+        setShouldFetch(true); // Активирует запрос GET_CURRENT_USER
+    };
+    
+    return (<AuthContext.Provider value={{user, loading, login, register, logout, updateEmailNotifications, refetchUser, loginWithToken }}>
         {children}
     </AuthContext.Provider>);
 };

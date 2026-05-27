@@ -19,76 +19,99 @@
         font-size: 14px;
     }
 
+    * {
+        -webkit-touch-callout: none;
+        -webkit-user-select: none;
+    }
+
+    input, textarea, select, button {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+
     /* Шапка */
     .app-navbar {
-        flex-direction: column;
-        padding: 12px 16px;
-        border-radius: 20px;
-        gap: 12px;
-        margin-bottom: 16px;
+        flex-direction: row;
+        padding: 10px 12px;
+        border-radius: 16px;
+        gap: 8px;
+        margin-bottom: 12px;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
     }
 
     .app-logo {
-        font-size: 1.3rem;
-        text-align: center;
+        font-size: 1.1rem;
+        text-align: left;
+        flex: 1;
+        min-width: 100px;
     }
 
     .app-nav-links {
-        width: 100%;
-        justify-content: space-around;
-        gap: 8px;
+        width: auto;
+        justify-content: flex-start;
+        gap: 4px;
         flex-wrap: wrap;
+        display: flex;
+        flex-direction: row;
     }
 
     .app-nav-links a,
     .app-user-info {
-        font-size: 0.8rem;
-        padding: 6px 12px;
+        font-size: 0.7rem;
+        padding: 4px 8px;
+        white-space: nowrap;
+        border-radius: 12px;
     }
 
     /* Карточки */
     .card {
-        padding: 16px;
-        border-radius: 20px;
-        margin-bottom: 16px;
+        padding: 14px;
+        border-radius: 16px;
+        margin-bottom: 12px;
     }
 
     .card h2 {
-        font-size: 1.3rem;
-        margin-bottom: 16px;
+        font-size: 1.1rem;
+        margin-bottom: 12px;
     }
 
     /* Формы */
     .form-group {
-        margin-bottom: 16px;
+        margin-bottom: 12px;
     }
 
     .form-label {
-        font-size: 0.85rem;
-        margin-bottom: 6px;
+        font-size: 0.8rem;
+        margin-bottom: 4px;
     }
 
     .form-input,
     .form-select,
     .form-textarea {
-        padding: 10px 14px;
+        padding: 10px 12px;
         font-size: 16px;
-        border-radius: 14px;
+        border-radius: 12px;
     }
 
     /* Кнопки */
     .btn {
         padding: 10px 16px;
-        font-size: 0.9rem;
-        border-radius: 40px;
-        width: 100%;
+        font-size: 0.85rem;
+        border-radius: 20px;
+        width: auto;
         text-align: center;
         justify-content: center;
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
 
     .flex-row {
         flex-direction: column;
-        gap: 10px;
+        gap: 8px;
     }
 
     .flex-row .btn {
@@ -101,20 +124,21 @@
         width: auto;
         min-width: 32px;
         padding: 6px 12px;
+        font-size: 0.75rem;
     }
 
     /* Проекты */
     .grid-2 {
         grid-template-columns: 1fr;
-        gap: 16px;
+        gap: 12px;
     }
 
     .project-card {
-        padding: 16px;
+        padding: 12px;
     }
 
     .project-card h3 {
-        font-size: 1.2rem;
+        font-size: 1rem;
     }
 
     .project-card .flex-row {
@@ -129,256 +153,737 @@
     /* Канбан доска */
     .kanban-layout {
         flex-direction: column;
+        gap: 0;
     }
 
     .groups-panel {
         width: 100%;
         margin-right: 0;
-        margin-bottom: 16px;
-        padding: 12px;
-        border-radius: 20px;
+        margin-bottom: 8px;
+        padding: 8px 4px;
+        border-radius: 12px;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+    }
+
+    .groups-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 8px 4px;
+        gap: 8px;
     }
 
     .groups-header h3 {
-        font-size: 1rem;
+        font-size: 0.85rem;
+        margin: 0;
+        flex: 1;
     }
 
     .groups-item {
-        padding: 8px 12px;
-        font-size: 0.85rem;
+        padding: 6px 10px;
+        font-size: 0.8rem;
+        border-radius: 12px;
+        margin: 2px 2px;
+        min-height: 32px;
+        display: flex;
+        align-items: center;
+        -webkit-user-select: none;
+        user-select: none;
     }
 
     .kanban-container {
         overflow-x: visible;
+        padding: 0 4px;
     }
 
     .kanban-header-row {
         flex-direction: column;
         align-items: stretch;
-        gap: 12px;
+        gap: 8px;
+        padding: 0 4px;
     }
 
     .kanban-title-area {
         justify-content: space-between;
+        align-items: center;
         flex-wrap: wrap;
+        gap: 8px;
     }
 
     .kanban-title {
-        font-size: 1.3rem;
+        font-size: 1.2rem;
+        margin: 0;
+        flex: 1;
     }
 
     .kanban-controls-row {
         flex-direction: column;
         align-items: stretch;
-        gap: 12px;
+        gap: 8px;
+        padding: 0 4px;
     }
 
     .kanban-sort-panel {
-        justify-content: flex-start;
+        display: flex;
+        align-items: center;
+        gap: 6px;
         overflow-x: auto;
-        flex-wrap: nowrap;
-        padding: 6px 12px;
+        padding: 8px;
+        background: #f8fafc;
+        border-radius: 12px;
+        border: 1px solid #e2e8f0;
         -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+    }
+
+    .kanban-sort-panel::-webkit-scrollbar {
+        display: none;
+    }
+
+    .sort-label {
+        font-size: 0.75rem;
+        white-space: nowrap;
+        color: #64748b;
+        display: flex;
+        align-items: center;
+        gap: 4px;
     }
 
     .sort-btn {
         white-space: nowrap;
-        font-size: 0.75rem;
-        padding: 4px 10px;
+        font-size: 0.7rem;
+        padding: 4px 8px;
+        border-radius: 20px;
+        background: white;
+        border: 1px solid #cbd5e1;
+        color: #1e293b;
+        cursor: pointer;
+        transition: all 0.15s;
+        flex-shrink: 0;
+        min-height: 28px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .sort-btn.active {
+        background: #2563eb;
+        color: white;
+        border-color: #2563eb;
+    }
+
+    .sort-btn:active {
+        transform: scale(0.95);
     }
 
     .kanban-filter-panel {
+        display: flex;
         justify-content: space-between;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
     }
 
     .filter-toggle-btn {
-        font-size: 0.85rem;
-        padding: 8px 14px;
+        font-size: 0.8rem;
+        padding: 8px 12px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+        flex: 1;
+        min-width: 100px;
+        border-radius: 20px;
+        background: white;
+        border: 1px solid #cbd5e1;
+        color: #1e293b;
+        cursor: pointer;
+        transition: all 0.15s;
+        min-height: 36px;
+    }
+
+    .filter-toggle-btn:active {
+        transform: scale(0.95);
+    }
+
+    .filter-badge-count {
+        background: #2563eb;
+        color: white;
+        border-radius: 50%;
+        width: 18px;
+        height: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.65rem;
+        font-weight: bold;
     }
 
     /* Канбан колонки */
     .kanban-board {
         flex-direction: column;
-        gap: 16px;
+        gap: 12px;
+        padding: 0 4px 8px;
     }
 
     .kanban-column {
         min-width: 100%;
         max-width: 100%;
-        padding: 12px;
-        border-radius: 20px;
+        padding: 0;
+        border-radius: 0;
+        background: transparent;
+        border: none;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .kanban-column-header {
+        background: #f8fafc;
+        padding: 8px 10px;
+        border-radius: 12px;
+        margin-bottom: 6px;
+        border: 1px solid #e2e8f0;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
     }
 
     .kanban-column-header h3 {
-        font-size: 1rem;
+        font-size: 0.9rem;
+        margin: 0;
+        padding: 0;
+        border: none;
+        flex: 1;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .kanban-task-count {
+        background: #e2e8f0;
+        padding: 2px 8px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        flex-shrink: 0;
     }
 
     .kanban-task-list {
-        gap: 10px;
+        gap: 8px;
+        min-height: auto;
     }
 
     /* Карточки задач */
     .task-card {
         padding: 10px;
+        border-radius: 12px;
+        border-left-width: 3px;
+        margin: 0;
+        cursor: pointer;
+        -webkit-user-select: none;
+        user-select: none;
+        touch-action: manipulation;
+        min-height: 60px;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+
+    .task-card:active {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+
+    .task-card-main {
+        flex: 1;
+        cursor: pointer;
+    }
+
+    .task-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 6px;
+        margin-bottom: 4px;
     }
 
     .task-title {
         font-size: 0.85rem;
+        font-weight: 500;
+        line-height: 1.3;
+        flex: 1;
+        word-break: break-word;
+    }
+
+    .task-menu-btn-top {
+        background: none;
+        border: none;
+        color: #64748b;
+        cursor: pointer;
+        font-size: 0.8rem;
+        padding: 4px 4px;
+        min-width: 24px;
+        min-height: 24px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border-radius: 8px;
+        transition: all 0.15s;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .task-menu-btn-top:active {
+        background: #e2e8f0;
+        color: #1e293b;
     }
 
     .task-bottom-row {
+        display: flex;
         flex-direction: row;
         flex-wrap: wrap;
-        gap: 8px;
-        margin-top: 6px;
+        gap: 6px;
+        margin-top: 4px;
+        align-items: center;
     }
 
     .task-priority {
         font-size: 0.65rem;
         padding: 2px 6px;
+        border-radius: 8px;
+        white-space: nowrap;
+        flex-shrink: 0;
     }
 
     .task-date {
         font-size: 0.6rem;
         padding: 2px 5px;
+        border-radius: 6px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .task-date i {
+        font-size: 0.55rem;
     }
 
     .task-assignees {
+        display: flex;
         gap: 4px;
-        margin-top: 8px;
+        margin-top: 4px;
+        flex-wrap: wrap;
+    }
+
+    .assignee-wrapper {
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+        position: relative;
     }
 
     .assignee-name {
         font-size: 0.6rem;
         padding: 2px 6px;
+        background: #e0e7ff;
+        color: #3730a3;
+        border-radius: 8px;
+        white-space: nowrap;
+        display: flex;
+        align-items: center;
+        gap: 2px;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .assignee-name i {
+        font-size: 0.55rem;
+    }
+
+    .assignee-tooltip {
+        display: none;
+    }
+
+    .assignee-more {
+        font-size: 0.6rem;
+        padding: 2px 4px;
+        color: #64748b;
+        font-weight: bold;
     }
 
     /* Подзадачи */
     .task-card.subtask-card {
         padding: 6px 8px;
+        margin-left: 12px;
+        border-radius: 8px;
+        min-height: 50px;
+    }
+
+    .subtask-header-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 6px;
     }
 
     .subtask-title {
-        font-size: 0.75rem !important;
+        font-size: 0.75rem;
+        font-weight: 500;
+        line-height: 1.2;
+        flex: 1;
+        word-break: break-word;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        flex-wrap: wrap;
     }
 
     .subtask-status-badge {
-        font-size: 0.45rem;
-        padding: 1px 4px;
+        font-size: 0.55rem;
+        padding: 2px 4px;
+        border-radius: 6px;
+        white-space: nowrap;
+        flex-shrink: 0;
+        display: inline-flex;
+        align-items: center;
+        gap: 2px;
+    }
+
+    .subtask-menu-btn {
+        background: none;
+        border: none;
+        color: #94a3b8;
+        cursor: pointer;
+        font-size: 0.7rem;
+        padding: 2px 4px;
+        min-width: 20px;
+        min-height: 20px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
+        border-radius: 6px;
+        -webkit-user-select: none;
+        user-select: none;
     }
 
     .subtask-priority {
         font-size: 0.55rem;
+        padding: 1px 4px;
+        border-radius: 6px;
     }
 
     .subtask-date {
         font-size: 0.55rem;
+        padding: 1px 4px;
+        border-radius: 6px;
+    }
+
+    .subtask-expand-btn {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+        border-radius: 6px;
+        background: white;
+        border: 1px solid #cbd5e1;
+        color: #1e293b;
+        cursor: pointer;
+        margin-top: 2px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .subtask-expand-btn:active {
+        transform: scale(0.95);
     }
 
     /* Модальные окна */
+    .modal-overlay {
+        background: rgba(0, 0, 0, 0.4);
+        backdrop-filter: blur(2px);
+    }
+
     .modal-content {
-        width: 95%;
-        max-width: 95%;
-        padding: 16px;
+        width: 95vw;
+        max-width: 95vw;
         max-height: 85vh;
-        border-radius: 20px;
+        padding: 14px;
+        border-radius: 16px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .modal-content h3 {
-        font-size: 1.2rem;
-        margin-bottom: 12px;
+        font-size: 1.1rem;
+        margin-bottom: 10px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
     }
 
     .modal-close {
-        top: 12px;
-        right: 12px;
-        font-size: 1rem;
+        top: 10px;
+        right: 10px;
+        font-size: 1.2rem;
+        background: #f1f5f9;
+        border: 1px solid #e2e8f0;
+        padding: 4px 8px;
+        border-radius: 8px;
+        min-width: 28px;
+        min-height: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        transition: all 0.15s;
+    }
+
+    .modal-close:active {
+        background: #e2e8f0;
     }
 
     .modal-actions {
+        display: flex;
         flex-direction: column;
-        gap: 10px;
+        gap: 8px;
+        margin-top: 12px;
     }
 
     .modal-actions .btn {
         width: 100%;
+        min-height: 36px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
     }
 
-    /* Окно просмотра задачи */
     .task-view-modal {
         min-width: auto;
-        width: 95%;
+        width: 95vw;
     }
 
     .task-timestamps {
         flex-direction: column;
-        gap: 6px;
+        gap: 4px;
         padding: 8px 10px;
         font-size: 0.7rem;
     }
 
     .task-description-view {
-        max-height: 150px;
+        max-height: 120px;
         font-size: 0.85rem;
+        font-size: 0.8rem;
+        line-height: 1.4;
     }
 
     /* Фильтры */
     .filter-modal {
-        min-width: 90%;
-        max-width: 95%;
+        max-width: 95vw;
+        max-height: 85vh;
+        padding: 12px;
     }
 
     .filter-modal-body {
-        max-height: 50vh;
+        max-height: 60vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 8px 0;
+    }
+
+    .filter-section {
+        padding: 8px 0;
     }
 
     .filter-section-title {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
+        font-weight: 600;
+        color: #64748b;
+        margin-bottom: 6px;
+        padding: 0 4px;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .filter-options {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .filter-option {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 4px;
+        cursor: pointer;
+        -webkit-user-select: none;
+        user-select: none;
+        border-radius: 8px;
+        transition: all 0.15s;
+    }
+
+    .filter-option:active {
+        background: #f1f5f9;
+    }
+
+    .filter-option input {
+        min-width: 16px;
+        min-height: 16px;
+        cursor: pointer;
     }
 
     .filter-option span {
         font-size: 0.8rem;
     }
 
+    .filter-divider {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 8px 0;
+    }
+
     .date-range-row {
-        flex-direction: row;
+        display: flex;
         gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .date-field {
+        flex: 1;
+        min-width: 120px;
     }
 
     .date-field .form-input {
         font-size: 0.8rem;
         padding: 8px 10px;
+        border-radius: 8px;
     }
 
     /* Выбор даты */
     .react-datepicker {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
     }
 
     .react-datepicker__input-container input {
-        font-size: 0.85rem;
-        padding: 8px 12px;
+        font-size: 0.8rem;
+        padding: 8px 10px;
     }
 
     /* Чекбоксы исполнителей */
     .assignees-checkbox-list {
-        max-height: 150px;
+        max-height: 120px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
     }
 
     .assignees-checkbox-label {
         font-size: 0.8rem;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 0;
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    .assignees-checkbox-label input {
+        min-width: 18px;
+        min-height: 18px;
+        cursor: pointer;
     }
 
     /* Контекстное меню */
     .context-menu {
         position: fixed !important;
-        bottom: 20px !important;
+        bottom: 16px !important;
         top: auto !important;
         left: 50% !important;
         transform: translateX(-50%);
-        width: 90%;
-        max-width: 320px;
-        border-radius: 20px;
+        width: 92vw;
+        max-width: 360px;
+        max-height: 70vh;
+        border-radius: 16px;
+        padding: 0;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        background: white;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.25);
+        z-index: 10001;
+    }
+
+    .context-menu-item {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        border-radius: 0;
+        border-bottom: 1px solid #f1f5f9;
+    }
+
+    .context-menu-item:last-child {
+        border-bottom: none;
+    }
+
+    .context-menu-item:active {
+        background: #f1f5f9;
+    }
+
+    .context-menu-divider {
+        height: 1px;
+        background: #e2e8f0;
+        margin: 0;
+    }
+
+    .context-menu-subtask {
+        padding: 10px 14px;
+        border-bottom: 1px solid #e2e8f0;
+    }
+
+    .context-menu-subtask-form {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .context-menu-subtask-form textarea {
+        font-size: 0.8rem;
+        padding: 8px;
+        min-height: 50px;
+        border-radius: 8px;
+    }
+
+    .context-menu-subtask-form button {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+
+    .context-menu-tags {
+        padding: 8px 14px;
+    }
+
+    .tags-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        max-height: 150px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .context-menu-tag-btn {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        border-radius: 12px;
+        min-height: 28px;
+        display: inline-flex;
+        align-items: center;
+    }
+
+    .delete-tag-icon {
+        font-size: 0.7rem;
+        padding: 2px 4px;
     }
 
     /* Настройки аккаунта */
@@ -388,12 +893,12 @@
     }
 
     .account-settings-card {
-        padding: 16px;
+        padding: 12px;
     }
 
     .form-actions {
         flex-direction: column;
-        gap: 10px;
+        gap: 8px;
     }
 
     .form-actions button {
@@ -408,8 +913,8 @@
     .member-item {
         flex-direction: column;
         align-items: flex-start;
-        gap: 8px;
-        padding: 10px 0;
+        gap: 6px;
+        padding: 8px 0;
     }
 
     .member-item .flex-row {
@@ -424,15 +929,65 @@
     }
 
     /* Группы на мобильных */
-    .mobile-groups-modal .groups-panel {
-        width: 85%;
-        max-width: 300px;
+    .mobile-groups-btn {
+        background: #f8fafc;
+        border: 1px solid #cbd5e1;
+        color: #1e293b;
+        padding: 8px 12px;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        white-space: nowrap;
+        min-height: 32px;
+        transition: all 0.15s;
+    }
+
+    .mobile-groups-btn:active {
+        background: #e2e8f0;
+        transform: scale(0.95);
+    }
+
+    .mobile-groups-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        backdrop-filter: blur(2px);
+        display: flex;
+        align-items: flex-start;
+        padding-top: 8px;
+        z-index: 9999;
+        overflow-y: auto;
+    }
+
+    .mobile-groups-modal > div {
+        width: 100%;
+    }
+
+    .filter-modal-actions {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+        margin-top: 12px;
+        padding-top: 12px;
+        border-top: 1px solid #e2e8f0;
+    }
+
+    .filter-modal-actions .btn {
+        width: 100%;
+        min-height: 36px;
     }
 
     /* Turnstile виджет */
     .turnstile-container {
-        transform: scale(0.85);
-        margin: -5px 0;
+        transform: scale(0.75);
+        transform-origin: top left;
+        margin: -8px 0;
     }
 }
 
@@ -443,48 +998,53 @@
     }
 
     .app-navbar {
-        padding: 10px 12px;
-        border-radius: 16px;
+        padding: 8px 10px;
+        border-radius: 12px;
+        gap: 6px;
     }
 
     .app-logo {
-        font-size: 1.1rem;
+        font-size: 1rem;
+        flex: 1;
     }
 
     .app-nav-links a,
     .app-user-info {
-        font-size: 0.7rem;
-        padding: 4px 8px;
+        font-size: 0.65rem;
+        padding: 3px 6px;
     }
 
     .card {
-        padding: 12px;
-        border-radius: 16px;
+        padding: 10px;
+        border-radius: 12px;
     }
 
     .card h2 {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .form-input,
     .form-select,
     .form-textarea {
-        padding: 8px 12px;
+        padding: 8px 10px;
         font-size: 14px;
+        border-radius: 10px;
     }
 
     .btn {
-        padding: 8px 14px;
-        font-size: 0.85rem;
+        padding: 8px 12px;
+        font-size: 0.8rem;
+        border-radius: 16px;
+        min-height: 32px;
     }
 
     .kanban-title {
-        font-size: 1.1rem;
+        font-size: 1rem;
     }
 
     .groups-item {
-        padding: 6px 10px;
-        font-size: 0.8rem;
+        padding: 4px 8px;
+        font-size: 0.75rem;
     }
 
     .task-title {
@@ -506,8 +1066,8 @@
     }
 
     .modal-content {
-        padding: 12px;
-        border-radius: 16px;
+        padding: 10px;
+        border-radius: 12px;
     }
 
     .modal-content h3 {
@@ -515,11 +1075,25 @@
     }
 
     .subtasks-list {
-        max-height: 200px;
+        max-height: 150px;
     }
 
     .subtask-item {
-        font-size: 0.75rem;
+        font-size: 0.7rem;
+    }
+
+    .sort-btn {
+        font-size: 0.65rem;
+        padding: 3px 6px;
+    }
+
+    .kanban-sort-panel {
+        padding: 6px;
+        gap: 4px;
+    }
+
+    .sort-label {
+        font-size: 0.7rem;
     }
 }
 
@@ -534,6 +1108,9 @@
     .kanban-column {
         min-width: 280px;
         max-width: 280px;
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
+        padding: 12px;
     }
 
     .modal-content {
@@ -564,6 +1141,13 @@
     input,
     select,
     textarea {
+        font-size: 16px;
+    }
+
+    /* Prevent zoom on input focus */
+    input:focus,
+    select:focus,
+    textarea:focus {
         font-size: 16px;
     }
 }

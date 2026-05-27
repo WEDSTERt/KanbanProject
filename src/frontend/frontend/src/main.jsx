@@ -7,6 +7,22 @@ import {AuthProvider} from './contexts/AuthContext';
 import App from './App';
 import './styles/index.css';
 
+// Читаем токен из фрагмента URL (#token=...)
+const hashParams = new URLSearchParams(window.location.hash.substring(1));
+let token = hashParams.get('token');
+
+// Fallback: если в query параметрах (старый способ)
+if (!token) {
+    const queryParams = new URLSearchParams(window.location.search);
+    token = queryParams.get('token');
+}
+
+if (token) {
+    localStorage.setItem('jwtToken', token);
+    // Очищаем фрагмент для чистоты
+    window.history.replaceState({}, document.title, window.location.pathname);
+}
+
 // Функция для подавления определённых ошибок в консоли
 (function suppressErrors() {
     const originalError = console.error;
@@ -23,7 +39,6 @@ import './styles/index.css';
         'Failed to parse audio',
         'Failed to parse video',
         'Invalid (ambiguous) video codec',
-        'Form submission canceled',
         'xr-spatial-tracking',
         'Private Access Token',
         'TrustedHTML',
@@ -38,10 +53,12 @@ import './styles/index.css';
         'Cannot find Widget',
         'Turnstile already has been loaded',
         'Turnstile has already been rendered',
-        'An error occurred! For more details, see the full error text'
+        'An error occurred! For more details, see the full error text',
+        'Application starting',
+        'App component rendering',
+        'Blocked aria-hidden on an element because its descendant retained focus'
     ];
 
-    // Перехват console.error
     console.error = function(...args) {
         const message = args[0]?.toString() || '';
         if (ignoredPatterns.some(pattern => message.includes(pattern))) {
@@ -50,7 +67,6 @@ import './styles/index.css';
         originalError.apply(console, args);
     };
 
-    // Перехват console.warn
     console.warn = function(...args) {
         const message = args[0]?.toString() || '';
         if (ignoredPatterns.some(pattern => message.includes(pattern))) {
@@ -59,15 +75,6 @@ import './styles/index.css';
         originalWarn.apply(console, args);
     };
 
-    // Фильтруем только важные сообщения Turnstile
-    console.log = function(...args) {
-        const message = args[0]?.toString() || '';
-        if (message.includes('Turnstile success')) {
-            originalLog.apply(console, args);
-        }
-    };
-
-    // Перехват ошибок на уровне window
     window.addEventListener('error', (e) => {
         const message = e.message || '';
         const filename = e.filename || '';
@@ -80,7 +87,6 @@ import './styles/index.css';
         }
     }, true);
 
-    // Перехват необработанных Promise ошибок
     window.addEventListener('unhandledrejection', (e) => {
         const message = e.reason?.message || '';
         if (ignoredPatterns.some(pattern => message.includes(pattern))) {
@@ -89,18 +95,15 @@ import './styles/index.css';
     });
 })();
 
-// Очистка кэша при ошибках Apollo
 window.addEventListener('error', (e) => {
     const message = e.message || '';
     if (message.includes('ApolloProvider') || message.includes('client instance')) {
-        console.log('Очистка кэша Apollo...');
         localStorage.removeItem('apollo-cache-persist');
         localStorage.removeItem('jwtToken');
         setTimeout(() => window.location.reload(), 100);
     }
 });
 
-// Рендеринг приложения
 ReactDOM.createRoot(document.getElementById('root')).render(
     <React.StrictMode>
         <ApolloProvider client={client}>

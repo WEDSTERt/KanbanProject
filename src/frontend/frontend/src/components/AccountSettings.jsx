@@ -117,6 +117,18 @@ const AccountSettings = () => {
                 <h2><i className="fas fa-user-cog"></i> Настройки профиля</h2>
                 <form onSubmit={handleSubmit}>
                     <div className="form-group">
+                        <label className="form-label" htmlFor="account-email">Email</label>
+                        <input
+                            className="form-input"
+                            type="email"
+                            id="account-email"
+                            value={user.email || ''}
+                            disabled
+                            style={{ backgroundColor: '#f1f5f9', cursor: 'not-allowed', opacity: 0.7 }}
+                        />
+                    </div>
+
+                    <div className="form-group">
                         <label className="form-label" htmlFor="account-fullname">Имя пользователя (Имя Фамилия)</label>
                         <input
                             className="form-input"

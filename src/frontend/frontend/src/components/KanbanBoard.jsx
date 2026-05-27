@@ -1,40 +1,116 @@
 /* eslint-disable no-unused-vars */
-import React, {useState, useEffect, useCallback, useReducer} from 'react';
-import {useNavigate, useSearchParams} from 'react-router-dom';
-import {useQuery, useMutation, useApolloClient} from '@apollo/client';
-import {GET_PROJECT_DETAILS, GET_TASKS_BY_SUBGROUP, GET_TASKS_BY_ASSIGNEE_AND_PROJECT, GET_ALL_SUBTASKS, GET_TAGS} from '../graphql/queries';
-import {UPDATE_TASK, DELETE_TASK, CREATE_TASK, SET_TASK_ASSIGNEES, CREATE_TAG, ADD_TAG_TO_TASK, REMOVE_TAG_FROM_TASK, DELETE_TAG_FROM_PROJECT} from '../graphql/mutations';
-import {useAuth} from '../contexts/AuthContext';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
+import {
+    GET_PROJECT_DETAILS,
+    GET_TASKS_BY_SUBGROUP,
+    GET_TASKS_BY_ASSIGNEE_AND_PROJECT,
+    GET_ALL_SUBTASKS,
+    GET_TAGS,
+} from '../graphql/queries';
+import {
+    UPDATE_TASK,
+    DELETE_TASK,
+    CREATE_TASK,
+    SET_TASK_ASSIGNEES,
+    CREATE_TAG,
+    ADD_TAG_TO_TASK,
+    REMOVE_TAG_FROM_TASK,
+    DELETE_TAG_FROM_PROJECT,
+} from '../graphql/mutations';
+import { useAuth } from '../contexts/AuthContext';
 import SubgroupsPanel from './SubgroupsPanel';
 import TaskModal from './TaskModal';
 import ConfirmModal from './ConfirmModal';
-import DatePicker from 'react-datepicker';
-import 'react-datepicker/dist/react-datepicker.css';
 
+
+
+// --- Вспомогательные компоненты для рендеринга ---
+const TaskPriority = ({ value }) => {
+    const priority = value || 2;
+    return (
+        <div className={`task-priority priority-${priority}`}>
+            {priority === 1 && <>Низкая</>}
+            {priority === 2 && <>Средняя</>}
+            {priority === 3 && <>Высокая</>}
+            {!value && <>Средняя</>}
+        </div>
+    );
+};
+
+const TaskDueDate = ({ dueDate, isCompleted = false }) => {
+    if (!dueDate) return null;
+    return (
+        <div className={`task-date ${isCompleted ? 'task-completed' : ''}`}>
+            <i className="far fa-calendar-alt"></i> {new Date(dueDate).toLocaleString()}
+        </div>
+    );
+};
+
+const DueWarning = ({ dueWarningText, dueWarningColor }) => {
+    if (!dueWarningText) return null;
+    return (
+        <span className="due-warning" style={{ backgroundColor: dueWarningColor }}>
+            <i className="fas fa-exclamation-triangle"></i> {dueWarningText}
+        </span>
+    );
+};
+
+const TaskAssignees = ({ assignees, maxDisplay = 3, isCompleted = false }) => {
+    if (!assignees?.length) return null;
+    const displayed = assignees.slice(0, maxDisplay);
+    const remaining = assignees.length - maxDisplay;
+    return (
+        <div className="task-assignees">
+            {displayed.map(a => (
+                <div key={a.id} className="assignee-wrapper">
+                    <span className={`assignee-name ${isCompleted ? 'assignee-name-completed' : ''}`}>
+                        <i className="fas fa-user"></i> {a.fullName}
+                    </span>
+                    <span className="assignee-tooltip">{a.email}</span>
+                </div>
+            ))}
+            {remaining > 0 && <span className="assignee-more">+{remaining}</span>}
+        </div>
+    );
+};
+
+// Utility function to normalize status for import
+const normalizeStatusForImport = (status) => {
+    if (typeof status === 'number') {
+        if (status === 0) return 'TODO';
+        if (status === 1) return 'IN_PROGRESS';
+        if (status === 2) return 'REVIEW';
+        return 'TODO';
+    }
+    const upper = String(status).toUpperCase();
+    if (upper === 'INPROGRESS') return 'IN_PROGRESS';
+    if (['TODO', 'IN_PROGRESS', 'REVIEW'].includes(upper)) return upper;
+    return 'TODO';
+};
+
+// --- Основной компонент KanbanBoard ---
 const KanbanBoard = () => {
     const navigate = useNavigate();
     const [searchParams, setSearchParams] = useSearchParams();
     const projectId = searchParams.get('projectId');
     const urlSubgroupId = searchParams.get('subgroupId');
     const highlightTaskId = searchParams.get('highlightTask');
-    const {user} = useAuth();
+    const { user } = useAuth();
     const client = useApolloClient();
 
     const [activeSubgroupId, setActiveSubgroupId] = useState(null);
     const [showTaskModal, setShowTaskModal] = useState(false);
     const [editingTask, setEditingTask] = useState(null);
-    const [deleteConfirm, setDeleteConfirm] = useState({isOpen: false, taskId: null});
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, taskId: null });
     const [initialAssigneeIds, setInitialAssigneeIds] = useState([]);
     const [isCreatingTask, setIsCreatingTask] = useState(false);
     const [showMobileGroups, setShowMobileGroups] = useState(false);
     const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
-    const [viewMode, setViewMode] = useState('kanban');
+    const [viewMode] = useState('kanban');
     const [highlightedTask, setHighlightedTask] = useState(null);
-
-    const [selectedTagFilters, setSelectedTagFilters] = useState([]);
-    const [showTagFilter, setShowTagFilter] = useState(false);
-
-    const [expandedTaskId, setExpandedTaskId] = useState(null);
+    const [expandedTaskIds, setExpandedTaskIds] = useState(new Set());
     const [subTasksCache, setSubTasksCache] = useState({});
     const [loadingSubTasks, setLoadingSubTasks] = useState({});
     const [contextMenuTaskId, setContextMenuTaskId] = useState(null);
@@ -45,23 +121,18 @@ const KanbanBoard = () => {
     const [newTagColor, setNewTagColor] = useState('#3b82f6');
     const [newSubTaskTitle, setNewSubTaskTitle] = useState('');
     const [showCreateTag, setShowCreateTag] = useState(false);
-    const [refreshContextMenu, setRefreshContextMenu] = useState(0);
-    const [cachedTasks, setCachedTasks] = useState({});
-
     const [sortBy, setSortBy] = useState('dueDate');
     const [sortOrder, setSortOrder] = useState('asc');
     const [isMobileSort, setIsMobileSort] = useState(window.innerWidth <= 480);
-
     const [filters, setFilters] = useState({
         priority: [],
         dateFrom: null,
         dateTo: null,
         assignee: null,
-        tags: []
+        tags: [],
     });
     const [showFilterModal, setShowFilterModal] = useState(false);
-    const [deleteTagConfirm, setDeleteTagConfirm] = useState({isOpen: false, tagId: null, tagName: ''});
-
+    const [deleteTagConfirm, setDeleteTagConfirm] = useState({ isOpen: false, tagId: null, tagName: '' });
 
     const [createTask] = useMutation(CREATE_TASK);
     const [updateTask] = useMutation(UPDATE_TASK);
@@ -75,8 +146,139 @@ const KanbanBoard = () => {
     const { data: tagsData, refetch: refetchTags } = useQuery(GET_TAGS, {
         variables: { projectId },
         skip: !projectId,
+        fetchPolicy: 'network-only',
     });
     const availableTags = tagsData?.tags || [];
+
+    const { loading: projectLoading, data: projectData, refetch: refetchProject } = useQuery(GET_PROJECT_DETAILS, {
+        variables: { projectId },
+        skip: !projectId,
+    });
+
+    const { loading: tasksLoading, data: tasksData, refetch: refetchTasks, networkStatus: tasksNetworkStatus } = useQuery(
+        GET_TASKS_BY_SUBGROUP,
+        {
+            variables: { subgroupId: activeSubgroupId },
+            skip: !activeSubgroupId || activeSubgroupId === 'my-tasks',
+            fetchPolicy: 'cache-and-network',
+            notifyOnNetworkStatusChange: true,
+            pollInterval: 5000, // Автообновление каждые 5 секунд
+        }
+    );
+
+    const { loading: myTasksLoading, data: myTasksData, refetch: refetchMyTasks, networkStatus: myTasksNetworkStatus } = useQuery(
+        GET_TASKS_BY_ASSIGNEE_AND_PROJECT,
+        {
+            variables: { userId: user.id, projectId: projectId },
+            skip: activeSubgroupId !== 'my-tasks',
+            fetchPolicy: 'cache-and-network',
+            notifyOnNetworkStatusChange: true,
+            pollInterval: 5000, // Автообновление каждые 5 секунд
+        }
+    );
+
+    const refetchCurrentTasks = useCallback(async () => {
+        if (activeSubgroupId === 'my-tasks') {
+            await refetchMyTasks();
+        } else if (activeSubgroupId) {
+            await refetchTasks();
+        }
+    }, [activeSubgroupId, refetchMyTasks, refetchTasks]);
+
+    let tasks = [];
+    if (activeSubgroupId === 'my-tasks') {
+        tasks = myTasksData?.tasksByAssigneeAndProject || [];
+    } else if (activeSubgroupId && tasksData?.tasksBySubgroup) {
+        tasks = tasksData.tasksBySubgroup;
+    }
+
+    // Автоматическая загрузка подзадач для отображения прогресса
+    useEffect(() => {
+        if (!tasks.length) return;
+        const taskIdsToLoad = tasks
+            .filter(task => task.subTasksCount > 0 && !subTasksCache[task.id])
+            .map(task => task.id);
+        if (taskIdsToLoad.length === 0) return;
+
+        const loadSubTasksProgress = async () => {
+            setLoadingSubTasks(prev => {
+                const newState = { ...prev };
+                taskIdsToLoad.forEach(id => { newState[id] = true; });
+                return newState;
+            });
+            try {
+                const { data } = await client.query({
+                    query: GET_ALL_SUBTASKS,
+                    variables: { taskIds: taskIdsToLoad },
+                    fetchPolicy: 'network-only',
+                });
+                if (data?.tasksByIds) {
+                    setSubTasksCache(prev => {
+                        const newCache = { ...prev };
+                        data.tasksByIds.forEach(taskData => {
+                            if (taskData?.id) {
+                                newCache[taskData.id] = taskData.subTasks || [];
+                            }
+                        });
+                        return newCache;
+                    });
+                }
+            } catch (err) {
+                console.error('Ошибка загрузки подзадач для прогресса:', err);
+            } finally {
+                setLoadingSubTasks(prev => {
+                    const newState = { ...prev };
+                    taskIdsToLoad.forEach(id => { delete newState[id]; });
+                    return newState;
+                });
+            }
+        };
+        loadSubTasksProgress();
+    }, [tasks, subTasksCache, client]);
+
+    // Pause polling when tab is inactive
+    useEffect(() => {
+        let inactivityTimer;
+        let pollIntervalId;
+        
+        const handleActivity = () => {
+            clearTimeout(inactivityTimer);
+            if (activeSubgroupId === 'my-tasks') {
+                if (myTasksData) refetchMyTasks();
+            } else if (activeSubgroupId) {
+                if (tasksData) refetchTasks();
+            }
+            
+            inactivityTimer = setTimeout(() => {
+                console.log('User inactive - pausing updates');
+            }, 30000);
+        };
+        
+        const handleVisibilityChange = () => {
+            if (!document.hidden) {
+                if (activeSubgroupId === 'my-tasks') {
+                    refetchMyTasks();
+                } else if (activeSubgroupId) {
+                    refetchTasks();
+                }
+            }
+        };
+        
+        document.addEventListener('mousemove', handleActivity);
+        document.addEventListener('keydown', handleActivity);
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        
+        inactivityTimer = setTimeout(() => {
+            console.log('User inactive');
+        }, 30000);
+        
+        return () => {
+            document.removeEventListener('mousemove', handleActivity);
+            document.removeEventListener('keydown', handleActivity);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            clearTimeout(inactivityTimer);
+        };
+    }, [activeSubgroupId, refetchMyTasks, refetchTasks, myTasksData, tasksData]);
 
     useEffect(() => {
         if (highlightTaskId) {
@@ -101,12 +303,7 @@ const KanbanBoard = () => {
     useEffect(() => {
         if (!projectId) navigate('/');
     }, [projectId, navigate]);
-    useEffect(() => {
-        if (projectId) {
-            console.log('Loading tags for project:', projectId);
-            refetchTags();
-        }
-    }, [projectId, refetchTags]);
+
     useEffect(() => {
         const handleResize = () => {
             setIsMobile(window.innerWidth <= 768);
@@ -125,66 +322,11 @@ const KanbanBoard = () => {
         return () => document.removeEventListener('click', handleClickOutside);
     }, []);
 
-    const {loading: projectLoading, data: projectData, refetch: refetchProject} = useQuery(GET_PROJECT_DETAILS, {
-        variables: {projectId},
-        skip: !projectId,
-    });
-
-    const {loading: tasksLoading, data: tasksData, refetch: refetchTasks, networkStatus: tasksNetworkStatus} = useQuery(GET_TASKS_BY_SUBGROUP, {
-        variables: {subgroupId: activeSubgroupId},
-        skip: !activeSubgroupId || activeSubgroupId === 'my-tasks',
-        fetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-    });
-
-    const {loading: myTasksLoading, data: myTasksData, refetch: refetchMyTasks, networkStatus: myTasksNetworkStatus} = useQuery(GET_TASKS_BY_ASSIGNEE_AND_PROJECT, {
-        variables: { userId: user.id, projectId: projectId },
-        skip: activeSubgroupId !== 'my-tasks',
-        fetchPolicy: 'cache-and-network',
-        notifyOnNetworkStatusChange: true,
-    });
-
-    const refetchCurrentTasks = useCallback(() => {
-        if (activeSubgroupId === 'my-tasks') {
-            refetchMyTasks();
-        } else if (activeSubgroupId) {
-            refetchTasks();
-        }
-    }, [activeSubgroupId, refetchMyTasks, refetchTasks]);
-
     useEffect(() => {
-        if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
-            setCachedTasks(prev => ({ ...prev, [activeSubgroupId]: myTasksData.tasksByAssigneeAndProject }));
-        } else if (tasksData?.tasksBySubgroup) {
-            setCachedTasks(prev => ({ ...prev, [activeSubgroupId]: tasksData.tasksBySubgroup }));
+        if (projectId) {
+            refetchTags();
         }
-    }, [tasksData, myTasksData, activeSubgroupId]);
-
-    // Синхронизация contextMenuTask при обновлении данных
-    useEffect(() => {
-        if (contextMenuTask && contextMenuTask.id && showContextMenu) {
-            let updatedTask = null;
-
-            if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
-                updatedTask = myTasksData.tasksByAssigneeAndProject.find(t => t.id === contextMenuTask.id);
-            } else if (tasksData?.tasksBySubgroup) {
-                updatedTask = tasksData.tasksBySubgroup.find(t => t.id === contextMenuTask.id);
-            }
-
-            if (updatedTask && updatedTask.tags) {
-                const currentTagIds = contextMenuTask.tags?.map(t => t.id).sort().join(',');
-                const newTagIds = updatedTask.tags.map(t => t.id).sort().join(',');
-
-                if (currentTagIds !== newTagIds) {
-                    setContextMenuTask(prev => ({
-                        ...prev,
-                        tags: [...updatedTask.tags]
-                    }));
-                    setRefreshContextMenu(prev => prev + 1);
-                }
-            }
-        }
-    }, [myTasksData, tasksData, activeSubgroupId, contextMenuTask?.id, showContextMenu]);
+    }, [projectId, refetchTags]);
 
     const fetchSubTasksForTask = useCallback(async (taskId, force = false) => {
         if (!force && subTasksCache[taskId]) return;
@@ -195,7 +337,7 @@ const KanbanBoard = () => {
             const { data } = await client.query({
                 query: GET_ALL_SUBTASKS,
                 variables: { taskIds: [taskId] },
-                fetchPolicy: 'cache-first',
+                fetchPolicy: force ? 'network-only' : 'cache-first',
             });
 
             if (data?.tasksByIds?.length > 0) {
@@ -213,17 +355,125 @@ const KanbanBoard = () => {
     }, [client, subTasksCache]);
 
     const toggleExpandTask = useCallback((taskId) => {
-        if (expandedTaskId === taskId) {
-            setExpandedTaskId(null);
-        } else {
-            setExpandedTaskId(taskId);
-            if (!subTasksCache[taskId]) {
-                fetchSubTasksForTask(taskId);
+        setExpandedTaskIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(taskId)) {
+                newSet.delete(taskId);
+            } else {
+                newSet.add(taskId);
+                if (!subTasksCache[taskId]) {
+                    fetchSubTasksForTask(taskId);
+                }
             }
-        }
-    }, [expandedTaskId, subTasksCache, fetchSubTasksForTask]);
+            return newSet;
+        });
+    }, [subTasksCache, fetchSubTasksForTask]);
 
-    // Добавление подзадачи
+    // --- Работа с тегами ---
+    const handleAddTagToTask = async (taskId, tagId) => {
+        try {
+            await addTagToTask({ variables: { taskId: parseInt(taskId), tagId: parseInt(tagId) } });
+            await refetchCurrentTasks();
+            await refetchTags();
+        } catch (err) {
+            console.error(err);
+            alert('Ошибка добавления тега: ' + err.message);
+        }
+    };
+
+    const handleRemoveTagFromTask = async (taskId, tagId) => {
+        try {
+            await removeTagFromTask({ variables: { taskId: parseInt(taskId), tagId: parseInt(tagId) } });
+            await refetchCurrentTasks();
+            await refetchTags();
+        } catch (err) {
+            console.error(err);
+            alert('Ошибка удаления тега: ' + err.message);
+        }
+    };
+
+    const handleCreateTag = async () => {
+        if (!newTagName.trim()) return;
+        try {
+            await createTag({
+                variables: { projectId: parseInt(projectId), name: newTagName.trim(), color: newTagColor },
+            });
+            setNewTagName('');
+            setNewTagColor('#3b82f6');
+            setShowCreateTag(false);
+            await refetchTags();
+        } catch (err) {
+            alert('Ошибка создания тега: ' + err.message);
+        }
+    };
+
+    const handleDeleteTagFromProject = async (tagId, tagName) => {
+        if (!window.confirm(`Удалить тег "${tagName}" из проекта?`)) return;
+        try {
+            await deleteTagFromProject({ variables: { tagId: parseInt(tagId), projectId: parseInt(projectId) } });
+            await refetchTags();
+            await refetchCurrentTasks();
+        } catch (err) {
+            alert('Ошибка удаления тега: ' + err.message);
+        }
+    };
+
+    const openContextMenu = (e, task, targetElement = null) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        if (showContextMenu && contextMenuTaskId === task.id) {
+            setShowContextMenu(false);
+            setContextMenuTaskId(null);
+            setContextMenuTask(null);
+            return;
+        }
+
+        let actualTask = null;
+        if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
+            actualTask = myTasksData.tasksByAssigneeAndProject.find(t => t.id === task.id);
+        } else if (tasksData?.tasksBySubgroup) {
+            actualTask = tasksData.tasksBySubgroup.find(t => t.id === task.id);
+        }
+        if (!actualTask) actualTask = task;
+
+        setContextMenuTaskId(actualTask.id);
+        setContextMenuTask({
+            ...actualTask,
+            tags: actualTask.tags ? [...actualTask.tags] : [],
+        });
+
+        let x, y;
+        if (targetElement && targetElement.getBoundingClientRect) {
+            const rect = targetElement.getBoundingClientRect();
+            x = rect.right + 5;
+            y = rect.top;
+        } else {
+            x = e.clientX;
+            y = e.clientY;
+        }
+        setContextMenuPosition({ x, y });
+        setShowContextMenu(true);
+        setNewTagName('');
+        setNewTagColor('#3b82f6');
+        setNewSubTaskTitle('');
+        setShowCreateTag(false);
+    };
+
+    const handleContextMenuDelete = async () => {
+        if (contextMenuTaskId) {
+            const parentId = contextMenuTask?.parentTaskId;
+            await deleteTask({ variables: { id: contextMenuTaskId } });
+            await refetchCurrentTasks();
+            if (parentId && parentId !== 0 && parentId !== null) {
+                await fetchSubTasksForTask(parentId, true);
+            }
+            setShowContextMenu(false);
+            setContextMenuTaskId(null);
+            setContextMenuTask(null);
+        }
+    };
+
     const handleAddSubTaskFromMenu = async (taskId) => {
         if (!newSubTaskTitle.trim()) return;
         try {
@@ -231,7 +481,22 @@ const KanbanBoard = () => {
             const targetSubgroupId = activeSubgroupId === 'my-tasks' && realSubgroups.length > 0
                 ? realSubgroups[0].id
                 : activeSubgroupId;
-
+            
+            let parentTask = null;
+            if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
+                parentTask = myTasksData.tasksByAssigneeAndProject.find(t => t.id === taskId);
+            } else if (tasksData?.tasksBySubgroup) {
+                parentTask = tasksData.tasksBySubgroup.find(t => t.id === taskId);
+            }
+            
+            if (!parentTask && contextMenuTask?.id === taskId) {
+                parentTask = contextMenuTask;
+            }
+            
+            const assigneeIds = parentTask?.assignees?.length > 0 
+                ? parentTask.assignees.map(a => a.id)
+                : [user.id];
+            
             await createTask({
                 variables: {
                     subgroupId: targetSubgroupId,
@@ -241,9 +506,9 @@ const KanbanBoard = () => {
                     dueDate: null,
                     value: 2,
                     status: 'TODO',
-                    assigneeIds: [user.id],
-                    parentTaskId: taskId
-                }
+                    assigneeIds: assigneeIds,
+                    parentTaskId: taskId,
+                },
             });
             setNewSubTaskTitle('');
             await fetchSubTasksForTask(taskId, true);
@@ -255,163 +520,119 @@ const KanbanBoard = () => {
         }
     };
 
-    // Функция для добавления тега к задаче
-    const handleAddTagToTask = async (taskId, tagId) => {
-        try {
-            const result = await addTagToTask({
-                variables: { taskId, tagId }
-            });
-
-            if (result?.data?.addTagToTask) {
-                setContextMenuTask(prev => {
-                    if (!prev) return prev;
-                    return {
-                        ...prev,
-                        tags: [...(result.data.addTagToTask.tags || [])]
-                    };
-                });
-                setRefreshContextMenu(prev => prev + 1);
-            }
-
-            await refetchCurrentTasks();
-        } catch (err) {
-            console.error('Ошибка добавления тега:', err);
-            alert('Ошибка добавления тега: ' + err.message);
-        }
+    const transliterateTitle = (title) => {
+        const translitMap = {
+            'а': 'a', 'б': 'b', 'в': 'v', 'г': 'g', 'д': 'd', 'е': 'e', 'ё': 'yo', 'ж': 'zh',
+            'з': 'z', 'и': 'i', 'й': 'y', 'к': 'k', 'л': 'l', 'м': 'm', 'н': 'n', 'о': 'o',
+            'п': 'p', 'р': 'r', 'с': 's', 'т': 't', 'у': 'u', 'ф': 'f', 'х': 'h', 'ц': 'ts',
+            'ч': 'ch', 'ш': 'sh', 'щ': 'sch', 'ъ': '', 'ы': 'y', 'ь': '', 'э': 'e', 'ю': 'yu',
+            'я': 'ya', 'А': 'A', 'Б': 'B', 'В': 'V', 'Г': 'G', 'Д': 'D', 'Е': 'E', 'Ё': 'Yo',
+            'Ж': 'Zh', 'З': 'Z', 'И': 'I', 'Й': 'Y', 'К': 'K', 'Л': 'L', 'М': 'M', 'Н': 'N',
+            'О': 'O', 'П': 'P', 'Р': 'R', 'С': 'S', 'Т': 'T', 'У': 'U', 'Ф': 'F', 'Х': 'H',
+            'Ц': 'Ts', 'Ч': 'Ch', 'Ш': 'Sh', 'Щ': 'Sch', 'Ъ': '', 'Ы': 'Y', 'Ь': '', 'Э': 'E',
+            'Ю': 'Yu', 'Я': 'Ya'
+        };
+        return title
+            .split('')
+            .map(char => translitMap[char] || char)
+            .join('')
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '_')
+            .replace(/^_+|_+$/g, '')
+            .slice(0, 50);
     };
 
-    const handleRemoveTagFromTask = async (taskId, tagId) => {
-        try {
-            const result = await removeTagFromTask({
-                variables: { taskId, tagId }
-            });
-
-            if (result?.data?.removeTagFromTask) {
-                setContextMenuTask(prev => {
-                    if (!prev) return prev;
-                    return {
-                        ...prev,
-                        tags: [...(result.data.removeTagFromTask.tags || [])]
-                    };
-                });
-                setRefreshContextMenu(prev => prev + 1);
-            }
-
-            await refetchCurrentTasks();
-        } catch (err) {
-            console.error('Ошибка удаления тега:', err);
-            alert('Ошибка удаления тега: ' + err.message);
-        }
+    const handleExportSingleTask = (task) => {
+        const cleanTask = (t) => {
+            const cleaned = {
+                title: t.title,
+                description: t.description || null,
+                dueDate: t.dueDate || null,
+                value: t.value || 2,
+                status: t.status,
+            };
+            const subs = subTasksCache[t.id] || [];
+            if (subs.length) cleaned.subTasks = subs.map(st => cleanTask(st));
+            return cleaned;
+        };
+        const exportData = cleanTask(task);
+        const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const transliteratedTitle = transliterateTitle(task.title);
+        a.download = `task_${task.id}_${transliteratedTitle}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     };
 
-    // Функция для создания и добавления нового тега
-    const handleCreateAndAddTag = async (taskId) => {
-        if (!newTagName.trim()) return;
-        try {
-            const tagResult = await createTag({
-                variables: {
-                    projectId: projectId,
-                    name: newTagName.trim(),
-                    color: newTagColor
+    const handleImportTasks = async (event) => {
+        const file = event.target.files[0];
+        if (!file) return;
+        if (activeSubgroupId === 'my-tasks') {
+            alert('Импорт недоступен для раздела "Мои задачи"');
+            event.target.value = '';
+            return;
+        }
+        if (!confirm('Импорт добавит новые задачи к существующим. Продолжить?')) {
+            event.target.value = '';
+            return;
+        }
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+            try {
+                let imported = JSON.parse(e.target.result);
+                let tasksToImport = Array.isArray(imported) ? imported : [imported];
+                let createdCount = 0, errorCount = 0;
+
+                const createTaskRecursively = async (taskData, parentId = null) => {
+                    const { subTasks, ...rest } = taskData;
+                    try {
+                        const normalizedStatus = normalizeStatusForImport(rest.status);
+                        
+                        const res = await createTask({
+                            variables: {
+                                subgroupId: activeSubgroupId,
+                                createdByUserId: user.id,
+                                title: rest.title,
+                                description: rest.description || null,
+                                dueDate: rest.dueDate || null,
+                                value: rest.value || 2,
+                                status: normalizedStatus,
+                                assigneeIds: [],
+                                parentTaskId: parentId,
+                            },
+                        });
+                        createdCount++;
+                        const newId = res.data.createTask.id;
+                        if (subTasks && subTasks.length) {
+                            for (const sub of subTasks) {
+                                await createTaskRecursively(sub, newId);
+                            }
+                        }
+                    } catch (err) {
+                        console.error(err);
+                        errorCount++;
+                    }
+                };
+
+                for (const t of tasksToImport) {
+                    await createTaskRecursively(t);
                 }
-            });
-            const newTagId = tagResult.data.createTag.id;
 
-            const addResult = await addTagToTask({
-                variables: { taskId, tagId: newTagId }
-            });
-
-            if (addResult?.data?.addTagToTask) {
-                setContextMenuTask(prev => ({
-                    ...prev,
-                    tags: [...(addResult.data.addTagToTask.tags || [])]
-                }));
-                setRefreshContextMenu(prev => prev + 1);
+                await refetchCurrentTasks();
+                setSubTasksCache({});
+                setExpandedTaskIds(new Set());
+            } catch (err) {
+                console.error(err);
+                alert('Ошибка импорта: ' + err.message);
+            } finally {
+                event.target.value = '';
             }
-
-            setNewTagName('');
-            setNewTagColor('#3b82f6');
-            setShowCreateTag(false);
-            await refetchCurrentTasks();
-            await refetchTags();
-        } catch (err) {
-            console.error('Ошибка создания и добавления тега:', err);
-            alert('Ошибка: ' + err.message);
-        }
-    };
-
-    const handleDeleteTagFromProject = (tagId, tagName) => {
-        setDeleteTagConfirm({isOpen: true, tagId, tagName});
-    };
-
-    const confirmDeleteTagFromProject = async () => {
-        if (!deleteTagConfirm.tagId) return;
-        try {
-            await deleteTagFromProject({
-                variables: {
-                    tagId: deleteTagConfirm.tagId,
-                    projectId: projectId
-                },
-                update: (cache) => {
-                    cache.evict({ fieldName: 'tags' });
-                    cache.evict({ fieldName: 'tasksBySubgroup' });
-                    cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
-                    cache.gc();
-                }
-            });
-            setDeleteTagConfirm({isOpen: false, tagId: null, tagName: ''});
-
-            await refetchTags();
-            await refetchCurrentTasks();
-            setShowContextMenu(false);
-        } catch (err) {
-            console.error('Ошибка удаления тега:', err);
-            alert('Ошибка удаления тега: ' + err.message);
-            setDeleteTagConfirm({isOpen: false, tagId: null, tagName: ''});
-        }
-    };
-
-    const openContextMenu = (e, task) => {
-        e.preventDefault();
-        e.stopPropagation();
-
-        // Получаем актуальную задачу из данных Apollo
-        let actualTask = null;
-
-        if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
-            actualTask = myTasksData.tasksByAssigneeAndProject.find(t => t.id === task.id);
-        } else if (tasksData?.tasksBySubgroup) {
-            actualTask = tasksData.tasksBySubgroup.find(t => t.id === task.id);
-        }
-
-        // Если не нашли в данных, используем переданную задачу
-        if (!actualTask) {
-            actualTask = task;
-        }
-
-        setContextMenuTaskId(actualTask.id);
-        setContextMenuTask({
-            ...actualTask,
-            tags: actualTask.tags ? [...actualTask.tags] : []
-        });
-
-        setContextMenuPosition({ x: e.clientX, y: e.clientY });
-        setShowContextMenu(true);
-        setNewTagName('');
-        setNewTagColor('#3b82f6');
-        setNewSubTaskTitle('');
-        setShowCreateTag(false);
-    };
-
-    const handleContextMenuDelete = async () => {
-        if (contextMenuTaskId) {
-            await deleteTask({ variables: { id: contextMenuTaskId } });
-            client.cache.evict({ fieldName: 'tasksBySubgroup' });
-            client.cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
-            client.cache.gc();
-            await refetchCurrentTasks();
-        }
-        setShowContextMenu(false);
+        };
+        reader.readAsText(file);
     };
 
     useEffect(() => {
@@ -422,29 +643,37 @@ const KanbanBoard = () => {
             else if (realSubgroups.some(g => g.id === urlSubgroupId)) setActiveSubgroupId(urlSubgroupId);
             else {
                 setActiveSubgroupId('my-tasks');
-                setSearchParams({projectId, subgroupId: 'my-tasks'});
+                setSearchParams({ projectId, subgroupId: 'my-tasks' });
             }
         } else {
             setActiveSubgroupId('my-tasks');
-            setSearchParams({projectId, subgroupId: 'my-tasks'});
+            setSearchParams({ projectId, subgroupId: 'my-tasks' });
         }
     }, [projectData, urlSubgroupId, projectId, setSearchParams]);
 
     const handleSelectSubgroup = (subgroupId) => {
         setActiveSubgroupId(subgroupId);
-        setSearchParams({projectId, subgroupId});
+        setSearchParams({ projectId, subgroupId });
         if (isMobile) setShowMobileGroups(false);
         setFilters({
             priority: [],
             dateFrom: null,
             dateTo: null,
             assignee: null,
-            tags: []
+            tags: [],
         });
-        setSelectedTagFilters([]);
-        setExpandedTaskId(null);
-        setSubTasksCache({});
+        setExpandedTaskIds(new Set());
     };
+
+    // Проверка доступа к проекту
+    useEffect(() => {
+        if (!projectLoading && projectData?.project && user) {
+            const isMember = projectData.project.members.some(m => m.userId === user.id);
+            if (!isMember) {
+                navigate('/');
+            }
+        }
+    }, [projectLoading, projectData?.project, user, navigate]);
 
     if (projectLoading) return <div className="loading">Загрузка проекта...</div>;
     if (!projectData?.project) return <div className="message-error">Проект не найден</div>;
@@ -458,13 +687,6 @@ const KanbanBoard = () => {
     const realSubgroups = project.subgroups || [];
     const projectMembers = project.members || [];
 
-    let tasks = [];
-    if (activeSubgroupId === 'my-tasks') {
-        tasks = myTasksData?.tasksByAssigneeAndProject || [];
-    } else if (activeSubgroupId && tasksData?.tasksBySubgroup) {
-        tasks = tasksData.tasksBySubgroup;
-    }
-
     const showLoading = () => {
         if (activeSubgroupId === 'my-tasks') {
             return myTasksLoading && myTasksNetworkStatus === 1 && !myTasksData?.tasksByAssigneeAndProject;
@@ -472,46 +694,7 @@ const KanbanBoard = () => {
         return tasksLoading && tasksNetworkStatus === 1 && !tasksData?.tasksBySubgroup;
     };
 
-    const applyFilters = (tasksArray) => {
-        let filtered = [...tasksArray];
-
-        if (filters.priority.length > 0) {
-            filtered = filtered.filter(task => {
-                const priority = task.value || 2;
-                if (filters.priority.includes('high') && priority === 3) return true;
-                if (filters.priority.includes('medium') && priority === 2) return true;
-                if (filters.priority.includes('low') && priority === 1) return true;
-                return false;
-            });
-        }
-
-        if (filters.dateFrom || filters.dateTo) {
-            filtered = filtered.filter(task => {
-                if (!task.dueDate) return false;
-                const dueDate = new Date(task.dueDate);
-                if (filters.dateFrom && dueDate < filters.dateFrom) return false;
-                if (filters.dateTo && dueDate > filters.dateTo) return false;
-                return true;
-            });
-        }
-
-        if (filters.assignee) {
-            filtered = filtered.filter(task =>
-                task.assignees?.some(a => a.id === filters.assignee)
-            );
-        }
-
-        if (filters.tags && filters.tags.length > 0) {
-            filtered = filtered.filter(task =>
-                task.tags?.some(tag => filters.tags.includes(tag.id))
-            );
-        }
-
-        return filtered;
-    };
-
     const normalizeStatus = (status) => {
-        if (status === undefined || status === null) return 'TODO';
         if (typeof status === 'number') {
             if (status === 0) return 'TODO';
             if (status === 1) return 'IN_PROGRESS';
@@ -519,9 +702,8 @@ const KanbanBoard = () => {
             return 'TODO';
         }
         const upper = String(status).toUpperCase();
-        if (upper === 'TODO') return 'TODO';
-        if (upper === 'IN_PROGRESS' || upper === 'INPROGRESS') return 'IN_PROGRESS';
-        if (upper === 'REVIEW') return 'REVIEW';
+        if (upper === 'INPROGRESS') return 'IN_PROGRESS';
+        if (['TODO', 'IN_PROGRESS', 'REVIEW'].includes(upper)) return upper;
         return 'TODO';
     };
 
@@ -569,6 +751,51 @@ const KanbanBoard = () => {
         return baseStyle;
     };
 
+    const statusLabels = {
+        TODO: <><i className="fas fa-clipboard-list"></i> Создано</>,
+        IN_PROGRESS: <><i className="fas fa-cogs"></i> В разработке</>,
+        REVIEW: <><i className="fas fa-check-circle"></i> Выполнено</>,
+    };
+    const statusColors = { TODO: '#3b82f6', IN_PROGRESS: '#f59e0b', REVIEW: '#10b981' };
+
+    const applyFilters = (tasksArray) => {
+        let filtered = [...tasksArray];
+
+        if (filters.priority.length > 0) {
+            filtered = filtered.filter(task => {
+                const priority = task.value || 2;
+                if (filters.priority.includes('high') && priority === 3) return true;
+                if (filters.priority.includes('medium') && priority === 2) return true;
+                if (filters.priority.includes('low') && priority === 1) return true;
+                return false;
+            });
+        }
+
+        if (filters.dateFrom || filters.dateTo) {
+            filtered = filtered.filter(task => {
+                if (!task.dueDate) return false;
+                const dueDate = new Date(task.dueDate);
+                if (filters.dateFrom && dueDate < filters.dateFrom) return false;
+                if (filters.dateTo && dueDate > filters.dateTo) return false;
+                return true;
+            });
+        }
+
+        if (filters.assignee) {
+            filtered = filtered.filter(task =>
+                task.assignees?.some(a => a.id === filters.assignee)
+            );
+        }
+
+        if (filters.tags && filters.tags.length > 0) {
+            filtered = filtered.filter(task =>
+                task.tags?.some(tag => filters.tags.includes(tag.id))
+            );
+        }
+
+        return filtered;
+    };
+
     const sortTasks = (tasksArray) => {
         if (!tasksArray.length) return tasksArray;
         const sorted = [...tasksArray];
@@ -603,13 +830,6 @@ const KanbanBoard = () => {
         return sorted;
     };
 
-    const statusLabels = {
-        TODO: <><i className="fas fa-clipboard-list"></i> Создано</>,
-        IN_PROGRESS: <><i className="fas fa-cogs"></i> В разработке</>,
-        REVIEW: <><i className="fas fa-check-circle"></i> Выполнено</>,
-    };
-    const statusColors = {TODO: '#3b82f6', IN_PROGRESS: '#f59e0b', REVIEW: '#10b981'};
-
     const tasksForStatus = (status) => {
         const filtered = tasks.filter(t => normalizeStatus(t.status) === status);
         return sortTasks(applyFilters(filtered));
@@ -635,37 +855,21 @@ const KanbanBoard = () => {
             ...prev,
             priority: prev.priority.includes(value)
                 ? prev.priority.filter(p => p !== value)
-                : [...prev.priority, value]
+                : [...prev.priority, value],
         }));
     };
 
-    const handleDateFromChange = (date) => {
-        setFilters(prev => ({ ...prev, dateFrom: date }));
-    };
-
-    const handleDateToChange = (date) => {
-        setFilters(prev => ({ ...prev, dateTo: date }));
-    };
-
-    const handleAssigneeChange = (e) => {
-        setFilters(prev => ({ ...prev, assignee: e.target.value || null }));
-    };
-
+    const handleDateFromChange = (date) => setFilters(prev => ({ ...prev, dateFrom: date }));
+    const handleDateToChange = (date) => setFilters(prev => ({ ...prev, dateTo: date }));
+    const handleAssigneeChange = (e) => setFilters(prev => ({ ...prev, assignee: e.target.value || null }));
     const handleTagFilterToggle = (tagId) => {
         setFilters(prev => ({
             ...prev,
-            tags: prev.tags.includes(tagId)
-                ? prev.tags.filter(id => id !== tagId)
-                : [...prev.tags, tagId]
+            tags: prev.tags.includes(tagId) ? prev.tags.filter(id => id !== tagId) : [...prev.tags, tagId],
         }));
-        setSelectedTagFilters(prev =>
-            prev.includes(tagId) ? prev.filter(id => id !== tagId) : [...prev, tagId]
-        );
     };
-
     const resetFilters = () => {
         setFilters({ priority: [], dateFrom: null, dateTo: null, assignee: null, tags: [] });
-        setSelectedTagFilters([]);
     };
 
     let targetSubgroupForAssign = null;
@@ -727,7 +931,7 @@ const KanbanBoard = () => {
                     },
                 });
                 if (taskData.assigneeIds) {
-                    await setTaskAssignees({variables: {taskId: editingTask.id, userIds: taskData.assigneeIds}});
+                    await setTaskAssignees({ variables: { taskId: editingTask.id, userIds: taskData.assigneeIds } });
                 }
                 if (taskData.creatorId && taskData.creatorId !== editingTask.createdBy?.id) {
                     await updateTask({
@@ -758,10 +962,12 @@ const KanbanBoard = () => {
                         value: taskData.value || 0,
                         status: statusValue,
                         assigneeIds,
-                        parentTaskId: null
+                        parentTaskId: null,
                     },
                 });
             }
+            setSubTasksCache({});
+            setExpandedTaskIds(new Set());
             await refetchCurrentTasks();
             setShowTaskModal(false);
         } catch (err) {
@@ -770,24 +976,45 @@ const KanbanBoard = () => {
         }
     };
 
-    const handleDeleteTask = (taskId) => setDeleteConfirm({isOpen: true, taskId});
-
-    const confirmDeleteTask = async () => {
-        if (isViewer) return;
-        await deleteTask({variables: {id: deleteConfirm.taskId}});
-        client.cache.evict({fieldName: 'tasksBySubgroup'});
-        client.cache.evict({fieldName: 'tasksByAssigneeAndProject'});
-        client.cache.gc();
-        await refetchCurrentTasks();
-        setDeleteConfirm({isOpen: false, taskId: null});
+    const confirmDeleteTagFromProject = async () => {
+        if (!deleteTagConfirm.tagId) return;
+        try {
+            await deleteTagFromProject({
+                variables: {
+                    tagId: deleteTagConfirm.tagId,
+                    projectId: projectId
+                },
+                update: (cache) => {
+                    cache.evict({ fieldName: 'tags' });
+                    cache.evict({ fieldName: 'tasksBySubgroup' });
+                    cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
+                    cache.gc();
+                }
+            });
+            setDeleteTagConfirm({ isOpen: false, tagId: null, tagName: '' });
+            await refetchTags();
+            await refetchCurrentTasks();
+            setShowContextMenu(false);
+        } catch (err) {
+            console.error('Ошибка удаления тега:', err);
+            alert('Ошибка удаления тега: ' + err.message);
+            setDeleteTagConfirm({ isOpen: false, tagId: null, tagName: '' });
+        }
     };
 
     const handleDeleteTaskFromModal = async (taskId) => {
-        await deleteTask({variables: {id: taskId}});
-        client.cache.evict({fieldName: 'tasksBySubgroup'});
-        client.cache.evict({fieldName: 'tasksByAssigneeAndProject'});
-        client.cache.gc();
+        let taskToDelete = null;
+        if (activeSubgroupId === 'my-tasks' && myTasksData?.tasksByAssigneeAndProject) {
+            taskToDelete = myTasksData.tasksByAssigneeAndProject.find(t => t.id === taskId);
+        } else if (tasksData?.tasksBySubgroup) {
+            taskToDelete = tasksData.tasksBySubgroup.find(t => t.id === taskId);
+        }
+        const parentId = taskToDelete?.parentTaskId;
+        await deleteTask({ variables: { id: taskId } });
         await refetchCurrentTasks();
+        if (parentId && parentId !== 0) {
+            await fetchSubTasksForTask(parentId, true);
+        }
         setShowTaskModal(false);
     };
 
@@ -807,14 +1034,11 @@ const KanbanBoard = () => {
         const taskId = e.dataTransfer.getData('taskId');
         const fromStatus = e.dataTransfer.getData('fromStatus');
         if (!taskId || fromStatus === toStatus) return;
-        await updateTask({variables: {id: taskId, status: toStatus}});
+        await updateTask({ variables: { id: taskId, status: toStatus } });
         await refetchCurrentTasks();
     };
 
-    const handleDragOver = (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = 'move';
-    };
+    const handleDragOver = (e) => e.preventDefault();
 
     const handleSortChange = (newSortBy) => {
         if (sortBy === newSortBy) {
@@ -830,6 +1054,7 @@ const KanbanBoard = () => {
         return sortOrder === 'asc' ? <i className="fas fa-sort-up"></i> : <i className="fas fa-sort-down"></i>;
     };
 
+    // Модальное окно фильтрации
     const FilterModal = () => (
         <div className="modal-overlay" onClick={() => setShowFilterModal(false)}>
             <div className="modal-content filter-modal" onClick={(e) => e.stopPropagation()}>
@@ -839,18 +1064,16 @@ const KanbanBoard = () => {
                     <div className="filter-section">
                         <div className="filter-section-title"><i className="fas fa-chart-line"></i> Важность</div>
                         <div className="filter-options">
-                            <label className={`filter-option ${filters.priority.includes('high') ? 'active' : ''}`}>
-                                <input type="checkbox" checked={filters.priority.includes('high')} onChange={() => handlePriorityChange('high')} />
-                                <span className="priority-high"><i className="fas fa-exclamation-triangle"></i> Высокая</span>
-                            </label>
-                            <label className={`filter-option ${filters.priority.includes('medium') ? 'active' : ''}`}>
-                                <input type="checkbox" checked={filters.priority.includes('medium')} onChange={() => handlePriorityChange('medium')} />
-                                <span className="priority-medium"><i className="fas fa-exclamation"></i> Средняя</span>
-                            </label>
-                            <label className={`filter-option ${filters.priority.includes('low') ? 'active' : ''}`}>
-                                <input type="checkbox" checked={filters.priority.includes('low')} onChange={() => handlePriorityChange('low')} />
-                                <span className="priority-low"><i className="fas fa-info-circle"></i> Низкая</span>
-                            </label>
+                            {[
+                                { key: 'high', label: 'Высокая', icon: 'fa-signal', className: 'priority-high' },
+                                { key: 'medium', label: 'Средняя', icon: 'fa-signal', className: 'priority-medium' },
+                                { key: 'low', label: 'Низкая', icon: 'fa-signal', className: 'priority-low' }
+                            ].map(opt => (
+                                <label key={opt.key} className={`filter-option ${filters.priority.includes(opt.key) ? 'active' : ''}`}>
+                                    <input type="checkbox" checked={filters.priority.includes(opt.key)} onChange={() => handlePriorityChange(opt.key)} />
+                                    <span className={opt.className}><i className={`fas ${opt.icon}`}></i> {opt.label}</span>
+                                </label>
+                            ))}
                         </div>
                     </div>
                     <div className="filter-divider"></div>
@@ -858,25 +1081,11 @@ const KanbanBoard = () => {
                         <div className="filter-section-title"><i className="fas fa-calendar-range"></i> Диапазон дат</div>
                         <div className="date-range-row">
                             <div className="date-field">
-                                <DatePicker
-                                    selected={filters.dateFrom}
-                                    onChange={handleDateFromChange}
-                                    dateFormat="dd.MM.yyyy"
-                                    placeholderText="Дата от"
-                                    className="form-input"
-                                    isClearable
-                                />
+                                <input type="date" className="form-input" value={filters.dateFrom ? filters.dateFrom.toISOString().split('T')[0] : ''} onChange={(e) => handleDateFromChange(e.target.value ? new Date(e.target.value) : null)} />
                             </div>
-                            <span className="date-separator">—</span>
+                            <span className="filter-date-separator">—</span>
                             <div className="date-field">
-                                <DatePicker
-                                    selected={filters.dateTo}
-                                    onChange={handleDateToChange}
-                                    dateFormat="dd.MM.yyyy"
-                                    placeholderText="Дата до"
-                                    className="form-input"
-                                    isClearable
-                                />
+                                <input type="date" className="form-input" value={filters.dateTo ? filters.dateTo.toISOString().split('T')[0] : ''} onChange={(e) => handleDateToChange(e.target.value ? new Date(e.target.value) : null)} />
                             </div>
                         </div>
                     </div>
@@ -904,13 +1113,7 @@ const KanbanBoard = () => {
                                         checked={filters.tags.includes(tag.id)}
                                         onChange={() => handleTagFilterToggle(tag.id)}
                                     />
-                                    <span style={{
-                                        backgroundColor: tag.color,
-                                        padding: '2px 8px',
-                                        borderRadius: '12px',
-                                        color: 'white',
-                                        fontSize: '0.75rem'
-                                    }}>
+                                    <span className="filter-tag-badge" style={{ backgroundColor: tag.color }}>
                                         {tag.name}
                                     </span>
                                 </label>
@@ -926,14 +1129,14 @@ const KanbanBoard = () => {
         </div>
     );
 
+    // Компонент подзадачи
     const SubTaskCard = ({ subTask, level = 1 }) => {
         const dueWarningText = getDueWarningText(subTask);
         const dueWarningColor = getTaskDueDateColor(subTask);
         const childSubTasks = subTasksCache[subTask.id] || [];
         const completedSubCount = childSubTasks.filter(st => st.status === 2).length;
-        const isExpandedSub = expandedTaskId === subTask.id;
+        const isExpandedSub = expandedTaskIds.has(subTask.id);
         const isLoading = loadingSubTasks[subTask.id];
-
         const subTaskStatus = normalizeStatus(subTask.status);
         const isCompleted = subTaskStatus === 'REVIEW';
         const isInProgress = subTaskStatus === 'IN_PROGRESS';
@@ -967,52 +1170,20 @@ const KanbanBoard = () => {
                             </span>
                         </div>
                         {!isViewer && activeSubgroupId !== 'my-tasks' && (
-                            <button className="subtask-menu-btn" onClick={(e) => openContextMenu(e, subTask)}>
+                            <button className="subtask-menu-btn" onClick={(e) => openContextMenu(e, subTask, e.currentTarget)}>
                                 <i className="fas fa-ellipsis-v"></i>
                             </button>
                         )}
                     </div>
 
                     <div className="task-bottom-row subtask-bottom-row">
-                        <div className={`task-priority priority-${subTask.value || 2} subtask-priority`}>
-                            {subTask.value === 1 && <>Низкая</>}
-                            {subTask.value === 2 && <>Средняя</>}
-                            {subTask.value === 3 && <>Высокая</>}
-                            {!subTask.value && <>Средняя</>}
-                        </div>
+                        <TaskPriority value={subTask.value} />
                         <div className="task-date-group">
-                            {dueWarningText && !isCompleted && (
-                                <span className="task-due-warning subtask-warning" style={{
-                                    backgroundColor: dueWarningColor,
-                                    color: 'white',
-                                    padding: '2px 6px',
-                                    borderRadius: '12px',
-                                    fontSize: '0.6rem',
-                                    display: 'inline-flex',
-                                    alignItems: 'center',
-                                    gap: '4px'
-                                }}>
-                                    <i className="fas fa-exclamation-triangle"></i> {dueWarningText}
-                                </span>
-                            )}
-                            {subTask.dueDate && (
-                                <div className="task-date subtask-date" style={isCompleted ? { textDecoration: 'line-through', opacity: 0.6 } : {}}>
-                                    <i className="far fa-calendar-alt"></i> {new Date(subTask.dueDate).toLocaleString()}
-                                </div>
-                            )}
+                            <DueWarning dueWarningText={dueWarningText} dueWarningColor={dueWarningColor} />
+                            <TaskDueDate dueDate={subTask.dueDate} isCompleted={isCompleted} />
                         </div>
                     </div>
-                    <div className="task-assignees subtask-assignees">
-                        {subTask.assignees?.slice(0, 2).map(a => (
-                            <div key={a.id} className="assignee-wrapper">
-                                <span className="assignee-name subtask-assignee-name" style={isCompleted ? { opacity: 0.6 } : {}}>
-                                    <i className="fas fa-user"></i> {a.fullName}
-                                </span>
-                                <span className="assignee-tooltip">{a.email}</span>
-                            </div>
-                        ))}
-                        {subTask.assignees?.length > 2 && <span className="assignee-more">+{subTask.assignees.length - 2}</span>}
-                    </div>
+                    <TaskAssignees assignees={subTask.assignees} maxDisplay={2} isCompleted={isCompleted} />
                 </div>
 
                 <div className="task-card-footer subtask-footer">
@@ -1025,7 +1196,7 @@ const KanbanBoard = () => {
 
                 {isExpandedSub && (
                     <div className="task-subtasks-expanded subtask-subtasks-expanded" onClick={(e) => e.stopPropagation()}>
-                        {isLoading ? <div className="subtask-loading">Загрузка...</div> : childSubTasks.map(nestedSubTask => (
+                        {isLoading ? <div className="subtask-loading">Загрузка...</div> : sortTasks(childSubTasks).map(nestedSubTask => (
                             <SubTaskCard key={nestedSubTask.id} subTask={nestedSubTask} level={level + 1} />
                         ))}
                     </div>
@@ -1073,15 +1244,7 @@ const KanbanBoard = () => {
                     <div className="kanban-sort-panel">
                         <span className="sort-label"><i className="fas fa-arrow-up-wide-short"></i> Сортировать:</span>
                         {isMobileSort ? (
-                            <select
-                                className="form-select sort-select-mobile"
-                                value={sortBy}
-                                onChange={(e) => {
-                                    setSortBy(e.target.value);
-                                    setSortOrder('asc');
-                                }}
-                                style={{ width: 'auto', minWidth: '130px', fontSize: '0.8rem', padding: '6px 10px', borderRadius: '30px' }}
-                            >
+                            <select className="form-select sort-select-mobile" value={sortBy} onChange={(e) => { setSortBy(e.target.value); setSortOrder('asc'); }}>
                                 <option value="dueDate">По дедлайну</option>
                                 <option value="priority">По важности</option>
                                 <option value="creator">По создателю</option>
@@ -1106,6 +1269,12 @@ const KanbanBoard = () => {
                             <i className="fas fa-filter"></i> Фильтры
                             {getActiveFiltersCount() > 0 && <span className="filter-badge-count">{getActiveFiltersCount()}</span>}
                         </button>
+                        <div className="kanban-export-import">
+                            <label className="btn btn--secondary btn--small" style={{ cursor: 'pointer' }}>
+                                <i className="fas fa-upload"></i> Импорт
+                                <input type="file" accept=".json" style={{ display: 'none' }} onChange={handleImportTasks} />
+                            </label>
+                        </div>
                         <div className="filter-info">
                             {getActiveFiltersCount() > 0 && (
                                 <span className="filter-badge">
@@ -1127,8 +1296,8 @@ const KanbanBoard = () => {
                         {['TODO', 'IN_PROGRESS', 'REVIEW'].map((status) => (
                             <div key={status} className="kanban-column" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, status)}>
                                 <div className="kanban-column-header">
-                                    <h3 style={{borderLeftColor: statusColors[status]}}>{statusLabels[status]}</h3>
-                                    <div style={{display: 'flex', gap: '8px', alignItems: 'center'}}>
+                                    <h3 style={{ borderLeftColor: statusColors[status] }}>{statusLabels[status]}</h3>
+                                    <div className="column-header-right">
                                         <span className="kanban-task-count">{tasksByStatus[status].length}</span>
                                     </div>
                                 </div>
@@ -1139,8 +1308,9 @@ const KanbanBoard = () => {
                                         const subTasksCount = task.subTasksCount || 0;
                                         const currentSubTasks = subTasksCache[task.id] || [];
                                         const completedSubCount = currentSubTasks.filter(st => st.status === 2).length;
-                                        const isExpandedTask = expandedTaskId === task.id;
+                                        const isExpandedTask = expandedTaskIds.has(task.id);
                                         const isLoadingSubTasks = loadingSubTasks[task.id];
+                                        const isTaskCompleted = normalizeStatus(task.status) === 'REVIEW';
 
                                         return (
                                             <div
@@ -1150,6 +1320,13 @@ const KanbanBoard = () => {
                                                 style={getTaskCardStyle(task)}
                                                 draggable={!isViewer}
                                                 onDragStart={(e) => handleDragStart(e, task.id, status)}
+                                                onMouseEnter={() => {
+                                                    if (highlightedTask === task.id) {
+                                                        setHighlightedTask(null);
+                                                        searchParams.delete('highlightTask');
+                                                        setSearchParams(searchParams);
+                                                    }
+                                                }}
                                             >
                                                 <div className="task-card-main" onClick={() => handleEditTask(task)}>
                                                     <div className="task-header-row">
@@ -1159,26 +1336,16 @@ const KanbanBoard = () => {
                                                             {subTasksCount > 0 && <span className="subtasks-badge">{completedSubCount}/{subTasksCount}</span>}
                                                         </div>
                                                         {!isViewer && activeSubgroupId !== 'my-tasks' && (
-                                                            <button className="task-menu-btn-top" onClick={(e) => openContextMenu(e, task)}>
+                                                            <button className="task-menu-btn-top" onClick={(e) => openContextMenu(e, task, e.currentTarget)}>
                                                                 <i className="fas fa-ellipsis-v"></i>
                                                             </button>
                                                         )}
                                                     </div>
 
                                                     {task.tags && task.tags.length > 0 && (
-                                                        <div className="task-tags" style={{ display: 'flex', gap: '4px', flexWrap: 'wrap', marginTop: '6px' }}>
+                                                        <div className="task-tags">
                                                             {task.tags.map((tag, idx) => (
-                                                                <span
-                                                                    key={`${task.id}-tag-${tag.id}-${idx}`}
-                                                                    style={{
-                                                                        backgroundColor: tag.color || '#3b82f6',
-                                                                        color: 'white',
-                                                                        padding: '2px 8px',
-                                                                        borderRadius: '12px',
-                                                                        fontSize: '0.65rem',
-                                                                        whiteSpace: 'nowrap'
-                                                                    }}
-                                                                >
+                                                                <span key={`${task.id}-tag-${tag.id}-${idx}`} className="tag-badge" style={{ backgroundColor: tag.color || '#3b82f6' }}>
                                                                     {tag.name}
                                                                 </span>
                                                             ))}
@@ -1186,30 +1353,13 @@ const KanbanBoard = () => {
                                                     )}
 
                                                     <div className="task-bottom-row">
-                                                        <div className={`task-priority priority-${task.value || 2}`}>
-                                                            {task.value === 1 && <>Низкая</>}
-                                                            {task.value === 2 && <>Средняя</>}
-                                                            {task.value === 3 && <>Высокая</>}
-                                                            {!task.value && <>Средняя</>}
-                                                        </div>
+                                                        <TaskPriority value={task.value} />
                                                         <div className="task-date-group">
-                                                            {task.dueDate && <div className="task-date"><i className="far fa-calendar-alt"></i> {new Date(task.dueDate).toLocaleString()}</div>}
-                                                            {dueWarningText && (
-                                                                <span className="task-due-warning" style={{ backgroundColor: dueWarningColor, color: 'white', padding: '2px 6px', borderRadius: '12px', fontSize: '0.65rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                                                                    <i className="fas fa-exclamation-triangle"></i> {dueWarningText}
-                                                                </span>
-                                                            )}
+                                                            <TaskDueDate dueDate={task.dueDate} isCompleted={isTaskCompleted} />
+                                                            <DueWarning dueWarningText={dueWarningText} dueWarningColor={dueWarningColor} />
                                                         </div>
                                                     </div>
-                                                    <div className="task-assignees">
-                                                        {task.assignees?.map(a => (
-                                                            <div key={a.id} className="assignee-wrapper">
-                                                                <span className="assignee-name"><i className="fas fa-user"></i> {a.fullName}</span>
-                                                                <span className="assignee-tooltip">{a.email}</span>
-                                                            </div>
-                                                        ))}
-                                                        {task.assignees?.length > 3 && <span className="assignee-more">+{task.assignees.length - 3}</span>}
-                                                    </div>
+                                                    <TaskAssignees assignees={task.assignees} maxDisplay={3} isCompleted={isTaskCompleted} />
                                                 </div>
                                                 <div className="task-card-footer">
                                                     {subTasksCount > 0 && (
@@ -1220,7 +1370,7 @@ const KanbanBoard = () => {
                                                 </div>
                                                 {isExpandedTask && (
                                                     <div className="task-subtasks-expanded" onClick={(e) => e.stopPropagation()}>
-                                                        {isLoadingSubTasks ? <div className="subtask-loading">Загрузка подзадач...</div> : currentSubTasks.map(subTask => (
+                                                        {isLoadingSubTasks ? <div className="subtask-loading">Загрузка подзадач...</div> : sortTasks(currentSubTasks).map(subTask => (
                                                             <SubTaskCard key={subTask.id} subTask={subTask} level={1} />
                                                         ))}
                                                     </div>
@@ -1250,159 +1400,78 @@ const KanbanBoard = () => {
                     onClose={handleCloseTaskModal}
                     projectId={projectId}
                     refetchProjectTags={refetchTags}
+                    refetchCurrentTasks={refetchCurrentTasks}
                 />
             )}
 
-            <ConfirmModal isOpen={deleteConfirm.isOpen} title="Удаление задачи" message="Вы действительно хотите удалить эту задачу? Это действие необратимо." onConfirm={confirmDeleteTask} onCancel={() => setDeleteConfirm({isOpen: false, taskId: null})} />
+            <ConfirmModal isOpen={deleteConfirm.isOpen} title="Удаление задачи" message="Вы действительно хотите удалить эту задачу? Это действие необратимо." onConfirm={async () => {
+                if (isViewer) return;
+                await deleteTask({ variables: { id: deleteConfirm.taskId } });
+                await refetchCurrentTasks();
+                setDeleteConfirm({ isOpen: false, taskId: null });
+            }} onCancel={() => setDeleteConfirm({ isOpen: false, taskId: null })} />
 
-            {/* Контекстное меню с подзадачами и тегами */}
             {showContextMenu && contextMenuTask && (
-                <div
-                    key={refreshContextMenu}
-                    className="context-menu"
-                    style={{ position: 'fixed', top: contextMenuPosition.y, left: contextMenuPosition.x, zIndex: 10000 }}
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <div className="context-menu-item" onClick={handleContextMenuDelete}>
-                        <i className="fas fa-trash-alt"></i> Удалить задачу
-                    </div>
-
-                    <div className="context-menu-divider"></div>
-
-                    {/* Блок добавления подзадачи */}
+                <div className="context-menu" style={{ position: 'fixed', top: contextMenuPosition.y, left: contextMenuPosition.x, zIndex: 10000 }} onClick={(e) => e.stopPropagation()}>
+                    <div className="context-menu-item" onClick={handleContextMenuDelete}><i className="fas fa-trash-alt"></i> Удалить задачу</div>
+                    <div className="context-menu-divider" />
+                    <div className="context-menu-item" onClick={() => handleExportSingleTask(contextMenuTask)}><i className="fas fa-download"></i> Экспортировать задачу</div>
+                    <div className="context-menu-divider" />
                     <div className="context-menu-subtask">
                         <div className="context-menu-subtask-form">
-                            <input
-                                type="text"
-                                placeholder="Название подзадачи..."
-                                value={newSubTaskTitle}
-                                onChange={(e) => setNewSubTaskTitle(e.target.value)}
-                                onKeyPress={(e) => e.key === 'Enter' && handleAddSubTaskFromMenu(contextMenuTaskId)}
-                                autoFocus
-                            />
+                            <textarea rows={2} placeholder="Название подзадачи" value={newSubTaskTitle} onChange={(e) => setNewSubTaskTitle(e.target.value)} onKeyDown={(e) => { if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); handleAddSubTaskFromMenu(contextMenuTaskId); } }} autoFocus />
                             <button onClick={() => handleAddSubTaskFromMenu(contextMenuTaskId)}>Добавить подзадачу</button>
                         </div>
                     </div>
-
-                    <div className="context-menu-divider"></div>
-
-                    {/* Блок тегов */}
+                    <div className="context-menu-divider" />
                     <div style={{ padding: '8px 16px' }}>
-                        <div style={{ fontWeight: '500', marginBottom: '8px', fontSize: '0.8rem', color: '#1e293b' }}>
-                            <i className="fas fa-tags"></i> Теги
-                        </div>
-                        <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px' }}>
+                        <div className="context-menu-section-title"><i className="fas fa-tags"></i> Теги</div>
+                        <div className="tags-container">
                             {availableTags.map(tag => {
-                                const taskTags = contextMenuTask?.tags || [];
-                                const isTagOnTask = taskTags.some(t => t.id === tag.id);
-
+                                const isTagOnTask = contextMenuTask.tags?.some(t => t.id === tag.id);
                                 return (
-                                    <div key={`context-tag-${tag.id}`} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                    <div key={`context-tag-${tag.id}`} className="context-menu-tag-wrapper">
                                         <button
                                             type="button"
-                                            onClick={() => {
-                                                if (isTagOnTask) {
-                                                    handleRemoveTagFromTask(contextMenuTask.id, tag.id);
-                                                } else {
-                                                    handleAddTagToTask(contextMenuTask.id, tag.id);
-                                                }
+                                            onClick={async () => {
+                                                if (isTagOnTask) await handleRemoveTagFromTask(contextMenuTask.id, tag.id);
+                                                else await handleAddTagToTask(contextMenuTask.id, tag.id);
+                                                setShowContextMenu(false);
                                             }}
+                                            className="context-menu-tag-btn"
                                             style={{
                                                 backgroundColor: isTagOnTask ? tag.color : 'transparent',
                                                 color: isTagOnTask ? 'white' : tag.color,
                                                 border: `1px solid ${tag.color}`,
-                                                borderRadius: '20px',
-                                                padding: '4px 12px',
-                                                fontSize: '0.8rem',
-                                                cursor: 'pointer',
-                                                transition: 'all 0.2s'
                                             }}
                                         >
                                             {tag.name}
                                         </button>
-                                        <button
-                                            type="button"
-                                            onClick={() => handleDeleteTagFromProject(tag.id, tag.name)}
-                                            style={{
-                                                background: 'none',
-                                                border: 'none',
-                                                color: '#ef4444',
-                                                cursor: 'pointer',
-                                                fontSize: '0.7rem',
-                                                padding: '4px'
-                                            }}
-                                            title="Удалить тег из проекта"
-                                        >
+                                        <button type="button" onClick={() => handleDeleteTagFromProject(tag.id, tag.name)} className="delete-tag-icon">
                                             <i className="fas fa-times-circle"></i>
                                         </button>
                                     </div>
                                 );
                             })}
-
                             {!showCreateTag ? (
-                                <button
-                                    type="button"
-                                    className="btn btn--secondary btn--small"
-                                    onClick={() => setShowCreateTag(true)}
-                                    style={{
-                                        background: '#f1f5f9',
-                                        border: 'none',
-                                        borderRadius: '20px',
-                                        padding: '4px 12px',
-                                        fontSize: '0.75rem',
-                                        cursor: 'pointer'
-                                    }}
-                                >
+                                <button type="button" className="btn btn--secondary btn--small" onClick={() => setShowCreateTag(true)} style={{ whiteSpace: 'nowrap' }}>
                                     <i className="fas fa-plus"></i> Новый тег
                                 </button>
                             ) : (
-                                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                    <input
-                                        type="text"
-                                        className="form-input"
-                                        placeholder="Название тега"
-                                        value={newTagName}
-                                        onChange={(e) => setNewTagName(e.target.value)}
-                                        style={{ flex: 1, padding: '4px 8px', fontSize: '0.75rem', width: '100px' }}
-                                        autoFocus
-                                    />
-                                    <input
-                                        type="color"
-                                        value={newTagColor}
-                                        onChange={(e) => setNewTagColor(e.target.value)}
-                                        style={{ width: '30px', height: '30px', borderRadius: '6px', cursor: 'pointer' }}
-                                    />
-                                    <button
-                                        type="button"
-                                        className="btn"
-                                        onClick={() => handleCreateAndAddTag(contextMenuTask.id)}
-                                        style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                                    >
-                                        <i className="fas fa-check"></i>
-                                    </button>
-                                    <button
-                                        type="button"
-                                        className="btn btn--secondary"
-                                        onClick={() => setShowCreateTag(false)}
-                                        style={{ padding: '4px 8px', fontSize: '0.7rem' }}
-                                    >
-                                        <i className="fas fa-times"></i>
-                                    </button>
+                                <div className="context-menu-new-tag-form">
+                                    <input type="text" className="form-input context-menu-new-tag-input" placeholder="Название тега" value={newTagName} onChange={(e) => setNewTagName(e.target.value)} />
+                                    <input type="color" value={newTagColor} onChange={(e) => setNewTagColor(e.target.value)} className="context-menu-color-input" />
+                                    <button type="button" className="btn" onClick={handleCreateTag}><i className="fas fa-check"></i></button>
+                                    <button type="button" className="btn btn--secondary" onClick={() => setShowCreateTag(false)}><i className="fas fa-times"></i></button>
                                 </div>
                             )}
                         </div>
                     </div>
                 </div>
             )}
-            <ConfirmModal
-                isOpen={deleteTagConfirm.isOpen}
-                title="Удаление тега из проекта"
-                message={`Вы действительно хотите удалить тег "${deleteTagConfirm.tagName}" из проекта? Это удалит тег отовсюду.`}
-                onConfirm={confirmDeleteTagFromProject}
-                onCancel={() => setDeleteTagConfirm({isOpen: false, tagId: null, tagName: ''})}
-                confirmText="Удалить"
-                confirmStyle="btn--danger"
-            />
+
+            <ConfirmModal isOpen={deleteTagConfirm.isOpen} title="Удаление тега из проекта" message={`Вы действительно хотите удалить тег "${deleteTagConfirm.tagName}" из проекта? Это удалит тег отовсюду.`} onConfirm={confirmDeleteTagFromProject} onCancel={() => setDeleteTagConfirm({ isOpen: false, tagId: null, tagName: '' })} confirmText="Удалить" confirmStyle="btn--danger" />
+
             {isMobile && showMobileGroups && (
                 <div className="mobile-groups-modal" onClick={() => setShowMobileGroups(false)}>
                     <div onClick={(e) => e.stopPropagation()}>

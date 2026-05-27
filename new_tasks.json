@@ -1,0 +1,318 @@
+[
+  {
+    "title": "Добавление системы уведомлений",
+    "description": "Реализовать систему уведомлений для обновлений задач, изменений ролей и комментариев",
+    "dueDate": "2026-06-10T21:00:00Z",
+    "value": 3,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Бек для отправки уведомлений",
+        "description": "Создать REST API endpoint для уведомлений, интеграция с WebSocket",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      },
+      {
+        "title": "Фронт для отображения уведомлений",
+        "description": "Создать компонент уведомлений в шапке приложения с выпадающим меню",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Интеграция WebSocket",
+        "description": "Настроить WebSocket соединение для реал-тайм уведомлений",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Комментарии к задачам",
+    "description": "Добавить функцию комментариев к задачам с возможностью редактирования и удаления",
+    "dueDate": "2026-06-15T21:00:00Z",
+    "value": 2,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Создать Entity для комментариев",
+        "description": "Создать JPA сущность Comment с связью к Task и User",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "GraphQL запросы и мутации для комментариев",
+        "description": "Добавить createComment, updateComment, deleteComment, getComments",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Компонент комментариев на фронте",
+        "description": "Создать компонент для отображения, добавления и редактирования комментариев в TaskModal",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "История изменений задач",
+    "description": "Добавить логирование истории изменений (аудит) всех изменений задач",
+    "dueDate": "2026-06-20T21:00:00Z",
+    "value": 3,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Entity для истории изменений",
+        "description": "Создать TaskAuditLog сущность для логирования изменений",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Добавить логирование в TaskService",
+        "description": "Перехватить все операции update/delete/create для логирования",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      },
+      {
+        "title": "Отображение истории в UI",
+        "description": "Создать временную шкалу изменений в TaskModal",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Повторяющиеся задачи",
+    "description": "Добавить функцию создания повторяющихся задач (ежедневно, еженедельно, ежемесячно)",
+    "dueDate": "2026-06-25T21:00:00Z",
+    "value": 2,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Entity для расписания",
+        "description": "Создать RecurringTask сущность с типом повторения и последней датой",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Scheduler для автосоздания",
+        "description": "Использовать Spring @Scheduled для автоматического создания повторяющихся задач",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      },
+      {
+        "title": "Интерфейс для настройки повторений",
+        "description": "Добавить опции повторения в TaskModal",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Приоритизация и срочность",
+    "description": "Улучшить систему приоритетов с визуальными индикаторами срочности",
+    "dueDate": "2026-06-12T21:00:00Z",
+    "value": 2,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Добавить поле urgency_level",
+        "description": "Добавить поле срочности с 5 уровнями вместо просто priority",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Визуальные индикаторы",
+        "description": "Создать иконки и цветовые кодирования для уровней срочности",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Прикрепление файлов к задачам",
+    "description": "Доработка функции прикрепления файлов с предпросмотром и удалением",
+    "dueDate": "2026-06-18T21:00:00Z",
+    "value": 2,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Улучшить хранилище файлов",
+        "description": "Оптимизировать метаданные файлов и организацию папок",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Предпросмотр разных типов файлов",
+        "description": "Добавить предпросмотр для изображений, PDF, видео",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      },
+      {
+        "title": "Интеграция с облачными хранилищами",
+        "description": "Добавить возможность прикреплять файлы с Google Drive, OneDrive",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Отчеты и аналитика",
+    "description": "Создать систему отчетов по проектам и задачам с графиками",
+    "dueDate": "2026-07-01T21:00:00Z",
+    "value": 3,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Entity для отчетов",
+        "description": "Создать таблицы для хранения данных аналитики",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "API для получения статистики",
+        "description": "Создать GraphQL запросы для статистики по проектам и людям",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      },
+      {
+        "title": "Компонент отчетов на фронте",
+        "description": "Создать новую страницу с диаграммами и графиками",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Интеграция с календарем",
+    "description": "Синхронизация задач с Google Calendar и другими сервисами",
+    "dueDate": "2026-07-05T21:00:00Z",
+    "value": 2,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "OAuth2 интеграция с Google Calendar",
+        "description": "Добавить возможность авторизации через Google Calendar",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      },
+      {
+        "title": "Синхронизация туда-сюда",
+        "description": "Двусторонняя синхронизация событий между приложением и календарем",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Мобильное приложение",
+    "description": "Создание мобильного приложения для iOS и Android",
+    "dueDate": "2026-08-01T21:00:00Z",
+    "value": 3,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Выбор фреймворка (React Native/Flutter)",
+        "description": "Выбрать между React Native и Flutter для кросс-платформной разработки",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Базовый функционал приложения",
+        "description": "Создать базовые экраны для просмотра и управления задачами",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      },
+      {
+        "title": "Push-уведомления",
+        "description": "Интегрировать push-уведомления для мобильного приложения",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Система шаблонов задач",
+    "description": "Создание переиспользуемых шаблонов для быстрого создания новых задач",
+    "dueDate": "2026-06-22T21:00:00Z",
+    "value": 2,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Entity для шаблонов",
+        "description": "Создать TaskTemplate сущность с полями и значениями по умолчанию",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Логика создания из шаблона",
+        "description": "Добавить функцию createTaskFromTemplate с заполнением данных",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "UI для работы с шаблонами",
+        "description": "Создать компонент для просмотра, создания и редактирования шаблонов",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      }
+    ]
+  },
+  {
+    "title": "Улучшение производительности",
+    "description": "Оптимизация запросов БД и фронт-енда для быстрей работы",
+    "dueDate": "2026-06-28T21:00:00Z",
+    "value": 2,
+    "status": "TODO",
+    "subTasks": [
+      {
+        "title": "Профилирование и анализ",
+        "description": "Использовать инструменты профилирования для поиска узких мест",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      },
+      {
+        "title": "Оптимизация N+1 запросов",
+        "description": "Переработать GraphQL запросы для избежания N+1 проблемы",
+        "dueDate": null,
+        "value": 3,
+        "status": "TODO"
+      },
+      {
+        "title": "Виртуализация списков",
+        "description": "Добавить виртуализацию для больших списков задач на фронте",
+        "dueDate": null,
+        "value": 2,
+        "status": "TODO"
+      }
+    ]
+  }
+]

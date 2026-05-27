@@ -1,0 +1,182 @@
+/* Панель групп */
+.groups-panel {
+    width: 280px;
+    background: #f8fafc;
+    border-radius: 20px;
+    padding: 16px;
+    flex-shrink: 0;
+    border: 1px solid #e2e8f0;
+    margin-right: 20px;
+}
+
+.groups-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.groups-header h3 {
+    font-size: 1.1rem;
+    font-weight: 600;
+    color: #334155;
+}
+
+.groups-add-btn {
+    background: transparent;
+    border: none;
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #94a3b8;
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    border-radius: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.groups-add-btn:hover {
+    background: #2563eb;
+    color: white;
+}
+
+.groups-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.groups-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 12px;
+    margin: 4px 0;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: background 0.1s;
+}
+
+.groups-item:hover {
+    background: #eef2ff;
+}
+
+.groups-item--active {
+    background: #e0e7ff;
+    color: #2563eb;
+}
+
+.groups-item i {
+    margin-right: 10px;
+}
+
+.groups-settings-btn {
+    background: #f1f5f9;
+    border: 1px solid #cbd5e1;
+    border-radius: 30px;
+    padding: 4px 8px;
+    color: #334155;
+    transition: all 0.2s;
+}
+
+.groups-settings-btn:hover {
+    background: #2563eb;
+    border-color: #2563eb;
+    color: white;
+}
+
+.groups-item--my-tasks i {
+    color: #2563eb;
+}
+
+.mobile-groups-btn {
+    display: inline-flex;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 30px;
+    padding: 6px 12px;
+    font-size: 0.85rem;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+.mobile-groups-btn i {
+    font-size: 1rem;
+}
+
+.mobile-groups-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 10000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-end;
+}
+
+.mobile-groups-modal .groups-panel {
+    display: block;
+    width: 80%;
+    max-width: 300px;
+    height: 100%;
+    margin: 0;
+    border-radius: 0;
+    background: white;
+    overflow-y: auto;
+    box-shadow: -2px 0 8px rgba(0, 0, 0, 0.1);
+}
+
+/* Мобильные улучшения для панели групп */
+@media (max-width: 768px) {
+    .groups-panel {
+        display: flex;
+        overflow-x: auto;
+        white-space: nowrap;
+        padding: 8px 12px;
+        margin-bottom: 16px;
+        gap: 8px;
+    }
+
+    .groups-header {
+        display: none;
+    }
+
+    .groups-list {
+        display: flex;
+        flex-direction: row;
+        gap: 8px;
+    }
+
+    .groups-item {
+        display: inline-flex;
+        white-space: nowrap;
+        padding: 6px 14px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 40px;
+        font-size: 0.8rem;
+    }
+
+    .groups-item--active {
+        background: #2563eb;
+        border-color: #2563eb;
+        color: white;
+    }
+
+    .groups-settings-btn {
+        margin-left: 8px;
+        padding: 2px 6px;
+        font-size: 0.7rem;
+    }
+
+    .groups-item i {
+        margin-right: 4px;
+    }
+}

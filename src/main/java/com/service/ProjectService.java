@@ -6,6 +6,7 @@ import com.entity.RoleProject;
 import com.entity.User;
 import com.repository.ProjectMemberRepository;
 import com.repository.ProjectRepository;
+import com.repository.SubgroupMemberRepository;
 import com.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,15 +22,18 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final ProjectMemberRepository projectMemberRepository;
+    private final SubgroupMemberRepository subgroupMemberRepository;
     private final EmailNotificationService emailNotificationService;
 
     public ProjectService(ProjectRepository projectRepository,
                           UserRepository userRepository,
                           ProjectMemberRepository projectMemberRepository,
+                          SubgroupMemberRepository subgroupMemberRepository,
                           EmailNotificationService emailNotificationService) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectMemberRepository = projectMemberRepository;
+        this.subgroupMemberRepository = subgroupMemberRepository;
         this.emailNotificationService = emailNotificationService;
     }
 
@@ -103,13 +107,18 @@ public class ProjectService {
             throw new RuntimeException("User already member of this project");
         }
         ProjectMember pm = new ProjectMember(project, user, role != null ? role : RoleProject.VIEWER);
+        ProjectMember saved = projectMemberRepository.save(pm);
 
-        // Отправляем уведомление
+        // Отправляем уведомление внутри транзакции
         if (addedBy != null && !addedBy.getId().equals(userId)) {
-            emailNotificationService.notifyUserAddedToProject(project, user, addedBy, role != null ? role.name() : "VIEWER");
+            try {
+                emailNotificationService.notifyUserAddedToProject(project, user, addedBy, role != null ? role.name() : "VIEWER");
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to send notification: " + e.getMessage());
+            }
         }
 
-        return projectMemberRepository.save(pm);
+        return saved;
     }
 
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
@@ -120,6 +129,7 @@ public class ProjectService {
         pm.setRole(role);
         return projectMemberRepository.save(pm);
     }
+    
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public ProjectMember updateProjectNotifications(Long projectId, Long userId, Boolean notificationsEnabled) {
@@ -128,13 +138,48 @@ public class ProjectService {
         pm.setNotificationsEnabled(notificationsEnabled);
         return projectMemberRepository.save(pm);
     }
+    
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public boolean removeProjectMember(Long memberId) {
         if (projectMemberRepository.existsById(memberId)) {
+            // Получаем ProjectMember перед удалением
+            ProjectMember projectMember = projectMemberRepository.findById(memberId)
+                    .orElseThrow(() -> new RuntimeException("Project member not found"));
+            
+            Long projectId = projectMember.getProjectId();
+            Long userId = projectMember.getUserId();
+            
+            Project project = projectRepository.findById(projectId)
+                    .orElseThrow(() -> new RuntimeException("Project not found"));
+            User removedUser = userRepository.findById(userId)
+                    .orElseThrow(() -> new RuntimeException("User not found"));
+            
+            // Удаляем все SubgroupMemberships этого пользователя из подгрупп этого проекта
+            removeUserFromProjectSubgroups(projectId, userId);
+            
+            // Удаляем ProjectMember
             projectMemberRepository.deleteById(memberId);
+            
+            // Отправляем уведомление об удалении из проекта
+            try {
+                emailNotificationService.notifyUserRemovedFromProject(project, removedUser);
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to send removal notification: " + e.getMessage());
+            }
+            
             return true;
         }
         return false;
+    }
+    
+    /**
+     * Удаляет пользователя из всех подгрупп проекта (каскадное удаление)
+     */
+    @Transactional
+    private void removeUserFromProjectSubgroups(Long projectId, Long userId) {
+        System.out.println("Removing user " + userId + " from all subgroups in project " + projectId);
+        // Используем SQL DELETE для удаления всех SubgroupMembers
+        subgroupMemberRepository.deleteByUserIdAndProjectId(userId, projectId);
     }
 }

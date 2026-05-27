@@ -14,7 +14,46 @@
     background: #fefce8;
     transform: translateY(-2px);
 }
+/* Подсветка задачи при переходе по ссылке */
+.task-card.task-highlighted {
+    animation: highlight-pulse 0.5s ease-in-out 3;
+    box-shadow: 0 0 0 3px #f59e0b, 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+}
 
+@keyframes highlight-pulse {
+    0% {
+        box-shadow: 0 0 0 0 #f59e0b;
+    }
+    70% {
+        box-shadow: 0 0 0 6px rgba(245, 158, 11, 0);
+    }
+    100% {
+        box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    }
+}
+.task-card.task-highlighted {
+    animation: blink-border 1s ease-in-out 5;
+    border-left-width: 4px !important;
+    border-left-color: #f59e0b !important;
+}
+
+@keyframes blink-border {
+    0%, 100% {
+        border-left-color: #f59e0b;
+        background-color: rgba(245, 158, 11, 0.05);
+    }
+    50% {
+        border-left-color: #ff9800;
+        background-color: rgba(245, 158, 11, 0.15);
+    }
+}
+/* Для тёмной темы, если есть */
+@media (prefers-color-scheme: dark) {
+    .task-card.task-highlighted {
+        box-shadow: 0 0 0 3px #fbbf24;
+    }
+}
 /* Заголовок задачи в одной строке с кнопкой */
 .task-header-row {
     display: flex;
@@ -720,4 +759,203 @@
     text-align: center;
     font-size: 0.7rem;
     color: #94a3b8;
+}
+/* Контекстное меню — ограничение максимальной ширины */
+.context-menu {
+    max-width: 320px;
+    width: max-content;
+    min-width: 220px;
+}
+
+/* Контейнер тегов — перенос и ограничение */
+.tags-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+    max-width: 100%;
+    overflow-x: hidden;
+}
+
+/* Кнопка тега — обрезка длинного текста */
+.context-menu-tag-btn {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;  /* если хотите однострочные кнопки с обрезкой */
+    /* или для переноса: white-space: normal; word-break: break-word; */
+}
+/* Мобильные улучшения для задач */
+@media (max-width: 768px) {
+    .task-card {
+        padding: 10px;
+        border-radius: 12px;
+        min-height: 60px;
+        border-left-width: 3px;
+    }
+
+    .task-card:hover {
+        transform: none;
+        background: white;
+    }
+
+    .task-card:active {
+        transform: scale(0.98);
+        opacity: 0.9;
+    }
+
+    .task-header-row {
+        gap: 6px;
+        margin-bottom: 4px;
+    }
+
+    .task-title {
+        font-size: 0.85rem;
+        line-height: 1.3;
+    }
+
+    .task-menu-btn-top {
+        min-width: 24px;
+        min-height: 24px;
+        padding: 4px 4px;
+        font-size: 0.75rem;
+    }
+
+    .task-bottom-row {
+        gap: 6px;
+        margin-top: 4px;
+        flex-wrap: wrap;
+    }
+
+    .task-priority {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+    }
+
+    .task-date {
+        font-size: 0.6rem;
+        padding: 2px 5px;
+    }
+
+    .task-assignees {
+        margin-top: 4px;
+        gap: 4px;
+    }
+
+    .assignee-name {
+        font-size: 0.6rem;
+        padding: 2px 6px;
+    }
+
+    .assignee-tooltip {
+        display: none;
+    }
+
+    .task-card-footer {
+        margin-top: 4px;
+        padding-top: 4px;
+    }
+
+    .task-expand-btn {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+    }
+
+    /* Подзадачи */
+    .task-card.subtask-card {
+        padding: 6px 8px;
+        margin-left: 12px;
+        border-radius: 8px;
+        min-height: 50px;
+    }
+
+    .subtask-title {
+        font-size: 0.75rem !important;
+        line-height: 1.2;
+    }
+
+    .subtask-priority {
+        font-size: 0.55rem;
+        padding: 1px 4px;
+    }
+
+    .subtask-date {
+        font-size: 0.55rem;
+        padding: 1px 4px;
+    }
+
+    .subtask-assignee-name {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+
+    .subtask-menu-btn {
+        padding: 2px 4px;
+        font-size: 0.65rem;
+    }
+
+    .subtask-expand-btn {
+        font-size: 0.65rem;
+        padding: 2px 6px;
+    }
+
+    /* Контекстное меню */
+    .context-menu {
+        position: fixed !important;
+        bottom: 16px !important;
+        top: auto !important;
+        left: 50% !important;
+        transform: translateX(-50%);
+        width: 92vw;
+        max-width: 360px;
+        max-height: 70vh;
+        border-radius: 16px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+        padding: 0;
+    }
+
+    .context-menu-item {
+        padding: 10px 14px;
+        font-size: 0.85rem;
+    }
+
+    .context-menu-divider {
+        margin: 0;
+    }
+
+    .tags-container {
+        max-height: 150px;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .context-menu-tag-btn {
+        font-size: 0.75rem;
+        padding: 4px 10px;
+    }
+}
+
+@media (max-width: 480px) {
+    .task-card {
+        padding: 8px;
+    }
+
+    .task-title {
+        font-size: 0.8rem;
+    }
+
+    .task-priority {
+        font-size: 0.6rem;
+        padding: 1px 4px;
+    }
+
+    .task-card.subtask-card {
+        padding: 4px 6px;
+        margin-left: 8px;
+    }
+
+    .subtask-title {
+        font-size: 0.7rem !important;
+    }
 }

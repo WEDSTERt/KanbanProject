@@ -3,8 +3,31 @@ import { setContext } from '@apollo/client/link/context';
 import { onError } from '@apollo/client/link/error';
 import { persistCache, LocalStorageWrapper } from 'apollo3-cache-persist';
 
+// Определи URL в зависимости от хоста
+const getGraphQLUrl = () => {
+    if (typeof window === 'undefined') {
+        return 'https://pitifully-holy-turbot.cloudpub.ru/graphql';
+    }
+    
+    const host = window.location.hostname;
+    
+    // Для локального dev сервера на любом порту
+    if (host === 'localhost' || host === '127.0.0.1') {
+        return '/graphql'; // Используй прокси из vite.config.js
+    }
+    
+    // Для cloudpub - используй backend cloudpub напрямую
+    if (host.includes('cloudpub.ru')) {
+        return 'https://pitifully-holy-turbot.cloudpub.ru/graphql';
+    }
+    
+    // Default
+    return 'https://pitifully-holy-turbot.cloudpub.ru/graphql';
+};
+
 const httpLink = createHttpLink({
-    uri: import.meta.env.VITE_GRAPHQL_URL || '/graphql',
+    uri: getGraphQLUrl(),
+    credentials: 'include',
 });
 
 const authLink = setContext((_, { headers }) => {
@@ -27,6 +50,8 @@ const errorLink = onError(({ graphQLErrors, networkError }) => {
         console.error(`[Network error]: ${networkError}`);
     }
 });
+
+const link = from([errorLink, authLink, httpLink]);
 
 const cache = new InMemoryCache({
     typePolicies: {
@@ -58,9 +83,8 @@ const cache = new InMemoryCache({
     }
 });
 
-// Создаём клиент синхронно
 export const client = new ApolloClient({
-    link: from([errorLink, authLink, httpLink]),
+    link,
     cache,
     defaultOptions: {
         watchQuery: {
@@ -78,7 +102,6 @@ export const client = new ApolloClient({
     },
 });
 
-// Асинхронная инициализация персистенции кэша (не блокирует рендеринг)
 persistCache({
     cache,
     storage: new LocalStorageWrapper(window.localStorage),

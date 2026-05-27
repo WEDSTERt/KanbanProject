@@ -226,3 +226,42 @@ export const GET_TAGS = gql`
         }
     }
 `;
+
+// ===== NOTIFICATION QUERIES =====
+export const GET_NOTIFICATIONS = gql`
+    query GetNotifications($userId: Long!) {
+        notifications(userId: $userId) {
+            id
+            type
+            title
+            message
+            taskId
+            projectId
+            isRead
+            createdAt
+            readAt
+        }
+    }
+`;
+
+export const GET_UNREAD_NOTIFICATIONS = gql`
+    query GetUnreadNotifications($userId: Long!) {
+        unreadNotifications(userId: $userId) {
+            id
+            type
+            title
+            message
+            taskId
+            projectId
+            isRead
+            createdAt
+            readAt
+        }
+    }
+`;
+
+export const GET_UNREAD_COUNT = gql`
+    query GetUnreadCount($userId: Long!) {
+        unreadCount(userId: $userId)
+    }
+`;

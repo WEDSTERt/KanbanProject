@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {Routes, Route, Navigate} from 'react-router-dom';
 import {useAuth} from './contexts/AuthContext';
+import {NotificationProvider} from './contexts/NotificationContext';
 import Layout from './components/Layout';
+import NotificationCenter from './components/NotificationCenter';
 import StartPage from './components/StartPage';
 import LoginForm from './components/LoginForm';
 import RegisterForm from './components/RegisterForm';
@@ -11,13 +13,13 @@ import ProjectSettings from './components/ProjectSettings';
 import KanbanBoard from './components/KanbanBoard';
 import VerifyEmail from './components/VerifyEmail';
 import VerifyEmailPending from './components/VerifyEmailPending';
+import OAuth2Redirect from './components/OAuth2Redirect';
 
 const PrivateRoute = ({children}) => {
     const {user, loading} = useAuth();
     if (loading) return <div className="loading">Загрузка...</div>;
     if (!user) return <Navigate to="/login"/>;
 
-    // Проверка, подтвержден ли email (только если пользователь загружен полностью)
     if (user && user.emailVerified === false) {
         return <Navigate to="/verify-email-pending" state={{ email: user.email }} />;
     }
@@ -31,11 +33,10 @@ const PublicRoute = ({children}) => {
     return !user ? children : <Navigate to="/"/>;
 };
 
-const RootRoute = () => {
+const HomePage = () => {
     const {user, loading} = useAuth();
     if (loading) return <div className="loading">Загрузка...</div>;
     if (user) {
-        // Только если emailVerified явно false, а не undefined
         if (user.emailVerified === false) {
             return <Navigate to="/verify-email-pending" state={{ email: user.email }} />;
         }
@@ -50,15 +51,39 @@ const RootRoute = () => {
 
 function App() {
     return (
+        <NotificationProvider>
+            <AppContent />
+            <NotificationCenter />
+        </NotificationProvider>
+    );
+}
+
+function AppContent() {
+    const { user } = useAuth();
+
+    // GraphQL subscriptions используются автоматически через Apollo Client
+    // WebSocket соединение устанавливается при первой подписке
+
+    return (
         <Routes>
-            <Route path="/" element={<RootRoute/>}/>
+            {/* OAuth2 редирект */}
+            <Route path="/oauth2-redirect" element={<OAuth2Redirect />} />
+
+            {/* Публичные маршруты */}
+            <Route path="/verify-email" element={<VerifyEmail/>}/>
             <Route path="/login" element={<PublicRoute><LoginForm/></PublicRoute>}/>
             <Route path="/register" element={<PublicRoute><RegisterForm/></PublicRoute>}/>
-            <Route path="/verify-email" element={<VerifyEmail/>}/>
+            
+            {/* Защищённые маршруты */}
             <Route path="/verify-email-pending" element={<PrivateRoute><VerifyEmailPending/></PrivateRoute>}/>
             <Route path="/account" element={<PrivateRoute><Layout><AccountSettings/></Layout></PrivateRoute>}/>
             <Route path="/settings" element={<PrivateRoute><Layout><ProjectSettings/></Layout></PrivateRoute>}/>
             <Route path="/board" element={<PrivateRoute><Layout><KanbanBoard/></Layout></PrivateRoute>}/>
+            
+            {/* Главная страница */}
+            <Route path="/" element={<HomePage/>}/>
+            
+            {/* Catch-all - ПОСЛЕДНИЙ */}
             <Route path="*" element={<Navigate to="/" replace/>}/>
         </Routes>
     );

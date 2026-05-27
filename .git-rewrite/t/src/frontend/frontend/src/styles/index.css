@@ -1,0 +1,22 @@
+
+/* Базовые стили */
+@import './base.css';
+
+/* Компоненты */
+@import './components.css';
+@import './navigation.css';
+@import './modal.css';
+
+/* Страницы и модули */
+@import './auth.css';
+@import './projects.css';
+@import './groups.css';
+@import './kanban.css';
+@import './tasks.css';
+@import './filters.css';
+@import './attachments.css';
+@import './members.css';
+@import './calendar.css';
+
+/* Адаптация */
+@import './responsive.css';

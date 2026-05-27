@@ -1,8 +1,8 @@
-import React, {useState, useEffect} from 'react';
-import {useNavigate, useSearchParams} from 'react-router-dom';
-import {useQuery, useMutation, useApolloClient} from '@apollo/client';
-import {GET_PROJECT_DETAILS, GET_USER_PROJECTS, GET_USERS} from '../graphql/queries';
-import {GET_TASKS_BY_SUBGROUP} from '../graphql/queries';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useQuery, useMutation, useApolloClient } from '@apollo/client';
+import { GET_PROJECT_DETAILS, GET_USER_PROJECTS, GET_USERS } from '../graphql/queries';
+import { GET_TASKS_BY_SUBGROUP } from '../graphql/queries';
 import {
     UPDATE_PROJECT,
     ADD_PROJECT_MEMBER,
@@ -14,28 +14,29 @@ import {
     UPDATE_TASK,
     UPDATE_PROJECT_NOTIFICATIONS,
 } from '../graphql/mutations';
-import {useAuth} from '../contexts/AuthContext';
+import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
 
 const ProjectSettings = () => {
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
     const projectId = searchParams.get('projectId');
-    const {user} = useAuth();
+    const { user } = useAuth();
     const client = useApolloClient();
     const [newMemberEmail, setNewMemberEmail] = useState('');
     const [newMemberRole, setNewMemberRole] = useState('MEMBER');
     const [message, setMessage] = useState(null);
     const [isError, setIsError] = useState(false);
     const [searchError, setSearchError] = useState('');
-    const [deleteConfirm, setDeleteConfirm] = useState({isOpen: false, memberId: null, isProject: false});
+    const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, memberId: null, isProject: false });
     const [renameModalOpen, setRenameModalOpen] = useState(false);
     const [newProjectName, setNewProjectName] = useState('');
-    const [projectNotificationsEnabled, setProjectNotificationsEnabled] = useState(true);
+    const [projectNotificationsEnabled, setProjectNotificationsEnabled] = useState(false);
     const [isUpdatingNotifications, setIsUpdatingNotifications] = useState(false);
+    const [isExporting, setIsExporting] = useState(false);
 
-    const {loading, error, data, refetch} = useQuery(GET_PROJECT_DETAILS, {variables: {projectId}});
-    const {data: usersData} = useQuery(GET_USERS, {variables: {limit: 100}});
+    const { loading, error, data, refetch } = useQuery(GET_PROJECT_DETAILS, { variables: { projectId } });
+    const { data: usersData } = useQuery(GET_USERS, { variables: { limit: 100 } });
 
     const [updateProject] = useMutation(UPDATE_PROJECT);
     const [addMember] = useMutation(ADD_PROJECT_MEMBER);
@@ -46,7 +47,7 @@ const ProjectSettings = () => {
     const [updateTask] = useMutation(UPDATE_TASK);
     const [deleteProject] = useMutation(DELETE_PROJECT, {
         onCompleted: () => navigate('/'),
-        refetchQueries: [{query: GET_USER_PROJECTS, variables: {userId: user.id}}],
+        refetchQueries: [{ query: GET_USER_PROJECTS, variables: { userId: user.id } }],
     });
     const [updateProjectNotifications] = useMutation(UPDATE_PROJECT_NOTIFICATIONS);
 
@@ -59,6 +60,16 @@ const ProjectSettings = () => {
         }
     }, [data, user.id]);
 
+    // Проверка доступа к проекту
+    useEffect(() => {
+        if (!loading && data?.project && user) {
+            const isMember = data.project.members.some(m => m.userId === user.id);
+            if (!isMember) {
+                navigate('/');
+            }
+        }
+    }, [loading, data?.project, user, navigate]);
+
     if (loading) return <div className="loading">Загрузка настроек проекта...</div>;
     if (error) return <div className="message-error">{error.message}</div>;
     if (!projectId) return <div className="message-error">Проект не указан</div>;
@@ -68,8 +79,8 @@ const ProjectSettings = () => {
     const currentMember = project.members.find(m => m.userId === user.id);
     const isAdmin = isOwner || currentMember?.role === 'ADMIN' || currentMember?.role === 'OWNER';
     const isMember = currentMember?.role === 'MEMBER';
-    const canManage = isAdmin; // Только админы могут управлять проектом
-    const canViewSettings = isAdmin || isMember; // Все участники могут открыть настройки
+    const canManage = isAdmin;
+    const canViewSettings = isAdmin || isMember;
 
     if (!canViewSettings) {
         return <div className="message-error">У вас нет доступа к настройкам этого проекта.</div>;
@@ -78,7 +89,7 @@ const ProjectSettings = () => {
     const handleUpdateName = async () => {
         if (!newProjectName.trim()) return;
         try {
-            await updateProject({variables: {id: projectId, name: newProjectName.trim()}});
+            await updateProject({ variables: { id: projectId, name: newProjectName.trim() } });
             refetch();
             setMessage('Название обновлено');
             setIsError(false);
@@ -116,6 +127,7 @@ const ProjectSettings = () => {
         }
 
         try {
+            // Если меняем на VIEWER, нужно удалить из задач и подгрупп
             if (newRole === 'VIEWER') {
                 const userId = member.userId;
                 const subgroups = project.subgroups || [];
@@ -123,9 +135,9 @@ const ProjectSettings = () => {
 
                 for (const sg of subgroups) {
                     try {
-                        const {data: tasksData} = await client.query({
+                        const { data: tasksData } = await client.query({
                             query: GET_TASKS_BY_SUBGROUP,
-                            variables: {subgroupId: sg.id},
+                            variables: { subgroupId: sg.id },
                             fetchPolicy: 'network-only',
                         });
                         const tasks = tasksData?.tasksBySubgroup || [];
@@ -134,7 +146,7 @@ const ProjectSettings = () => {
                             if (task.assignees?.some(a => a.id === userId)) {
                                 const newIds = task.assignees.filter(a => a.id !== userId).map(a => a.id);
                                 try {
-                                    await setTaskAssignees({variables: {taskId: task.id, userIds: newIds}});
+                                    await setTaskAssignees({ variables: { taskId: task.id, userIds: newIds } });
                                 } catch (e) {
                                     console.error('Ошибка удаления из задачи', e);
                                 }
@@ -158,15 +170,15 @@ const ProjectSettings = () => {
                     }
                 }
 
-                client.cache.evict({fieldName: 'tasksBySubgroup'});
-                client.cache.evict({fieldName: 'tasksByAssignee'});
+                client.cache.evict({ fieldName: 'tasksBySubgroup' });
+                client.cache.evict({ fieldName: 'tasksByAssignee' });
                 client.cache.gc();
 
                 for (const sg of subgroups) {
                     const sgMember = sg.members?.find(m => m.userId === userId);
                     if (sgMember) {
                         try {
-                            await removeSubgroupMember({variables: {id: sgMember.id}});
+                            await removeSubgroupMember({ variables: { id: sgMember.id } });
                         } catch (err) {
                             console.error('Ошибка удаления из подгруппы', err);
                         }
@@ -174,12 +186,17 @@ const ProjectSettings = () => {
                 }
             }
 
-            await updateRole({variables: {id: memberId, role: newRole}});
+            // Обновляем роль
+            const response = await updateRole({ variables: { id: memberId, role: newRole } });
+            
+            // Обновляем данные проекта
             await refetch();
-            setMessage('Роль обновлена');
+            
+            setMessage('Роль обновлена успешно');
             setIsError(false);
         } catch (err) {
-            setMessage(err.message);
+            console.error('Ошибка изменения роли:', err);
+            setMessage('Ошибка: ' + (err.message || 'Не удалось изменить роль'));
             setIsError(true);
         }
     };
@@ -190,7 +207,7 @@ const ProjectSettings = () => {
             setIsError(true);
             return;
         }
-        setDeleteConfirm({isOpen: true, memberId, isProject: false});
+        setDeleteConfirm({ isOpen: true, memberId, isProject: false });
     };
 
     const confirmRemoveMember = async () => {
@@ -198,14 +215,14 @@ const ProjectSettings = () => {
         if (member?.role === 'OWNER') {
             setMessage('Нельзя удалить владельца проекта');
             setIsError(true);
-            setDeleteConfirm({isOpen: false, memberId: null, isProject: false});
+            setDeleteConfirm({ isOpen: false, memberId: null, isProject: false });
             return;
         }
-        await removeMember({variables: {id: deleteConfirm.memberId}});
+        await removeMember({ variables: { id: deleteConfirm.memberId } });
         await refetch();
         setMessage('Участник удалён');
         setIsError(false);
-        setDeleteConfirm({isOpen: false, memberId: null, isProject: false});
+        setDeleteConfirm({ isOpen: false, memberId: null, isProject: false });
     };
 
     const handleAddMember = async (e) => {
@@ -229,7 +246,7 @@ const ProjectSettings = () => {
             return;
         }
         try {
-            await addMember({variables: {projectId, userId: foundUser.id, role: newMemberRole}});
+            await addMember({ variables: { projectId, userId: foundUser.id, role: newMemberRole } });
             refetch();
             setNewMemberEmail('');
             setMessage('Участник добавлен');
@@ -246,12 +263,12 @@ const ProjectSettings = () => {
             setIsError(true);
             return;
         }
-        setDeleteConfirm({isOpen: true, isProject: true});
+        setDeleteConfirm({ isOpen: true, isProject: true });
     };
 
     const confirmDeleteProject = async () => {
-        await deleteProject({variables: {id: projectId}});
-        setDeleteConfirm({isOpen: false, isProject: false});
+        await deleteProject({ variables: { id: projectId } });
+        setDeleteConfirm({ isOpen: false, isProject: false });
     };
 
     const openRenameModal = () => {
@@ -288,13 +305,37 @@ const ProjectSettings = () => {
         }
     };
 
+    const transliterateTitle = (title) => { const m = {"а":"a","б":"b","в":"v","г":"g","д":"d","е":"e","ё":"yo","ж":"zh","з":"z","и":"i","й":"y","к":"k","л":"l","м":"m","н":"n","о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f","х":"h","ц":"ts","ч":"ch","ш":"sh","щ":"sch","ъ":"","ы":"y","ь":"","э":"e","ю":"yu","я":"ya","А":"A","Б":"B","В":"V","Г":"G","Д":"D","Е":"E","Ё":"Yo","Ж":"Zh","З":"Z","И":"I","Й":"Y","К":"K","Л":"L","М":"M","Н":"N","О":"O","П":"P","Р":"R","С":"S","Т":"T","У":"U","Ф":"F","Х":"H","Ц":"Ts","Ч":"Ch","Ш":"Sh","Щ":"Sch","Ъ":"","Ы":"Y","Ь":"","Э":"E","Ю":"Yu","Я":"Ya"}; return title.split("").map(c=>m[c]||c).join("").toLowerCase().replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+`$/g,"").slice(0,50); }; const handleExportProject = async () => {
+        setIsExporting(true);
+        try {
+            const token = localStorage.getItem('jwtToken');
+            const response = await fetch(`/api/export/project/${projectId}`, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!response.ok) throw new Error('Export failed');
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `project_${projectId}_${transliterateTitle(project.name)}.zip`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.URL.revokeObjectURL(url);
+        } catch (err) {
+            console.error(err);
+            alert('Ошибка экспорта проекта: ' + err.message);
+        } finally {
+            setIsExporting(false);
+        }
+    };
+
     return (
-        <div style={{position: 'relative'}}>
+        <div style={{ position: 'relative' }}>
             <button className="modal-close--settings" onClick={() => navigate(-1)}>✕</button>
             <h2><i className="fas fa-cog"></i> Настройки проекта</h2>
 
             <div className="card">
-                {/* Блок уведомлений - виден ВСЕМ участникам */}
                 <h3><i className="fas fa-bell"></i> Уведомления</h3>
                 <div className="form-group">
                     <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center' }}>
@@ -339,31 +380,34 @@ const ProjectSettings = () => {
                     </div>
                 </div>
 
-                {/* Админская часть - видна только админам и владельцу */}
                 {isAdmin && (
                     <>
-                        <div className="divider"/>
+                        <div className="divider" />
 
                         <h3><i className="fas fa-pen"></i> Основное</h3>
                         <div className="form-group">
                             <label className="form-label" htmlFor="project-name">Название проекта</label>
-                            <input className="form-input" type="text" id="project-name" value={project.name} readOnly/>
+                            <input className="form-input" type="text" id="project-name" value={project.name} readOnly />
                         </div>
-                        <button className="btn btn--secondary" onClick={openRenameModal}>
-                            <i className="fas fa-edit"></i> Изменить название
-                        </button>
+                        <div className="flex-row" style={{ gap: '12px', marginBottom: '20px' }}>
+                            <button className="btn btn--secondary" onClick={openRenameModal}>
+                                <i className="fas fa-edit"></i> Изменить название
+                            </button>
+                            <button className="btn btn--secondary" onClick={handleExportProject} disabled={isExporting}>
+                                <i className="fas fa-download"></i> {isExporting ? 'Экспорт...' : 'Экспорт проекта'}
+                            </button>
+                        </div>
 
-                        <div className="divider"/>
+                        <div className="divider" />
 
                         <h3><i className="fas fa-users"></i> Участники</h3>
                         <div>
                             {project.members.map((m) => (
-                                <div key={m.id} className="flex-row"
-                                     style={{justifyContent: 'space-between', marginBottom: 12}}>
+                                <div key={m.id} className="flex-row" style={{ justifyContent: 'space-between', marginBottom: 12 }}>
                                     <span>
                                         <strong>{m.user.fullName}</strong> ({m.user.email})
                                         <span className="badge-role">{m.role}</span>
-                                        {m.userId === user.id && <span className="badge-role" style={{background: '#22c55e', color: 'white'}}>Вы</span>}
+                                        {m.userId === user.id && <span className="badge-role" style={{ background: '#22c55e', color: 'white' }}>Вы</span>}
                                     </span>
                                     <div className="flex-row">
                                         <select
@@ -371,7 +415,7 @@ const ProjectSettings = () => {
                                             id={`role-select-${m.id}`}
                                             value={m.role}
                                             onChange={(e) => handleRoleChange(m.id, e.target.value)}
-                                            style={{width: 'auto'}}
+                                            style={{ width: 'auto' }}
                                             disabled={m.userId === project.owner.id || m.role === 'OWNER' || m.userId === user.id}
                                         >
                                             <option value="ADMIN">Админ</option>
@@ -395,9 +439,9 @@ const ProjectSettings = () => {
                                 <div className="flex-row">
                                     <input className="form-input" type="email" id="new-member-email" value={newMemberEmail}
                                            onChange={(e) => setNewMemberEmail(e.target.value)} placeholder="Email пользователя"
-                                           style={{flex: 2}}/>
+                                           style={{ flex: 2 }} />
                                     <select className="form-select" id="new-member-role" value={newMemberRole}
-                                            onChange={(e) => setNewMemberRole(e.target.value)} style={{flex: 1}}>
+                                            onChange={(e) => setNewMemberRole(e.target.value)} style={{ flex: 1 }}>
                                         <option value="ADMIN">Админ</option>
                                         <option value="MEMBER">Участник</option>
                                         <option value="VIEWER">Наблюдатель</option>
@@ -406,11 +450,11 @@ const ProjectSettings = () => {
                                         <i className="fas fa-user-plus"></i> Добавить
                                     </button>
                                 </div>
-                                {searchError && <div className="message-error" style={{marginTop: '8px'}}>{searchError}</div>}
+                                {searchError && <div className="message-error" style={{ marginTop: '8px' }}>{searchError}</div>}
                             </div>
                         </form>
 
-                        <div className="divider"/>
+                        <div className="divider" />
 
                         <button className="btn btn--danger" onClick={handleDeleteProject}>
                             <i className="fas fa-trash-alt"></i> Удалить проект
@@ -418,9 +462,8 @@ const ProjectSettings = () => {
                     </>
                 )}
 
-                {/* Информация для обычных участников */}
                 {!isAdmin && isMember && (
-                    <div className="info-message" style={{marginTop: '20px', padding: '16px', background: '#f0fdf4', borderRadius: '12px', color: '#166534'}}>
+                    <div className="info-message" style={{ marginTop: '20px', padding: '16px', background: '#f0fdf4', borderRadius: '12px', color: '#166534' }}>
                         <i className="fas fa-info-circle"></i> Вы участник проекта. Для управления проектом обратитесь к администратору.
                     </div>
                 )}
@@ -444,7 +487,7 @@ const ProjectSettings = () => {
                                 autoFocus
                             />
                         </div>
-                        <div className="flex-row" style={{justifyContent: 'flex-end', gap: '8px', marginTop: '16px'}}>
+                        <div className="flex-row" style={{ justifyContent: 'flex-end', gap: '8px', marginTop: '16px' }}>
                             <button className="btn btn--secondary" onClick={() => setRenameModalOpen(false)}>
                                 <i className="fas fa-times"></i> Отмена
                             </button>
@@ -463,10 +506,15 @@ const ProjectSettings = () => {
                     ? "Вы действительно хотите удалить проект? Все данные будут потеряны."
                     : "Вы действительно хотите удалить этого участника из проекта?"}
                 onConfirm={deleteConfirm.isProject ? confirmDeleteProject : confirmRemoveMember}
-                onCancel={() => setDeleteConfirm({isOpen: false, memberId: null, isProject: false})}
+                onCancel={() => setDeleteConfirm({ isOpen: false, memberId: null, isProject: false })}
             />
         </div>
     );
 };
 
 export default ProjectSettings;
+
+
+
+
+

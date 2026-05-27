@@ -1,0 +1,19 @@
+scalar DateTime
+
+enum RoleProject {
+    OWNER
+    ADMIN
+    MEMBER
+    VIEWER
+}
+
+enum RoleSubgroup {
+    LEADER
+    MEMBER
+}
+
+enum TaskStatus {
+    TODO
+    IN_PROGRESS
+    REVIEW
+}

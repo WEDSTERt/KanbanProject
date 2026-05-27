@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Panel — Kanban Docky</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: linear-gradient(135deg, #0a0a0f 0%, #12121a 100%);
+            font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+            color: #e2e8f0;
+            padding: 24px;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        /* Header */
+        .header {
+            background: rgba(18, 24, 36, 0.8);
+            backdrop-filter: blur(12px);
+            border-radius: 24px;
+            padding: 20px 28px;
+            margin-bottom: 28px;
+            border: 1px solid rgba(79, 114, 139, 0.25);
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .header h1 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            background: linear-gradient(135deg, #a78bfa, #6d28d9);
+            -webkit-background-clip: text;
+            background-clip: text;
+            color: transparent;
+            display: inline-flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .header h1 i {
+            background: none;
+            -webkit-background-clip: unset;
+            background-clip: unset;
+            color: #a78bfa;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .status-badge {
+            background: #1e293b;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        .status-online {
+            color: #4ade80;
+        }
+
+        .status-offline {
+            color: #f87171;
+        }
+
+        /* User bar */
+        .user-bar {
+            background: #111827;
+            border-radius: 20px;
+            padding: 16px 24px;
+            margin-bottom: 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            border: 1px solid #1f2937;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .user-id-badge {
+            background: #6d28d9;
+            padding: 6px 14px;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .input-group {
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .input-group input {
+            background: #0f172a;
+            border: 1px solid #334155;
+            padding: 8px 14px;
+            border-radius: 40px;
+            color: white;
+            font-size: 0.9rem;
+            width: 120px;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #3b82f6, #2563eb);
+            border: none;
+            padding: 8px 18px;
+            border-radius: 40px;
+            color: white;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 0.85rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-secondary {
+            background: #334155;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: #0f172a;
+        }
+
+        .btn-danger {
+            background: #dc2626;
+        }
+
+        .btn-outline {
+            background: transparent;
+            border: 1px solid #4b5563;
+        }
+
+        .btn-sm {
+            padding: 4px 12px;
+            font-size: 0.75rem;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            margin-bottom: 24px;
+            border-bottom: 1px solid #1f2937;
+            padding-bottom: 8px;
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            padding: 10px 24px;
+            border-radius: 40px;
+            color: #94a3b8;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .tab-btn:hover {
+            background: #1e293b;
+            color: white;
+        }
+
+        .tab-btn.active {
+            background: #6d28d9;
+            color: white;
+        }
+
+        /* Cards */
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .card {
+            background: #0f172a;
+            border-radius: 20px;
+            padding: 20px;
+            margin-bottom: 24px;
+            border: 1px solid #1e293b;
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .card-header h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #c084fc;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .quick-buttons {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .grid-2 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+        }
+
+        .stat-card {
+            background: #111827;
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid #1f2937;
+            transition: all 0.2s;
+        }
+
+        .stat-card:hover {
+            border-color: #6d28d9;
+            transform: translateY(-4px);
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #a78bfa;
+        }
+
+        .stat-label {
+            color: #94a3b8;
+            margin-top: 8px;
+            font-size: 0.85rem;
+        }
+
+        .response-area {
+            background: #0a0a0f;
+            border-radius: 16px;
+            padding: 16px;
+            font-family: 'JetBrains Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            max-height: 500px;
+            min-height: 200px;
+            border: 1px solid #1e293b;
+        }
+
+        .response-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 12px;
+            font-size: 0.75rem;
+            color: #64748b;
+        }
+
+        pre {
+            margin: 0;
+            font-family: inherit;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #1e293b;
+        }
+
+        .info-label {
+            color: #94a3b8;
+        }
+
+        .info-value {
+            font-weight: 600;
+            color: #e2e8f0;
+        }
+
+        hr {
+            border-color: #1e293b;
+            margin: 20px 0;
+        }
+
+        .footer-note {
+            text-align: center;
+            font-size: 0.7rem;
+            color: #475569;
+            margin-top: 40px;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading {
+            animation: pulse 1s infinite;
+        }
+
+        .badge {
+            background: #1e293b;
+            padding: 2px 8px;
+            border-radius: 20px;
+            font-size: 0.7rem;
+            color: #c084fc;
+        }
+    </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+<div class="container">
+    <div class="header">
+        <h1>
+            <i class="fas fa-bug"></i>
+            Debug Panel
+            <span class="badge" id="currentUserIdDisplay">Не выбран</span>
+        </h1>
+        <div class="subtitle">
+            <span><i class="fas fa-terminal"></i> Административная панель отладки</span>
+            <span class="status-badge">
+                <i class="fas fa-circle" style="font-size: 0.7rem;" id="statusIndicator"></i>
+                <span id="serverStatusText">Проверка...</span>
+            </span>
+        </div>
+    </div>
+
+    <div class="user-bar">
+        <div class="user-info">
+            <i class="fas fa-user-shield"></i>
+            <span>Рабочий User ID:</span>
+            <input type="number" id="userIdInput" placeholder="ID пользователя">
+            <button id="setUserIdBtn" class="btn btn-sm"><i class="fas fa-check"></i> Установить</button>
+        </div>
+        <div class="input-group">
+            <button id="refreshAllBtn" class="btn btn-secondary btn-sm"><i class="fas fa-sync-alt"></i> Обновить всё</button>
+            <button id="clearCacheBtn" class="btn btn-warning btn-sm"><i class="fas fa-trash-alt"></i> Сбросить кэш</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <button class="tab-btn active" data-tab="stats"><i class="fas fa-chart-simple"></i> Статистика</button>
+        <button class="tab-btn" data-tab="users"><i class="fas fa-users"></i> Пользователи</button>
+        <button class="tab-btn" data-tab="projects"><i class="fas fa-folder"></i> Проекты</button>
+        <button class="tab-btn" data-tab="members"><i class="fas fa-link"></i> Участники</button>
+        <button class="tab-btn" data-tab="test"><i class="fas fa-flask"></i> Тесты</button>
+        <button class="tab-btn" data-tab="cache"><i class="fas fa-database"></i> Кэш</button>
+        <button class="tab-btn" data-tab="sql"><i class="fas fa-code"></i> SQL</button>
+    </div>
+
+    <!-- Статистика -->
+    <div id="tab-stats" class="tab-content active">
+        <div class="grid-2" id="statsGrid">
+            <div class="stat-card"><div class="stat-number">—</div><div class="stat-label">Загрузка...</div></div>
+        </div>
+    </div>
+
+    <!-- Пользователи -->
+    <div id="tab-users" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-users"></i> Список пользователей</h3>
+                <div class="quick-buttons">
+                    <button class="btn btn-secondary btn-sm" data-load="users"><i class="fas fa-list"></i> Все</button>
+                    <button class="btn btn-secondary btn-sm" data-load="users-me"><i class="fas fa-user"></i> Мой профиль</button>
+                </div>
+            </div>
+            <div class="response-area" id="usersResponse">⏳ Нажмите кнопку для загрузки...</div>
+            <div class="response-stats">
+                <span id="usersCount">0 записей</span>
+                <button id="copyUsersBtn" class="btn-outline btn-sm" style="background:transparent;"><i class="fas fa-copy"></i> Копировать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Проекты -->
+    <div id="tab-projects" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-folder"></i> Управление проектами</h3>
+                <div class="quick-buttons">
+                    <button class="btn btn-secondary btn-sm" data-load="projects-all"><i class="fas fa-globe"></i> Все</button>
+                    <button class="btn btn-secondary btn-sm" data-load="projects-owned"><i class="fas fa-crown"></i> Мои (владелец)</button>
+                    <button class="btn btn-secondary btn-sm" data-load="projects-member"><i class="fas fa-user-check"></i> Мои (участник)</button>
+                </div>
+            </div>
+            <div class="response-area" id="projectsResponse">⏳ Нажмите кнопку для загрузки...</div>
+            <div class="response-stats">
+                <span id="projectsCount">0 записей</span>
+                <button id="copyProjectsBtn" class="btn-outline btn-sm" style="background:transparent;"><i class="fas fa-copy"></i> Копировать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Участники -->
+    <div id="tab-members" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-link"></i> Связи пользователей и проектов</h3>
+                <div class="quick-buttons">
+                    <button class="btn btn-secondary btn-sm" data-load="members-all"><i class="fas fa-list"></i> Все связи</button>
+                    <button class="btn btn-secondary btn-sm" data-load="members-my"><i class="fas fa-user"></i> Мои связи</button>
+                </div>
+            </div>
+            <div class="response-area" id="membersResponse">⏳ Нажмите кнопку для загрузки...</div>
+            <div class="response-stats">
+                <span id="membersCount">0 записей</span>
+                <button id="copyMembersBtn" class="btn-outline btn-sm" style="background:transparent;"><i class="fas fa-copy"></i> Копировать</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Тесты -->
+    <div id="tab-test" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-flask"></i> Тестирование кэша и данных</h3>
+                <div class="quick-buttons">
+                    <button id="testProjectsBtn" class="btn btn-primary btn-sm"><i class="fas fa-play"></i> Выполнить тест</button>
+                </div>
+            </div>
+            <div class="response-area" id="testResponse">⏳ Введите ID пользователя и нажмите "Выполнить тест"</div>
+            <div class="response-stats" style="margin-top: 12px;">
+                <input type="number" id="testUserId" placeholder="User ID" style="background:#0f172a; border:1px solid #334155; padding:6px 12px; border-radius:40px; width:150px;">
+            </div>
+        </div>
+    </div>
+
+    <!-- Кэш -->
+    <div id="tab-cache" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-database"></i> Управление кэшем</h3>
+                <div class="quick-buttons">
+                    <button class="btn btn-secondary btn-sm" data-load="cache-stats"><i class="fas fa-chart-simple"></i> Показать кэши</button>
+                    <button id="clearMemberCacheBtn" class="btn btn-warning btn-sm"><i class="fas fa-eraser"></i> Очистить кэш member проектов</button>
+                    <button id="refreshMemberBtn" class="btn btn-primary btn-sm"><i class="fas fa-sync"></i> Принудительно обновить</button>
+                </div>
+            </div>
+            <div class="response-area" id="cacheResponse">⏳ Нажмите кнопку для загрузки...</div>
+        </div>
+    </div>
+
+    <!-- SQL -->
+    <div id="tab-sql" class="tab-content">
+        <div class="card">
+            <div class="card-header">
+                <h3><i class="fas fa-code"></i> Симуляция SQL запросов</h3>
+                <button id="sqlTestBtn" class="btn btn-primary btn-sm"><i class="fas fa-play"></i> Выполнить</button>
+            </div>
+            <div class="response-area" id="sqlResponse">⏳ Введите ID пользователя и нажмите "Выполнить"</div>
+            <div class="response-stats" style="margin-top: 12px;">
+                <input type="number" id="sqlUserId" placeholder="User ID" style="background:#0f172a; border:1px solid #334155; padding:6px 12px; border-radius:40px; width:150px;">
+            </div>
+            <div class="code-block" id="sqlQueryBlock" style="margin-top: 16px; background:#0a0a0f; padding:12px; border-radius:12px; font-family:monospace; font-size:11px;"></div>
+        </div>
+    </div>
+
+    <div class="footer-note">
+        <i class="fas fa-lock"></i> Доступно только с localhost | <i class="fas fa-chart-line"></i> Данные в реальном времени
+    </div>
+</div>
+
+<script>
+    let currentUserId = null;
+    let baseUrl = '';
+
+    const getToken = () => localStorage.getItem('jwtToken');
+
+    const apiCall = async (endpoint, options = {}) => {
+        const url = endpoint.startsWith('http') ? endpoint : baseUrl + endpoint;
+        const token = getToken();
+        const response = await fetch(url, {
+            ...options,
+            headers: {
+                'Content-Type': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` }),
+                ...options.headers
+            }
+        });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const type = response.headers.get('content-type');
+        return type?.includes('application/json') ? await response.json() : await response.text();
+    };
+
+    const checkServerStatus = async () => {
+        try {
+            await apiCall('/debug/info');
+            document.getElementById('serverStatusText').innerText = 'Онлайн';
+            document.getElementById('statusIndicator').style.color = '#4ade80';
+            return true;
+        } catch (e) {
+            document.getElementById('serverStatusText').innerText = 'Оффлайн';
+            document.getElementById('statusIndicator').style.color = '#f87171';
+            return false;
+        }
+    };
+
+    const loadStats = async () => {
+        const grid = document.getElementById('statsGrid');
+        try {
+            const data = await apiCall('/debug/info');
+            grid.innerHTML = `
+                <div class="stat-card"><div class="stat-number">${data.usersCount || 0}</div><div class="stat-label"><i class="fas fa-users"></i> Пользователи</div></div>
+                <div class="stat-card"><div class="stat-number">${data.projectsCount || 0}</div><div class="stat-label"><i class="fas fa-folder"></i> Проекты</div></div>
+                <div class="stat-card"><div class="stat-number">${data.projectMembersCount || 0}</div><div class="stat-label"><i class="fas fa-link"></i> Участники</div></div>
+                <div class="stat-card"><div class="stat-number">${data.subgroupsCount || 0}</div><div class="stat-label"><i class="fas fa-layer-group"></i> Подгруппы</div></div>
+                <div class="stat-card"><div class="stat-number">${data.tasksCount || 0}</div><div class="stat-label"><i class="fas fa-tasks"></i> Задачи</div></div>
+                <div class="stat-card"><div class="stat-number">${data.attachmentsCount || 0}</div><div class="stat-label"><i class="fas fa-paperclip"></i> Вложения</div></div>
+            `;
+        } catch (e) {
+            grid.innerHTML = `<div class="stat-card"><div class="stat-number">⚠️</div><div class="stat-label">Ошибка загрузки</div></div>`;
+        }
+    };
+
+    const loadData = async (endpoint, respId, countId = null) => {
+        const div = document.getElementById(respId);
+        div.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Загрузка...';
+        try {
+            const data = await apiCall(endpoint);
+            div.innerHTML = `<pre style="margin:0; font-family:inherit;">${JSON.stringify(data, null, 2)}</pre>`;
+            if (countId) {
+                const len = Array.isArray(data) ? data.length : (data?.length || Object.keys(data).length);
+                document.getElementById(countId).innerText = `${len} записей`;
+            }
+        } catch (e) {
+            div.innerHTML = `❌ Ошибка: ${e.message}`;
+        }
+    };
+
+    const loadTest = async () => {
+        const userId = document.getElementById('testUserId').value || currentUserId || '1';
+        const div = document.getElementById('testResponse');
+        div.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Выполнение теста...';
+        try {
+            const data = await apiCall(`/debug/test/projects-for-user/${userId}`);
+            div.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            if (data.memberViaRepo?.length !== data.memberViaService?.length) {
+                div.innerHTML += '<div style="color:#f59e0b; margin-top:12px;"><i class="fas fa-exclamation-triangle"></i> ⚠️ ВНИМАНИЕ: Расхождение между репозиторием и сервисом! Очистите кэш.</div>';
+            }
+        } catch (e) {
+            div.innerHTML = `❌ Ошибка: ${e.message}`;
+        }
+    };
+
+    const loadSql = async () => {
+        const userId = document.getElementById('sqlUserId').value || currentUserId || '1';
+        const div = document.getElementById('sqlResponse');
+        div.innerHTML = '<i class="fas fa-spinner fa-pulse"></i> Выполнение...';
+        try {
+            const data = await apiCall(`/debug/test/raw-sql/user/${userId}`);
+            div.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            const sqlDiv = document.getElementById('sqlQueryBlock');
+            sqlDiv.innerHTML = `<i class="fas fa-database"></i> <strong>Эквивалент SQL:</strong><br><code style="font-size:11px;">SELECT p.* FROM projects p JOIN project_members pm ON p.id = pm.project_id WHERE pm.user_id = ${userId};</code>`;
+        } catch (e) {
+            div.innerHTML = `❌ Ошибка: ${e.message}`;
+        }
+    };
+
+    const clearCache = async () => {
+        try {
+            await apiCall('/debug/cache/clear', { method: 'DELETE' });
+            alert('✅ Кэш очищен');
+            loadStats();
+            loadData('/debug/cache', 'cacheResponse');
+        } catch (e) {
+            alert('❌ Ошибка очистки');
+        }
+    };
+
+    const clearMemberCache = async () => {
+        const uid = currentUserId || document.getElementById('userIdInput').value || '1';
+        try {
+            await apiCall(`/debug/refresh/member-projects/${uid}`, { method: 'POST' });
+            alert(`✅ Кэш для user ${uid} очищен`);
+            loadData('/debug/cache', 'cacheResponse');
+        } catch (e) {
+            alert('❌ Ошибка');
+        }
+    };
+
+    const refreshMember = async () => {
+        const uid = currentUserId || document.getElementById('userIdInput').value || '1';
+        try {
+            await apiCall(`/debug/refresh/member-projects/${uid}`, { method: 'POST' });
+            alert(`✅ Кэш для user ${uid} обновлён`);
+            loadTest();
+        } catch (e) {
+            alert('❌ Ошибка');
+        }
+    };
+
+    const setUserId = () => {
+        const id = document.getElementById('userIdInput').value;
+        if (id) {
+            currentUserId = id;
+            document.getElementById('currentUserIdDisplay').innerHTML = `ID: ${currentUserId} <i class="fas fa-check-circle" style="color:#4ade80;"></i>`;
+            localStorage.setItem('debugUserId', currentUserId);
+            loadData('/debug/users', 'usersResponse', 'usersCount');
+            loadData('/debug/projects/member/' + currentUserId, 'projectsResponse', 'projectsCount');
+            loadData('/debug/project-members/user/' + currentUserId, 'membersResponse', 'membersCount');
+        }
+    };
+
+    const refreshAll = () => {
+        loadStats();
+        loadData('/debug/users', 'usersResponse', 'usersCount');
+        if (currentUserId) {
+            loadData('/debug/projects/member/' + currentUserId, 'projectsResponse', 'projectsCount');
+            loadData('/debug/project-members/user/' + currentUserId, 'membersResponse', 'membersCount');
+        }
+        loadData('/debug/cache', 'cacheResponse');
+    };
+
+    const copyResponse = (id) => {
+        const text = document.getElementById(id).innerText;
+        navigator.clipboard.writeText(text);
+        alert('✅ Скопировано');
+    };
+
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tabId = btn.dataset.tab;
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.getElementById(`tab-${tabId}`).classList.add('active');
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        });
+    });
+
+    document.querySelectorAll('[data-load="users"]').forEach(btn => btn.addEventListener('click', () => loadData('/debug/users', 'usersResponse', 'usersCount')));
+    document.querySelectorAll('[data-load="users-me"]').forEach(btn => btn.addEventListener('click', () => loadData('/debug/users', 'usersResponse', 'usersCount')));
+    document.querySelectorAll('[data-load="projects-all"]').forEach(btn => btn.addEventListener('click', () => loadData('/debug/projects', 'projectsResponse', 'projectsCount')));
+    document.querySelectorAll('[data-load="projects-owned"]').forEach(btn => btn.addEventListener('click', () => loadData('/debug/projects/owner/' + (currentUserId || '1'), 'projectsResponse', 'projectsCount')));
+    document.querySelectorAll('[data-load="projects-member"]').forEach(btn => btn.addEventListener('click', () => loadData('/debug/projects/member/' + (currentUserId || '1'), 'projectsResponse', 'projectsCount')));
+    document.querySelectorAll('[data-load="members-all"]').forEach(btn => btn.addEventListener('click', () => loadData('/debug/project-members', 'membersResponse', 'membersCount')));
+    document.querySelectorAll('[data-load="members-my"]').forEach(btn => btn.addEventListener('click', () => loadData('/debug/project-members/user/' + (currentUserId || '1'), 'membersResponse', 'membersCount')));
+    document.querySelectorAll('[data-load="cache-stats"]').forEach(btn => btn.addEventListener('click', () => loadData('/debug/cache', 'cacheResponse')));
+
+    document.getElementById('setUserIdBtn').addEventListener('click', setUserId);
+    document.getElementById('refreshAllBtn').addEventListener('click', refreshAll);
+    document.getElementById('clearCacheBtn').addEventListener('click', clearCache);
+    document.getElementById('testProjectsBtn').addEventListener('click', loadTest);
+    document.getElementById('sqlTestBtn').addEventListener('click', loadSql);
+    document.getElementById('clearMemberCacheBtn').addEventListener('click', clearMemberCache);
+    document.getElementById('refreshMemberBtn').addEventListener('click', refreshMember);
+
+    document.getElementById('copyUsersBtn').addEventListener('click', () => copyResponse('usersResponse'));
+    document.getElementById('copyProjectsBtn').addEventListener('click', () => copyResponse('projectsResponse'));
+    document.getElementById('copyMembersBtn').addEventListener('click', () => copyResponse('membersResponse'));
+
+    const saved = localStorage.getItem('debugUserId');
+    if (saved) {
+        document.getElementById('userIdInput').value = saved;
+        setUserId();
+    }
+
+    checkServerStatus();
+    refreshAll();
+</script>
+</body>
+</html>
