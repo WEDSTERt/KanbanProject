@@ -21,17 +21,20 @@ public class SubgroupService {
     private final UserRepository userRepository;
     private final SubgroupMemberRepository subgroupMemberRepository;
     private final EmailNotificationService emailNotificationService;
+    private final NotificationService notificationService;
 
     public SubgroupService(SubgroupRepository subgroupRepository,
                            ProjectRepository projectRepository,
                            UserRepository userRepository,
                            SubgroupMemberRepository subgroupMemberRepository,
-                           EmailNotificationService emailNotificationService) {
+                           EmailNotificationService emailNotificationService,
+                           NotificationService notificationService) {
         this.subgroupRepository = subgroupRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.subgroupMemberRepository = subgroupMemberRepository;
         this.emailNotificationService = emailNotificationService;
+        this.notificationService = notificationService;
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails"}, allEntries = true)
@@ -107,13 +110,28 @@ public class SubgroupService {
         SubgroupMember sm = new SubgroupMember(subgroup, user, role != null ? role : RoleSubgroup.MEMBER);
         SubgroupMember saved = subgroupMemberRepository.save(sm);
 
-        // Отправляем уведомление внутри транзакции
+        // Отправляем email уведомление
         if (addedBy != null && !addedBy.getId().equals(userId)) {
             try {
                 emailNotificationService.notifyUserAddedToSubgroup(subgroup, user, addedBy, role != null ? role.name() : "MEMBER");
             } catch (Exception e) {
-                System.err.println("Warning: Failed to send notification: " + e.getMessage());
+                System.err.println("Warning: Failed to send email notification: " + e.getMessage());
             }
+        }
+        
+        // Отправляем in-app уведомление
+        try {
+            String addedByName = addedBy != null ? addedBy.getFullName() : "Администратор";
+            notificationService.createNotification(
+                userId,
+                "SUBGROUP_MEMBER_ADDED",
+                "Добавлены в группу",
+                addedByName + " добавил вас в группу \"" + subgroup.getName() + "\"",
+                null,
+                subgroup.getProjectId()
+            );
+        } catch (Exception e) {
+            System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
         }
 
         return saved;
@@ -137,14 +155,29 @@ public class SubgroupService {
             
             Subgroup subgroup = member.getSubgroup();
             User removedUser = member.getUser();
-            
+            Long projectId = subgroup.getProjectId();
+
             subgroupMemberRepository.deleteById(memberId);
             
-            // Отправляем уведомление об удалении из группы
+            // Отправляем email уведомление
             try {
                 emailNotificationService.notifyUserRemovedFromSubgroup(subgroup, removedUser);
             } catch (Exception e) {
-                System.err.println("Warning: Failed to send removal notification: " + e.getMessage());
+                System.err.println("Warning: Failed to send email notification: " + e.getMessage());
+            }
+            
+            // Отправляем in-app уведомление
+            try {
+                notificationService.createNotification(
+                    removedUser.getId(),
+                    "SUBGROUP_MEMBER_REMOVED",
+                    "Удалены из группы",
+                    "Вы удалены из группы \"" + subgroup.getName() + "\"",
+                    null,
+                    projectId
+                );
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
             }
             
             return true;
