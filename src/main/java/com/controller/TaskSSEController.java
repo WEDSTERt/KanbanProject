@@ -9,7 +9,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
  * SSE контроллер для отправки real-time событий
- * 
+ *
  * События:
  * - projects-changed: Изменения в списке проектов
  * - project-removed: Пользователя удалили из проекта (перенаправить на главную)
@@ -20,18 +20,18 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 @Controller
 public class TaskSSEController {
-    
+
     private static TaskSSEController instance;
-    
+
     // Храним эмиттеры для каждого пользователя
     private final Map<Long, SseEmitter> userEmitters = new ConcurrentHashMap<>();
-    
+
     // Храним эмиттеры для каждого проекта
     private final Map<Long, List<SseEmitter>> projectEmitters = new ConcurrentHashMap<>();
-    
+
     // Храним эмиттеры для каждой подгруппы
     private final Map<Long, List<SseEmitter>> subgroupEmitters = new ConcurrentHashMap<>();
-    
+
     private static final long TIMEOUT = 5 * 60 * 1000; // 5 минут timeout
 
     public TaskSSEController() {
@@ -47,10 +47,10 @@ public class TaskSSEController {
      */
     public SseEmitter subscribe(Long userId) {
         System.out.println("📡 User " + userId + " subscribing to global events");
-        
+
         SseEmitter emitter = new SseEmitter(TIMEOUT);
         userEmitters.put(userId, emitter);
-        
+
         // Обработка разрыва соединения
         emitter.onCompletion(() -> {
             System.out.println("✅ User " + userId + " connection completed");
@@ -64,7 +64,7 @@ public class TaskSSEController {
             System.out.println("❌ User " + userId + " connection error: " + throwable.getMessage());
             userEmitters.remove(userId);
         });
-        
+
         return emitter;
     }
 
@@ -73,13 +73,13 @@ public class TaskSSEController {
      */
     public SseEmitter subscribeToProject(Long projectId) {
         System.out.println("📡 Subscribing to project " + projectId + " events");
-        
+
         SseEmitter emitter = new SseEmitter(TIMEOUT);
         List<SseEmitter> emittersList = projectEmitters.computeIfAbsent(projectId, k -> new CopyOnWriteArrayList<>());
         emittersList.add(emitter);
-        
+
         System.out.println("✅ Added emitter for project " + projectId + ", total subscribers: " + emittersList.size());
-        
+
         emitter.onCompletion(() -> {
             System.out.println("✅ Project " + projectId + " subscription completed");
             List<SseEmitter> list = projectEmitters.get(projectId);
@@ -104,7 +104,7 @@ public class TaskSSEController {
                 System.out.println("   Remaining subscribers for project " + projectId + ": " + list.size());
             }
         });
-        
+
         return emitter;
     }
 
@@ -113,23 +113,26 @@ public class TaskSSEController {
      */
     public SseEmitter subscribeToSubgroup(Long subgroupId) {
         System.out.println("📡 Subscribing to subgroup " + subgroupId + " events");
-        
+
         SseEmitter emitter = new SseEmitter(TIMEOUT);
         subgroupEmitters.computeIfAbsent(subgroupId, k -> new CopyOnWriteArrayList<>()).add(emitter);
-        
+
         emitter.onCompletion(() -> {
             System.out.println("✅ Subgroup " + subgroupId + " subscription completed");
-            subgroupEmitters.get(subgroupId).remove(emitter);
+            List<SseEmitter> list = subgroupEmitters.get(subgroupId);
+            if (list != null) list.remove(emitter);
         });
         emitter.onTimeout(() -> {
             System.out.println("⏱️ Subgroup " + subgroupId + " subscription timeout");
-            subgroupEmitters.get(subgroupId).remove(emitter);
+            List<SseEmitter> list = subgroupEmitters.get(subgroupId);
+            if (list != null) list.remove(emitter);
         });
         emitter.onError(throwable -> {
-            System.out.println("❌ Subgroup " + subgroupId + " subscription error");
-            subgroupEmitters.get(subgroupId).remove(emitter);
+            System.out.println("❌ Subgroup " + subgroupId + " subscription error: " + throwable.getMessage());
+            List<SseEmitter> list = subgroupEmitters.get(subgroupId);
+            if (list != null) list.remove(emitter);
         });
-        
+
         return emitter;
     }
 
@@ -138,7 +141,7 @@ public class TaskSSEController {
      */
     public void notifyProjectsListChanged(Long userId) {
         System.out.println("📢 Notifying user " + userId + " about projects list change");
-        
+
         SseEmitter emitter = userEmitters.get(userId);
         if (emitter != null) {
             try {
@@ -164,7 +167,7 @@ public class TaskSSEController {
      */
     public void notifyAllProjectsListChanged() {
         System.out.println("📢 Notifying ALL users about projects list change");
-        
+
         for (Long userId : new ArrayList<>(userEmitters.keySet())) {
             try {
                 SseEmitter emitter = userEmitters.get(userId);
@@ -191,7 +194,7 @@ public class TaskSSEController {
      */
     public void notifyNotificationReceived(Long userId, Object notification) {
         System.out.println("📢 Notifying user " + userId + " about new notification");
-        
+
         SseEmitter emitter = userEmitters.get(userId);
         if (emitter != null) {
             try {
@@ -216,7 +219,7 @@ public class TaskSSEController {
      */
     public void notifySubgroupsChanged(Long projectId) {
         System.out.println("📢 Notifying project " + projectId + " subscribers about subgroups change");
-        
+
         List<SseEmitter> emitters = projectEmitters.get(projectId);
         if (emitters != null && !emitters.isEmpty()) {
             System.out.println("   Project " + projectId + " has " + emitters.size() + " active subscribers");
@@ -244,12 +247,14 @@ public class TaskSSEController {
 
     /**
      * Отправить событие об обновлении задачи
+     * ⚠️ ВАЖНО: Включаем subgroupId_field для фронтенда!
      */
     public void notifyTaskUpdated(Long subgroupId, Object taskData) {
         System.out.println("📢 Notifying about task update in subgroup " + subgroupId);
-        
+
         List<SseEmitter> emitters = subgroupEmitters.get(subgroupId);
-        if (emitters != null) {
+        if (emitters != null && !emitters.isEmpty()) {
+            System.out.println("   Subgroup " + subgroupId + " has " + emitters.size() + " active subscribers");
             for (SseEmitter emitter : new ArrayList<>(emitters)) {
                 try {
                     emitter.send(SseEmitter.event()
@@ -258,26 +263,32 @@ public class TaskSSEController {
                             .data(new Object() {
                                 public String action = "updated";
                                 public Object task = taskData;
+                                public Long subgroupId_field = subgroupId;  // ✅ ВАЖНО!
                                 public long timestamp = System.currentTimeMillis();
                             })
                             .build());
+                    System.out.println("✅ Task update notification sent to subscriber");
                 } catch (IOException e) {
-                    System.out.println("❌ Failed to send task update notification");
+                    System.out.println("❌ Failed to send task update notification: " + e.getMessage());
                     emitters.remove(emitter);
                 }
             }
             System.out.println("✅ Task update notification sent to subgroup " + subgroupId);
+        } else {
+            System.out.println("⚠️ No active subscribers for subgroup " + subgroupId);
         }
     }
 
     /**
      * Отправить событие об удалении задачи
+     * ⚠️ ВАЖНО: Включаем subgroupId_field для фронтенда!
      */
     public void notifyTaskDeleted(Long subgroupId, Long taskId) {
         System.out.println("📢 Notifying about task deletion in subgroup " + subgroupId);
-        
+
         List<SseEmitter> emitters = subgroupEmitters.get(subgroupId);
-        if (emitters != null) {
+        if (emitters != null && !emitters.isEmpty()) {
+            System.out.println("   Subgroup " + subgroupId + " has " + emitters.size() + " active subscribers");
             for (SseEmitter emitter : new ArrayList<>(emitters)) {
                 try {
                     emitter.send(SseEmitter.event()
@@ -286,15 +297,19 @@ public class TaskSSEController {
                             .data(new Object() {
                                 public String action = "deleted";
                                 public Long taskId_field = taskId;
+                                public Long subgroupId_field = subgroupId;  // ✅ ВАЖНО!
                                 public long timestamp = System.currentTimeMillis();
                             })
                             .build());
+                    System.out.println("✅ Task delete notification sent to subscriber");
                 } catch (IOException e) {
-                    System.out.println("❌ Failed to send task delete notification");
+                    System.out.println("❌ Failed to send task delete notification: " + e.getMessage());
                     emitters.remove(emitter);
                 }
             }
             System.out.println("✅ Task delete notification sent to subgroup " + subgroupId);
+        } else {
+            System.out.println("⚠️ No active subscribers for subgroup " + subgroupId);
         }
     }
 
@@ -303,7 +318,7 @@ public class TaskSSEController {
      */
     public void notifyUserRemovedFromProject(Long userId, Long projectId) {
         System.out.println("📢 Notifying user " + userId + " they were removed from project " + projectId);
-        
+
         SseEmitter emitter = userEmitters.get(userId);
         if (emitter != null) {
             try {

@@ -37,10 +37,9 @@ public class SseController {
                         userId.toString(), null, java.util.Collections.emptyList()
                     );
                     SecurityContextHolder.getContext().setAuthentication(auth);
-                    System.out.println("✅ SSE authenticated user from token: " + userId);
                 }
             } catch (Exception e) {
-                System.out.println("⚠️ Failed to authenticate SSE from token: " + e.getMessage());
+                // Token authentication failed, continue without auth
             }
         }
     }
@@ -52,7 +51,6 @@ public class SseController {
     @GetMapping("/subscribe/{userId}")
     public SseEmitter subscribe(@PathVariable Long userId, @RequestParam(required = false) String token) {
         authenticateFromToken(token);
-        System.out.println("🔌 SSE connection request from user " + userId);
         return sseController.subscribe(userId);
     }
 
@@ -63,7 +61,6 @@ public class SseController {
     @GetMapping("/subscribe-project/{projectId}")
     public SseEmitter subscribeToProject(@PathVariable Long projectId, @RequestParam(required = false) String token) {
         authenticateFromToken(token);
-        System.out.println("🔌 SSE connection request for project " + projectId);
         return sseController.subscribeToProject(projectId);
     }
 
@@ -74,9 +71,6 @@ public class SseController {
     @GetMapping("/subscribe-subgroup/{subgroupId}")
     public SseEmitter subscribeToSubgroup(@PathVariable Long subgroupId, @RequestParam(required = false) String token) {
         authenticateFromToken(token);
-        System.out.println("🔌 SSE connection request for subgroup " + subgroupId);
         return sseController.subscribeToSubgroup(subgroupId);
     }
 }
-
-

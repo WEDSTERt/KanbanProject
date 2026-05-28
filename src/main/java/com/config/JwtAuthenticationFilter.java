@@ -53,7 +53,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 token = request.getParameter("token");
                 if (token != null && !token.trim().isEmpty() && jwtUtil.validateToken(token)) {
                     userId = jwtUtil.extractUserId(token);
-                    System.out.println("✅ JWT extracted from query parameter for user: " + userId);
                 }
             }
 

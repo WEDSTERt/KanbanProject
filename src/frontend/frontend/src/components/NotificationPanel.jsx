@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useApolloClient, gql } from '@apollo/client';
 import { useNotification } from '../contexts/NotificationContext';
 import { GET_NOTIFICATIONS, GET_UNREAD_COUNT } from '../graphql/queries';
-import SSEService from '../services/SSEService';
+import { useSSE } from '../contexts/SSEContext';
 import ConfirmModal from './ConfirmModal';
 import '../styles/notification-panel.css';
 
@@ -36,12 +36,12 @@ const DELETE_ALL_NOTIFICATIONS = gql`
 
 const NotificationPanel = ({ userId, onClose }) => {
     const { addNotification } = useNotification();
+    const { subscribe } = useSSE();
     const client = useApolloClient();
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
     const numericUserId = Number(userId);
-    const sseServiceRef = useRef(null);
 
     // Query БЕЗ polling (только начальная загрузка)
     const { data: notificationsData, loading, refetch: refetchNotifications } = useQuery(GET_NOTIFICATIONS, {
@@ -77,25 +77,23 @@ const NotificationPanel = ({ userId, onClose }) => {
         }
     }, [countData]);
 
-    // 🆕 SSE подписка на новые уведомления
+    // 🆕 SSE подписка на новые уведомления (берем из глобального контекста)
     useEffect(() => {
         if (!userId) return;
 
-        // Инициализируем SSEService если еще не создан
-        if (!sseServiceRef.current) {
-            sseServiceRef.current = new SSEService(numericUserId);
-            sseServiceRef.current.connect(); // Подключаемся к глобальному каналу
-            console.log('✅ SSEService initialized for notifications');
-        }
+        console.log('📬 NotificationPanel subscribing to SSE events');
 
         // Подписываемся на события notification-received
-        const unsubscribe = sseServiceRef.current.subscribe('notification-received', (data) => {
-            console.log('📬 Received notification-received event via SSE:', data);
-            
-            // Обновляем список уведомлений
-            refetchNotifications();
-            refetchCount();
-            
+        const unsubscribe = subscribe('notification-received', (data) => {
+            console.log('📬 NotificationPanel received notification-received event via SSE:', data);
+
+            // ⚠️ ВАЖНО: Используем refetch вместо локального обновления
+            // Это гарантирует синхронизацию со счётчиком в Layout и сервером
+            setTimeout(() => {
+                refetchNotifications();
+                refetchCount();
+            }, 100);
+
             // Показываем toast-уведомление о новом сообщении
             addNotification({
                 type: 'info',
@@ -106,9 +104,10 @@ const NotificationPanel = ({ userId, onClose }) => {
 
         // Очищаем подписку при размонтировании
         return () => {
+            console.log('📬 NotificationPanel unsubscribing from SSE events');
             unsubscribe();
         };
-    }, [userId, numericUserId, refetchNotifications, refetchCount, addNotification]);
+    }, [userId, numericUserId, refetchNotifications, refetchCount, addNotification, subscribe]);
 
     const handleMarkAsRead = async (notificationId) => {
         try {
@@ -220,7 +219,7 @@ const NotificationPanel = ({ userId, onClose }) => {
         try {
             const notification = notifications.find(n => n.id === notificationId);
             const isUnread = notification && !notification.isRead;
-            
+
             await client.mutate({
                 mutation: DELETE_NOTIFICATION,
                 variables: { userId: numericUserId, notificationId: Number(notificationId) },
@@ -318,7 +317,7 @@ const NotificationPanel = ({ userId, onClose }) => {
         if (minutes < 60) return `${minutes} мин назад`;
         if (hours < 24) return `${hours} ч назад`;
         if (days < 7) return `${days} дн назад`;
-        
+
         return date.toLocaleDateString('ru-RU');
     };
 

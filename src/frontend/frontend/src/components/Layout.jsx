@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect,useCallback } from 'react';
 import {Link, useNavigate} from 'react-router-dom';
 import {useAuth} from '../contexts/AuthContext';
 import { useNotification } from '../contexts/NotificationContext';
 import { useSSE } from '../contexts/SSEContext';
 import NotificationPanel from './NotificationPanel';
+import { useQuery } from '@apollo/client';
+import { GET_UNREAD_COUNT } from '../graphql/queries';
 
 const Layout = ({children}) => {
     const {user, logout} = useAuth();
@@ -12,7 +14,17 @@ const Layout = ({children}) => {
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const { addNotification } = useNotification();
-
+    const numericUserId = user?.id ? Number(user.id) : null;
+    const { data: countData, refetch: refetchCount } = useQuery(GET_UNREAD_COUNT, {
+        variables: { userId: numericUserId },
+        skip: !numericUserId,
+        pollInterval: 0,
+    });
+    useEffect(() => {
+        if (countData?.unreadCount !== undefined) {
+            setUnreadCount(countData.unreadCount);
+        }
+    }, [countData]);
     // 🆕 SSE подписка на новые уведомления (используем глобальный контекст)
     useEffect(() => {
         if (!user?.id) return;
@@ -22,12 +34,12 @@ const Layout = ({children}) => {
         // Подписываемся на события notification-received
         const unsubscribe = subscribe('notification-received', (data) => {
             console.log('📬 Layout received notification-received event via SSE:', data);
-            
+
             const newNotification = data.notification_field;
             if (newNotification) {
                 // Увеличиваем счетчик
-                setUnreadCount(prev => prev + 1);
-                
+                refetchCount();
+
                 // Показываем toast уведомление
                 addNotification({
                     type: 'info',
@@ -46,7 +58,7 @@ const Layout = ({children}) => {
                         }, 500);
                     }
                 }
-                
+
                 // 🔔 Если участника добавили в группу, проверяем что он подписан на проект
                 if (newNotification.type === 'SUBGROUP_MEMBER_ADDED' && newNotification.projectId) {
                     console.log('🔌 User was added to subgroup in project', newNotification.projectId, ', ensuring project subscription...');
@@ -65,7 +77,7 @@ const Layout = ({children}) => {
             console.log('🔌 Layout unsubscribing from SSE events');
             unsubscribe();
         };
-    }, [user?.id, addNotification, subscribe, sseService]);
+    }, [user?.id, addNotification, subscribe, sseService, refetchCount]);
 
     const handleLogout = () => {
         logout();
@@ -80,7 +92,7 @@ const Layout = ({children}) => {
                 </div>
                 <div className="app-nav-links">
                     <Link to="/"><i className="fas fa-folder-open"></i> Проекты</Link>
-                    <button 
+                    <button
                         className="btn btn--secondary btn--small notification-bell-btn"
                         onClick={() => setShowNotifications(true)}
                         title="Уведомления"

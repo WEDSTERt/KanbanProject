@@ -35,14 +35,7 @@ public class SecurityHeadersConfig implements WebMvcConfigurer {
                     "frame-ancestors 'none'; " +
                     "upgrade-insecure-requests";
             
-            // ⚠️ ВАЖНО: На production'е CloudPub может переопределять CSP header
-            // Если это происходит, нужно:
-            // 1. Добавить текущий домен в CSP на уровне CloudPub/reverse proxy
-            // 2. Или использовать X-CSP-Report-Only для debug
             response.setHeader("Content-Security-Policy", csp);
-            
-            // Для debug: видим какой CSP применяется
-            System.out.println("⚠️ CSP Header Set: " + csp);
             
             // Устанавливаем остальные security headers
             response.setHeader("X-Content-Type-Options", "nosniff");
