@@ -68,4 +68,11 @@ public class NotificationResolver {
         notificationService.deleteOldNotifications();
         return true;
     }
+
+    @MutationMapping
+    @PreAuthorize("isAuthenticated()")
+    public Boolean deleteAllNotifications(@Argument Long userId) {
+        notificationService.deleteAllNotifications(userId);
+        return true;
+    }
 }

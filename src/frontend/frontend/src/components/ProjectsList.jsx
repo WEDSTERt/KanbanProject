@@ -210,7 +210,7 @@ const ProjectsList = () => {
     return (
         <>
             <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
-                <h2 style={{ margin: 0 }}><i className="fas fa-folder-open"></i> Мои прfоекты</h2>
+                <h2 style={{ margin: 0 }}><i className="fas fa-folder-open"></i> Мои проекты</h2>
                 <div className="flex-row" style={{ gap: '12px' }}>
                     <button className="btn" onClick={() => setShowCreateModal(true)}>
                         <i className="fas fa-plus"></i> Создать проект

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useApolloClient, gql } from '@apollo/client';
 import { useNotification } from '../contexts/NotificationContext';
 import { GET_NOTIFICATIONS, GET_UNREAD_COUNT } from '../graphql/queries';
+import ConfirmModal from './ConfirmModal';
 import '../styles/notification-panel.css';
 
 const MARK_NOTIFICATION_AS_READ = gql`
@@ -37,6 +38,7 @@ const NotificationPanel = ({ userId, onClose }) => {
     const client = useApolloClient();
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
     const numericUserId = Number(userId);
 
     // Query для уведомлений с polling
@@ -148,7 +150,6 @@ const NotificationPanel = ({ userId, onClose }) => {
     };
 
     const handleDeleteAllNotifications = async () => {
-        if (!window.confirm('Удалить все уведомления? Это действие необратимо.')) return;
         try {
             await client.mutate({
                 mutation: DELETE_ALL_NOTIFICATIONS,
@@ -164,6 +165,7 @@ const NotificationPanel = ({ userId, onClose }) => {
                 },
             });
             setNotifications([]);
+            setDeleteAllConfirm(false);
             addNotification({
                 type: 'success',
                 title: 'Успешно',
@@ -306,7 +308,7 @@ const NotificationPanel = ({ userId, onClose }) => {
                             </button>
                         )}
                         {notifications.length > 0 && (
-                            <button className="btn btn--secondary btn--danger" onClick={handleDeleteAllNotifications}>
+                            <button className="btn btn--secondary btn--danger" onClick={() => setDeleteAllConfirm(true)}>
                                 <i className="fas fa-trash-alt"></i> Удалить все
                             </button>
                         )}
@@ -371,6 +373,14 @@ const NotificationPanel = ({ userId, onClose }) => {
                         </div>
                     )}
                 </div>
+
+                <ConfirmModal
+                    isOpen={deleteAllConfirm}
+                    title="Удаление всех уведомлений"
+                    message="Удалить все уведомления? Это действие необратимо."
+                    onConfirm={handleDeleteAllNotifications}
+                    onCancel={() => setDeleteAllConfirm(false)}
+                />
             </div>
         </div>
     );

@@ -177,6 +177,19 @@ public class NotificationService {
     }
 
     /**
+     * Удалить все уведомления пользователя
+     */
+    @Transactional
+    public Boolean deleteAllNotifications(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        List<Notification> notifications = notificationRepository.findByRecipientOrderByCreatedAtDesc(user);
+        notificationRepository.deleteAll(notifications);
+        return true;
+    }
+
+    /**
      * Удалить старые уведомления (старше 30 дней)
      */
     @Transactional

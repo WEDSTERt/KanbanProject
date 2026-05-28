@@ -665,6 +665,26 @@ const KanbanBoard = () => {
         setExpandedTaskIds(new Set());
     };
 
+    // Проверка доступа к группе - если исключили из группы, перенаправить в мои задачи
+    useEffect(() => {
+        if (!activeSubgroupId || activeSubgroupId === 'my-tasks' || !projectData?.project) return;
+        
+        const subgroup = projectData.project.subgroups?.find(s => s.id === activeSubgroupId);
+        if (!subgroup) {
+            // Группа не существует или удалена
+            setActiveSubgroupId('my-tasks');
+            setSearchParams({ projectId, subgroupId: 'my-tasks' });
+            return;
+        }
+        
+        const userInGroup = subgroup.members?.some(m => m.userId === user.id);
+        if (!userInGroup) {
+            // Пользователь не в группе (исключен или не был добавлен)
+            setActiveSubgroupId('my-tasks');
+            setSearchParams({ projectId, subgroupId: 'my-tasks' });
+        }
+    }, [activeSubgroupId, projectData?.project, user.id, projectId, setSearchParams]);
+
     // Проверка доступа к проекту
     useEffect(() => {
         if (!projectLoading && projectData?.project && user) {

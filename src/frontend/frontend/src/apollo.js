@@ -102,6 +102,9 @@ export const client = new ApolloClient({
     },
 });
 
+// Очистить старый кэш Apollo для обновления схемы
+localStorage.removeItem('apollo-cache-persist');
+
 persistCache({
     cache,
     storage: new LocalStorageWrapper(window.localStorage),

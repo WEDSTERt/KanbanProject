@@ -22,6 +22,7 @@ extend type Mutation {
     markAllAsRead(userId: Long!): Boolean!
     deleteNotification(userId: Long!, notificationId: Long!): Boolean!
     deleteOldNotifications(userId: Long!): Boolean!
+    deleteAllNotifications(userId: Long!): Boolean!
 }
 
 extend type Subscription {
