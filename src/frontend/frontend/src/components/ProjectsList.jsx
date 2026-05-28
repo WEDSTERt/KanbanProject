@@ -10,7 +10,7 @@ import { useSSE } from '../contexts/SSEContext';
 
 const ProjectsList = () => {
     const { user } = useAuth();
-    const { subscribe } = useSSE();
+    const { subscribe, isReady } = useSSE();
     const navigate = useNavigate();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [projectName, setProjectName] = useState('');
@@ -49,8 +49,12 @@ const ProjectsList = () => {
     }, [projectUpdateData, refetch]);
 
     // 🆕 SSE подписка на изменения проектов (используем глобальный контекст)
+    // ✅ ИСПРАВЛЕНИЕ: Ждем когда SSE будет готов (isReady = true)
     useEffect(() => {
-        if (!user?.id) return;
+        if (!user?.id || !isReady) {
+            console.log('⏳ ProjectsList: Waiting for SSE to be ready... (user:', user?.id, ', isReady:', isReady, ')');
+            return;
+        }
 
         console.log('🎯 ProjectsList subscribing to SSE events');
 
@@ -78,7 +82,7 @@ const ProjectsList = () => {
             unsubscribeProjects();
             unsubscribeRemoved();
         };
-    }, [user?.id]);
+    }, [user?.id, isReady, subscribe]);
 
     useEffect(() => {
         document.body.style.overflow = showCreateModal ? 'hidden' : '';
@@ -318,4 +322,3 @@ const ProjectsList = () => {
 };
 
 export default ProjectsList;
-

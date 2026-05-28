@@ -9,7 +9,7 @@ import { GET_UNREAD_COUNT } from '../graphql/queries';
 
 const Layout = ({children}) => {
     const {user, logout} = useAuth();
-    const { subscribe, sseService } = useSSE();
+    const { subscribe, sseService, isReady } = useSSE();
     const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -25,9 +25,14 @@ const Layout = ({children}) => {
             setUnreadCount(countData.unreadCount);
         }
     }, [countData]);
+    
     // 🆕 SSE подписка на новые уведомления (используем глобальный контекст)
+    // ✅ ИСПРАВЛЕНИЕ: Ждем когда SSE будет готов (isReady = true)
     useEffect(() => {
-        if (!user?.id) return;
+        if (!user?.id || !isReady) {
+            console.log('⏳ Layout: Waiting for SSE to be ready... (user:', user?.id, ', isReady:', isReady, ')');
+            return;
+        }
 
         console.log('🎯 Layout subscribing to SSE events');
 
@@ -77,7 +82,7 @@ const Layout = ({children}) => {
             console.log('🔌 Layout unsubscribing from SSE events');
             unsubscribe();
         };
-    }, [user?.id, addNotification, subscribe, sseService, refetchCount]);
+    }, [user?.id, isReady, addNotification, subscribe, sseService, refetchCount]);
 
     const handleLogout = () => {
         logout();

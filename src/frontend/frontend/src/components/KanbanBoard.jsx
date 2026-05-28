@@ -19,7 +19,7 @@ const KanbanBoard = () => {
     const urlSubgroupId = searchParams.get('subgroupId');
     const highlightTaskId = searchParams.get('highlightTask');
     const { user } = useAuth();
-    const { subscribe, sseService } = useSSE();
+    const { subscribe, sseService, isReady } = useSSE();
 
     // Используем custom hook для всей логики
     const logic = useKanbanLogic(projectId, urlSubgroupId, user);
@@ -36,8 +36,12 @@ const KanbanBoard = () => {
     }, [logic.projectData, urlSubgroupId, projectId, setSearchParams]);
 
     // ✅ ИСПРАВЛЕННАЯ SSE подписка - ОДИН useEffect, правильная синхронизация
+    // ✅ НОВОЕ: Ждем пока SSE будет готов (isReady = true)
     useEffect(() => {
-        if (!user?.id || !logic.activeSubgroupId || logic.activeSubgroupId === 'my-tasks' || !subscribe || !sseService) {
+        if (!user?.id || !logic.activeSubgroupId || logic.activeSubgroupId === 'my-tasks' || !subscribe || !sseService || !isReady) {
+            if (!isReady) {
+                console.log('⏳ KanbanBoard: Waiting for SSE to be ready...');
+            }
             return;
         }
 
@@ -47,7 +51,7 @@ const KanbanBoard = () => {
         sseService.subscribeToSubgroup(logic.activeSubgroupId)
             .catch(err => console.error('Failed to subscribe to subgroup:', err));
 
-        // ✅ Используем ОДИН дебаунс таймер для обоих событий
+        // ✅ Используем ОДИН дебаунс таймер для ВСЕХ событий
         let updateTimeout = null;
         const scheduleRefetch = () => {
             clearTimeout(updateTimeout);
@@ -80,7 +84,24 @@ const KanbanBoard = () => {
             }
         });
 
-        // ✅ Cleanup: отписываемся от обоих events и закрываем soединение
+        // ✅ НОВОЕ: Обработка смены статуса (перетаскивание + смена в модальном окне)
+        const unsubscribeTaskStatusChanged = subscribe('task-status-changed', (data) => {
+            const eventSubgroupId = Number(data.subgroupId_field);
+            const currentSubgroupId = Number(logic.activeSubgroupId);
+            console.log('📨 task-status-changed event:', { 
+                eventSubgroupId, 
+                currentSubgroupId, 
+                taskId: data.taskId_field,
+                newStatus: data.newStatus_field,
+                match: eventSubgroupId === currentSubgroupId 
+            });
+            
+            if (eventSubgroupId === currentSubgroupId) {
+                scheduleRefetch();
+            }
+        });
+
+        // ✅ Cleanup: отписываемся от ВСЕХ events и закрываем соединение
         return () => {
             console.log('🔌 KanbanBoard: Cleaning up SSE subscriptions for subgroup', logic.activeSubgroupId);
             clearTimeout(updateTimeout);
@@ -88,13 +109,14 @@ const KanbanBoard = () => {
             // Отписываемся от events
             if (unsubscribeTaskUpdated) unsubscribeTaskUpdated();
             if (unsubscribeTaskDeleted) unsubscribeTaskDeleted();
+            if (unsubscribeTaskStatusChanged) unsubscribeTaskStatusChanged();
             
             // Закрываем соединение к subgroup
             if (sseService) {
                 sseService.disconnect(`subgroup-${logic.activeSubgroupId}`);
             }
         };
-    }, [user?.id, logic.activeSubgroupId, subscribe, logic.refetchCurrentTasks, sseService]);
+    }, [user?.id, logic.activeSubgroupId, subscribe, logic.refetchCurrentTasks, sseService, isReady]);
 
     // Загрузка подзадач при изменении задач
     useEffect(() => {

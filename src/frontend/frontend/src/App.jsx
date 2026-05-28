@@ -50,11 +50,10 @@ const HomePage = () => {
     return <StartPage/>;
 };
 
+// ✅ ИСПРАВЛЕНИЕ: SSEProvider ВНУТРИ, чтобы он получал userId от useAuth()
 function App() {
-    const { user } = useAuth();
-
     return (
-        <SSEProvider userId={user?.id}>
+        <SSEProvider>
             <NotificationProvider>
                 <AppContent />
                 <NotificationCenter />

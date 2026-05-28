@@ -5,6 +5,7 @@
  * 1. Проверка живого соединения перед переиспользованием
  * 2. Автоматическое переподключение при разрыве
  * 3. Правильная очистка мертвых соединений
+ * 4. Выявление разорванного соединения после перезагрузки браузера
  */
 
 class SSEService {
@@ -24,11 +25,11 @@ class SSEService {
     // Попытки переподключения
     this.reconnectAttempts = {};
     this.maxReconnectAttempts = 5;
-    this.reconnectDelay = 3000;
+    this.reconnectDelay = 1000; // Начальная задержка 1 сек
 
-    // Дебаунс таймеры
-    this.refetchTimers = {};
-    this.refetchDebounceMs = 100;
+    // Таймеры проверки живого соединения
+    this.healthCheckIntervals = {};
+    this.healthCheckInterval = 5000; // Проверяем каждые 5 сек
 
     console.log('📡 SSEService initialized for user:', userId);
   }
@@ -44,7 +45,43 @@ class SSEService {
     // 0 = CONNECTING
     // 1 = OPEN
     // 2 = CLOSED
-    return es.readyState === 0 || es.readyState === 1;
+    const isAlive = es.readyState === 0 || es.readyState === 1;
+    
+    if (!isAlive) {
+      console.log(`🔴 Connection ${channelName} is dead (readyState=${es.readyState})`);
+    }
+    
+    return isAlive;
+  }
+
+  /**
+   * Запустить периодическую проверку живого соединения
+   */
+  _startHealthCheck(channelName) {
+    // Если уже есть проверка - не создаем новую
+    if (this.healthCheckIntervals[channelName]) {
+      return;
+    }
+
+    console.log(`⚕️ Starting health check for ${channelName}`);
+    
+    this.healthCheckIntervals[channelName] = setInterval(() => {
+      if (!this._isConnectionAlive(channelName)) {
+        console.log(`🔴 Health check: ${channelName} is dead, will reconnect`);
+        this.handleConnectionError(channelName);
+      }
+    }, this.healthCheckInterval);
+  }
+
+  /**
+   * Остановить проверку живого соединения
+   */
+  _stopHealthCheck(channelName) {
+    if (this.healthCheckIntervals[channelName]) {
+      clearInterval(this.healthCheckIntervals[channelName]);
+      delete this.healthCheckIntervals[channelName];
+      console.log(`✅ Stopped health check for ${channelName}`);
+    }
   }
 
   /**
@@ -90,6 +127,7 @@ class SSEService {
           } else {
             // Соединение мертво - удаляем и создаем новое
             console.log(`🔄 Connection to ${connectionKey} is dead, reconnecting...`);
+            this._stopHealthCheck(connectionKey);
             try {
               this.connections[connectionKey].close();
             } catch (e) {
@@ -139,8 +177,10 @@ class SSEService {
         });
 
         eventSource.onopen = () => {
-          console.log(`✅ SSE ${connectionKey} connection established`);
+          console.log(`✅ SSE ${connectionKey} connection established (readyState=${eventSource.readyState})`);
           this.reconnectAttempts[connectionKey] = 0;
+          // Запускаем health check для этого соединения
+          this._startHealthCheck(connectionKey);
         };
 
         resolve(eventSource);
@@ -222,6 +262,9 @@ class SSEService {
   handleConnectionError(channelName) {
     console.log(`⏱️ SSE ${channelName} connection error, attempting to reconnect...`);
 
+    // Остановим health check
+    this._stopHealthCheck(channelName);
+
     const eventSource = this.connections[channelName];
     if (eventSource) {
       try {
@@ -238,7 +281,8 @@ class SSEService {
 
     if (this.reconnectAttempts[channelName] < this.maxReconnectAttempts) {
       this.reconnectAttempts[channelName]++;
-      const delay = this.reconnectDelay * this.reconnectAttempts[channelName];
+      // Экспоненциальная задержка: 1s, 2s, 4s, 8s, 16s
+      const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts[channelName] - 1);
 
       console.log(`⏳ Reconnecting attempt ${this.reconnectAttempts[channelName]}/${this.maxReconnectAttempts} in ${delay}ms...`);
 
@@ -266,6 +310,8 @@ class SSEService {
    * Закрыть конкретное соединение
    */
   disconnect(channelName) {
+    this._stopHealthCheck(channelName);
+    
     const eventSource = this.connections[channelName];
     if (eventSource) {
       try {
@@ -285,6 +331,7 @@ class SSEService {
   disconnectAll() {
     console.log('🔌 Disconnecting all SSE connections...');
     Object.keys(this.connections).forEach(channelName => {
+      this._stopHealthCheck(channelName);
       try {
         this.connections[channelName].close();
         console.log(`✅ Closed ${channelName}`);

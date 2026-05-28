@@ -17,6 +17,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * - subgroups-changed: Изменения в списке групп
  * - task-updated: Задача обновлена
  * - task-deleted: Задача удалена
+ * - task-status-changed: ✅ НОВОЕ - Статус задачи изменился (перетаскивание, смена в модальном окне)
  */
 @Controller
 public class TaskSSEController {
@@ -308,6 +309,41 @@ public class TaskSSEController {
                 }
             }
             System.out.println("✅ Task delete notification sent to subgroup " + subgroupId);
+        } else {
+            System.out.println("⚠️ No active subscribers for subgroup " + subgroupId);
+        }
+    }
+
+    /**
+     * ✅ НОВОЕ: Отправить событие о смене статуса задачи
+     * Вызывается при перетаскивании задачи или смене статуса в модальном окне
+     */
+    public void notifyTaskStatusChanged(Long subgroupId, Long taskId, String newStatus) {
+        System.out.println("📢 Notifying about task status change in subgroup " + subgroupId + ", taskId: " + taskId + ", newStatus: " + newStatus);
+
+        List<SseEmitter> emitters = subgroupEmitters.get(subgroupId);
+        if (emitters != null && !emitters.isEmpty()) {
+            System.out.println("   Subgroup " + subgroupId + " has " + emitters.size() + " active subscribers");
+            for (SseEmitter emitter : new ArrayList<>(emitters)) {
+                try {
+                    emitter.send(SseEmitter.event()
+                            .id(UUID.randomUUID().toString())
+                            .name("task-status-changed")
+                            .data(new Object() {
+                                public String action = "status-changed";
+                                public Long taskId_field = taskId;  // ✅ ВАЖНО!
+                                public String newStatus_field = newStatus;  // ✅ ВАЖНО!
+                                public Long subgroupId_field = subgroupId;  // ✅ ВАЖНО!
+                                public long timestamp = System.currentTimeMillis();
+                            })
+                            .build());
+                    System.out.println("✅ Task status change notification sent to subscriber");
+                } catch (IOException e) {
+                    System.out.println("❌ Failed to send task status change notification: " + e.getMessage());
+                    emitters.remove(emitter);
+                }
+            }
+            System.out.println("✅ Task status change notification sent to subgroup " + subgroupId);
         } else {
             System.out.println("⚠️ No active subscribers for subgroup " + subgroupId);
         }
