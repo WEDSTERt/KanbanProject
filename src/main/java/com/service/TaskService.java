@@ -187,7 +187,6 @@ public class TaskService {
             if (changedBy != null && notificationData != null) {
                 Task task = notificationData.recreateTask();
                 emailNotificationService.notifyTaskUpdated(task, changedBy, changes);
-                System.out.println("📧 Sent combined notification with " + changes.size() + " changes for task " + taskId);
             }
         } catch (Exception e) {
             System.err.println("Ошибка отправки уведомления: " + e.getMessage());
@@ -386,8 +385,6 @@ public class TaskService {
                 .map(Task::getId)
                 .collect(Collectors.toList());
 
-        System.out.println("=== Loading tags for " + taskIds.size() + " tasks: " + taskIds);
-
         // 3. Отдельным запросом загружаем задачи с тегами
         List<Task> tasksWithTags = taskRepository.findTasksWithTagsByIds(taskIds);
 
@@ -397,10 +394,6 @@ public class TaskService {
             // Важно: инициализируем коллекцию через Hibernate.initialize
             Hibernate.initialize(taskWithTags.getTags());
             tagsMap.put(taskWithTags.getId(), new ArrayList<>(taskWithTags.getTags()));
-            System.out.println("Task " + taskWithTags.getId() + " has " + taskWithTags.getTags().size() + " tags from DB");
-            for (Tag tag : taskWithTags.getTags()) {
-                System.out.println("  - Tag: " + tag.getName() + " (id=" + tag.getId() + ")");
-            }
         }
 
         // 5. Присоединяем теги к исходным задачам
@@ -411,9 +404,6 @@ public class TaskService {
                 Hibernate.initialize(task.getTags());
                 task.getTags().clear();
                 task.getTags().addAll(tags);
-                System.out.println("Task ID: " + task.getId() + ", Tags count after merge: " + task.getTags().size());
-            } else {
-                System.out.println("Task ID: " + task.getId() + ", No tags found");
             }
         }
 
