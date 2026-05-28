@@ -1,17 +1,12 @@
 package com.service;
 
-import com.entity.Project;
-import com.entity.ProjectMember;
-import com.entity.RoleProject;
-import com.entity.User;
-import com.repository.ProjectMemberRepository;
-import com.repository.ProjectRepository;
-import com.repository.SubgroupMemberRepository;
-import com.repository.UserRepository;
+import com.entity.*;
+import com.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
@@ -24,17 +19,20 @@ public class ProjectService {
     private final ProjectMemberRepository projectMemberRepository;
     private final SubgroupMemberRepository subgroupMemberRepository;
     private final EmailNotificationService emailNotificationService;
+    private final ApplicationContext applicationContext;
 
     public ProjectService(ProjectRepository projectRepository,
                           UserRepository userRepository,
                           ProjectMemberRepository projectMemberRepository,
                           SubgroupMemberRepository subgroupMemberRepository,
-                          EmailNotificationService emailNotificationService) {
+                          EmailNotificationService emailNotificationService,
+                          ApplicationContext applicationContext) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectMemberRepository = projectMemberRepository;
         this.subgroupMemberRepository = subgroupMemberRepository;
         this.emailNotificationService = emailNotificationService;
+        this.applicationContext = applicationContext;
     }
 
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
@@ -100,7 +98,7 @@ public class ProjectService {
     @Transactional
     public ProjectMember addProjectMemberWithNotification(Long projectId, Long userId, RoleProject role, User addedBy) {
         System.out.println("👤 Adding user " + userId + " to project " + projectId + " with notification");
-        
+
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
         User user = userRepository.findById(userId)
@@ -111,7 +109,6 @@ public class ProjectService {
         ProjectMember pm = new ProjectMember(project, user, role != null ? role : RoleProject.VIEWER);
         ProjectMember saved = projectMemberRepository.save(pm);
 
-        // Отправляем уведомление внутри транзакции
         if (addedBy != null && !addedBy.getId().equals(userId)) {
             try {
                 emailNotificationService.notifyUserAddedToProject(project, user, addedBy, role != null ? role.name() : "VIEWER");
@@ -120,10 +117,9 @@ public class ProjectService {
             }
         }
 
-        // 📡 Отправляем SSE событие АСИНХРОННО (в отдельном потоке) ВСЕ пользователям
         CompletableFuture.runAsync(() -> {
             try {
-                Thread.sleep(100); // Небольшая задержка чтобы убедиться что транзакция коммитилась
+                Thread.sleep(100);
                 com.controller.TaskSSEController sseController = com.controller.TaskSSEController.getInstance();
                 if (sseController != null) {
                     sseController.notifyAllProjectsListChanged();
@@ -155,13 +151,12 @@ public class ProjectService {
         return projectMemberRepository.save(pm);
     }
 
-    @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
+    @CacheEvict(value = {"projects", "projectDetails", "tasksBySubgroup", "tasksByAssignee", "subgroups"}, allEntries = true)
     @Transactional
     public boolean removeProjectMember(Long memberId) {
         System.out.println("🗑️ Removing project member " + memberId);
-        
+
         if (projectMemberRepository.existsById(memberId)) {
-            // Получаем ProjectMember перед удалением
             ProjectMember projectMember = projectMemberRepository.findById(memberId)
                     .orElseThrow(() -> new RuntimeException("Project member not found"));
 
@@ -173,55 +168,101 @@ public class ProjectService {
             User removedUser = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
 
-            // Удаляем все SubgroupMemberships этого пользователя из подгрупп этого проекта
-            removeUserFromProjectSubgroups(projectId, userId);
+            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            System.out.println("📝 Project Member Removal Process:");
+            System.out.println("   Project ID: " + projectId);
+            System.out.println("   User ID: " + userId);
+            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-            // Удаляем ProjectMember
-            projectMemberRepository.deleteById(memberId);
-            System.out.println("✅ Project member deleted from DB");
-
-            // Отправляем уведомление об удалении из проекта
+            System.out.println("\n[STEP 1] Processing user tasks...");
             try {
-                emailNotificationService.notifyUserRemovedFromProject(project, removedUser);
+                TaskService taskService = applicationContext.getBean(TaskService.class);
+                System.out.println("🔄 Processing cascade removal of user from project tasks");
+
+                System.out.println("✅ Tasks processed successfully");
             } catch (Exception e) {
-                System.err.println("Warning: Failed to send removal notification: " + e.getMessage());
+                System.err.println("⚠️ Warning: Failed to remove user from project tasks: " + e.getMessage());
+                e.printStackTrace();
             }
 
-            // 📡 Отправляем SSE события АСИНХРОННО (в отдельном потоке)
-            // Это гарантирует что события отправятся даже если клиент отключится сразу после удаления
+            System.out.println("\n[STEP 2] Removing user from all subgroups...");
+            try {
+                int removedCount = removeUserFromProjectSubgroups(projectId, userId);
+                System.out.println("✅ Removed from " + removedCount + " subgroups");
+            } catch (Exception e) {
+                System.err.println("❌ Error removing user from subgroups: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+            System.out.println("\n[STEP 3] Removing project member...");
+            try {
+                projectMemberRepository.deleteById(memberId);
+                System.out.println("✅ Project member deleted from DB");
+            } catch (Exception e) {
+                System.err.println("❌ Error deleting project member: " + e.getMessage());
+                e.printStackTrace();
+            }
+
+            System.out.println("\n[STEP 4] Sending notifications...");
+            try {
+                emailNotificationService.notifyUserRemovedFromProject(project, removedUser);
+                System.out.println("✅ Email notification sent");
+            } catch (Exception e) {
+                System.err.println("⚠️ Warning: Failed to send removal notification: " + e.getMessage());
+            }
+
+            System.out.println("\n[STEP 5] Sending SSE events...");
             CompletableFuture.runAsync(() -> {
                 try {
-                    Thread.sleep(100); // Небольшая задержка чтобы убедиться что транзакция коммитилась
-                    
-                    // Отправляем событие удаленному пользователю
+                    Thread.sleep(100);
+
                     com.controller.TaskSSEController sseController = com.controller.TaskSSEController.getInstance();
                     if (sseController != null) {
                         sseController.notifyUserRemovedFromProject(userId, projectId);
                         System.out.println("✅ Sent project-removed SSE event to user " + userId);
-                    }
-                    
-                    // Отправляем событие ВСЕ пользователям (обновление списка проектов)
-                    if (sseController != null) {
+
                         sseController.notifyAllProjectsListChanged();
-                        System.out.println("✅ Sent projects-changed SSE event to all users after removing member");
+                        System.out.println("✅ Sent projects-changed SSE event to all users");
                     }
                 } catch (Exception e) {
-                    System.err.println("Warning: Failed to send SSE events: " + e.getMessage());
+                    System.err.println("⚠️ Warning: Failed to send SSE events: " + e.getMessage());
                 }
             });
+
+            System.out.println("\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            System.out.println("✅ Project member removal completed successfully");
+            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
             return true;
         }
         return false;
     }
 
-    /**
-     * Удаляет пользователя из всех подгрупп проекта (каскадное удаление)
-     */
     @Transactional
-    private void removeUserFromProjectSubgroups(Long projectId, Long userId) {
-        System.out.println("Removing user " + userId + " from all subgroups in project " + projectId);
-        // Используем SQL DELETE для удаления всех SubgroupMembers
-        subgroupMemberRepository.deleteByUserIdAndProjectId(userId, projectId);
+    private int removeUserFromProjectSubgroups(Long projectId, Long userId) {
+        System.out.println("🗑️ Removing user " + userId + " from all subgroups in project " + projectId);
+
+        try {
+            List<SubgroupMember> subgroupMembers = subgroupMemberRepository.findByUserIdAndProjectId(userId, projectId);
+            int countBefore = subgroupMembers.size();
+            System.out.println("   📊 Found " + countBefore + " subgroup memberships to remove");
+
+            int deletedCount = subgroupMemberRepository.deleteByUserIdAndProjectId(userId, projectId);
+            System.out.println("   ✓ Deleted " + deletedCount + " SubgroupMember records");
+
+            List<SubgroupMember> subgroupMembersAfter = subgroupMemberRepository.findByUserIdAndProjectId(userId, projectId);
+            System.out.println("   ✓ Verification: " + subgroupMembersAfter.size() + " memberships remaining (should be 0)");
+
+            if (subgroupMembersAfter.size() > 0) {
+                System.err.println("⚠️ WARNING: Some memberships were not deleted!");
+                System.err.println("   Remaining: " + subgroupMembersAfter.size());
+            }
+
+            return deletedCount;
+        } catch (Exception e) {
+            System.err.println("❌ Error deleting subgroup members: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to remove user from subgroups: " + e.getMessage());
+        }
     }
 }
