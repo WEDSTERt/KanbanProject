@@ -86,9 +86,10 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
         { variables: { subgroupId: activeSubgroupId }, skip: !activeSubgroupId || activeSubgroupId === 'my-tasks', fetchPolicy: 'cache-and-network', notifyOnNetworkStatusChange: true, pollInterval: 0 }
     );
 
+    // ✅ ИСПРАВЛЕНИЕ: Для "мои задачи" используем network-only чтобы избежать кэша
     const { loading: myTasksLoading, data: myTasksData, refetch: refetchMyTasks, networkStatus: myTasksNetworkStatus } = useQuery(
         GET_TASKS_BY_ASSIGNEE_AND_PROJECT,
-        { variables: { userId: user.id, projectId: projectId }, skip: activeSubgroupId !== 'my-tasks' || !user.id || !projectId, fetchPolicy: 'cache-and-network', notifyOnNetworkStatusChange: true, pollInterval: 0 }
+        { variables: { userId: user.id, projectId: projectId }, skip: activeSubgroupId !== 'my-tasks' || !user.id || !projectId, fetchPolicy: 'network-only', notifyOnNetworkStatusChange: true, pollInterval: 0 }
     );
 
     const refetchCurrentTasks = useCallback(async () => {

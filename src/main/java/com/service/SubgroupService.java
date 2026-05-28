@@ -5,6 +5,7 @@ import com.entity.*;
 import com.repository.ProjectRepository;
 import com.repository.SubgroupMemberRepository;
 import com.repository.SubgroupRepository;
+import com.repository.TaskRepository;
 import com.repository.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -24,6 +25,7 @@ public class SubgroupService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final SubgroupMemberRepository subgroupMemberRepository;
+    private final TaskRepository taskRepository;
     private final NotificationService notificationService;
     private final ApplicationContext applicationContext;
 
@@ -32,12 +34,14 @@ public class SubgroupService {
                            ProjectRepository projectRepository,
                            UserRepository userRepository,
                            SubgroupMemberRepository subgroupMemberRepository,
+                           TaskRepository taskRepository,
                            NotificationService notificationService,
                            ApplicationContext applicationContext) {
         this.subgroupRepository = subgroupRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.subgroupMemberRepository = subgroupMemberRepository;
+        this.taskRepository = taskRepository;
         this.notificationService = notificationService;
         this.applicationContext = applicationContext;
     }
@@ -52,6 +56,23 @@ public class SubgroupService {
             System.err.println("❌ Failed to get SSE Controller: " + e.getMessage());
             return null;
         }
+    }
+
+    /**
+     * ✅ НОВОЕ: Получить текущего пользователя
+     */
+    private User getCurrentUser() {
+        try {
+            org.springframework.security.core.Authentication auth = 
+                org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated() && auth.getPrincipal() instanceof org.springframework.security.core.userdetails.UserDetails userDetails) {
+                Long userId = Long.parseLong(userDetails.getUsername());
+                return userRepository.findById(userId).orElse(null);
+            }
+        } catch (Exception e) {
+            System.err.println("Error getting current user: " + e.getMessage());
+        }
+        return null;
     }
 
     /**
@@ -232,9 +253,28 @@ public class SubgroupService {
             
             Subgroup subgroup = member.getSubgroup();
             User removedUser = member.getUser();
+            User adminUser = getCurrentUser(); // Пользователь который исключает (админ)
             Long projectId = subgroup.getProjectId();
             String subgroupName = subgroup.getName();
+            Long subgroupId = subgroup.getId();
+            Long removedUserId = removedUser.getId();
+            Long adminUserId = adminUser != null ? adminUser.getId() : null;
 
+            // ✅ НОВОЕ (v2): Использовать SQL методы для эффективного обновления БД
+            
+            // 1️⃣ Перенести все задачи удаляемого пользователя на админа в БД
+            if (adminUserId != null) {
+                System.out.println("🔄 Transferring tasks from user " + removedUserId + " to admin " + adminUserId);
+                int transferred = taskRepository.transferTasksCreatedByUser(subgroupId, removedUserId, adminUserId);
+                System.out.println("  ✅ Transferred " + transferred + " tasks to admin " + adminUserId);
+            }
+            
+            // 2️⃣ Удалить удаляемого пользователя из исполнителей всех задач через SQL
+            System.out.println("🔄 Removing user " + removedUserId + " from all task assignees");
+            int removed = taskRepository.removeUserFromAllTaskAssignees(subgroupId, removedUserId);
+            System.out.println("  ✅ Removed user " + removedUserId + " from " + removed + " assignee records");
+
+            // 3️⃣ Удалить из членов подгруппы
             subgroupMemberRepository.deleteById(memberId);
             
             // ℹ️ Отправляем in-app уведомление

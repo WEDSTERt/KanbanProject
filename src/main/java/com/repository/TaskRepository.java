@@ -83,20 +83,43 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     List<Object[]> countSubTasksByParentIds(@Param("taskIds") List<Long> taskIds);
 
     /**
-     * ✅ ИСПРАВЛЕНИЕ: Улучшенный запрос для "мои задачи"
-     * Загружает все участников через DISTINCT с GROUP BY для избежания дублей
+     * ✅ ИСПРАВЛЕНИЕ: Используем подзапрос вместо DISTINCT + JOIN
+     * DISTINCT с JOIN на многие-ко-многим вызывает проблемы - загружает только одного assignee
+     * Решение: найти ID всех задач, где пользователь - assignee, затем загрузить их со всеми assignees
      */
     @Query("SELECT DISTINCT t FROM Task t " +
-            "LEFT JOIN FETCH t.assignees a " +
-            "JOIN t.subgroup s " +
-            "JOIN s.project p " +
-            "WHERE a.id = :userId " +
-            "AND p.id = :projectId " +
-            "AND (t.parentTaskId IS NULL OR t.parentTaskId = 0) " +
-            "ORDER BY t.id")
+            "LEFT JOIN FETCH t.assignees " +
+            "WHERE t.id IN (SELECT DISTINCT t2.id FROM Task t2 " +
+            "  JOIN t2.assignees a " +
+            "  JOIN t2.subgroup s " +
+            "  JOIN s.project p " +
+            "  WHERE a.id = :userId AND p.id = :projectId) " +
+            "AND (t.parentTaskId IS NULL OR t.parentTaskId = 0)")
     List<Task> findRootTasksByAssigneeAndProject(@Param("userId") Long userId,
                                                  @Param("projectId") Long projectId);
 
     @Query("SELECT DISTINCT t FROM Task t LEFT JOIN FETCH t.subgroup sg LEFT JOIN FETCH sg.project p WHERE t.id = :taskId")
     Optional<Task> findByIdWithSubgroupAndProject(@Param("taskId") Long taskId);
+
+    @Query("SELECT t FROM Task t WHERE t.subgroupId = :subgroupId AND t.createdByUserId = :userId")
+    List<Task> findTasksInSubgroupCreatedByUser(@Param("subgroupId") Long subgroupId, 
+                                                @Param("userId") Long userId);
+
+    @Modifying
+    @Query("UPDATE Task t SET t.createdByUserId = :newUserId WHERE t.subgroupId = :subgroupId AND t.createdByUserId = :oldUserId")
+    int transferTasksCreatedByUser(@Param("subgroupId") Long subgroupId,
+                                   @Param("oldUserId") Long oldUserId,
+                                   @Param("newUserId") Long newUserId);
+
+    @Modifying
+    @Query(value = "DELETE FROM task_assignees WHERE task_id IN (SELECT id FROM tasks WHERE subgroup_id = :subgroupId) AND user_id = :userId", nativeQuery = true)
+    int removeUserFromAllTaskAssignees(@Param("subgroupId") Long subgroupId,
+                                       @Param("userId") Long userId);
+
+    @Modifying
+    @Query(value = "DELETE FROM task_assignees WHERE task_id IN (SELECT t.id FROM tasks t " +
+            "JOIN subgroups sg ON t.subgroup_id = sg.id " +
+            "WHERE sg.project_id = :projectId) AND user_id = :userId", nativeQuery = true)
+    int removeUserFromAllTaskAssigneesInProject(@Param("projectId") Long projectId,
+                                                @Param("userId") Long userId);
 }

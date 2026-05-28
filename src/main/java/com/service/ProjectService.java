@@ -18,6 +18,7 @@ public class ProjectService {
     private final UserRepository userRepository;
     private final ProjectMemberRepository projectMemberRepository;
     private final SubgroupMemberRepository subgroupMemberRepository;
+    private final TaskRepository taskRepository;
     private final EmailNotificationService emailNotificationService;
     private final ApplicationContext applicationContext;
 
@@ -25,12 +26,14 @@ public class ProjectService {
                           UserRepository userRepository,
                           ProjectMemberRepository projectMemberRepository,
                           SubgroupMemberRepository subgroupMemberRepository,
+                          TaskRepository taskRepository,
                           EmailNotificationService emailNotificationService,
                           ApplicationContext applicationContext) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.projectMemberRepository = projectMemberRepository;
         this.subgroupMemberRepository = subgroupMemberRepository;
+        this.taskRepository = taskRepository;
         this.emailNotificationService = emailNotificationService;
         this.applicationContext = applicationContext;
     }
@@ -174,12 +177,10 @@ public class ProjectService {
             System.out.println("   User ID: " + userId);
             System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
-            System.out.println("\n[STEP 1] Processing user tasks...");
+            System.out.println("\n[STEP 1] Removing user from all task assignees in project...");
             try {
-                TaskService taskService = applicationContext.getBean(TaskService.class);
-                System.out.println("🔄 Processing cascade removal of user from project tasks");
-
-                System.out.println("✅ Tasks processed successfully");
+                int removedAssignees = removeUserFromProjectTasks(projectId, userId);
+                System.out.println("✅ Removed from " + removedAssignees + " task assignee records");
             } catch (Exception e) {
                 System.err.println("⚠️ Warning: Failed to remove user from project tasks: " + e.getMessage());
                 e.printStackTrace();
@@ -236,6 +237,24 @@ public class ProjectService {
             return true;
         }
         return false;
+    }
+
+    /**
+     * ✅ НОВОЕ: Удалить пользователя из всех задач проекта через SQL
+     * Каскадное удаление при удалении пользователя из проекта
+     */
+    @Transactional
+    private int removeUserFromProjectTasks(Long projectId, Long userId) {
+        System.out.println("🔄 Removing user " + userId + " from all task assignees in project " + projectId);
+        try {
+            int removed = taskRepository.removeUserFromAllTaskAssigneesInProject(projectId, userId);
+            System.out.println("   ✓ Deleted " + removed + " task_assignees records");
+            return removed;
+        } catch (Exception e) {
+            System.err.println("❌ Error removing user from project tasks: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Failed to remove user from project tasks: " + e.getMessage());
+        }
     }
 
     @Transactional
