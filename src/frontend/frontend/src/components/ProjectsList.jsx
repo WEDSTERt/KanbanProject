@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { useQuery, useMutation, useSubscription } from '@apollo/client';
 import { useNavigate } from 'react-router-dom';
@@ -6,16 +6,17 @@ import { GET_USER_PROJECTS } from '../graphql/queries';
 import { CREATE_PROJECT } from '../graphql/mutations';
 import { PROJECT_UPDATED_SUBSCRIPTION } from '../graphql/subscriptions';
 import { useAuth } from '../contexts/AuthContext';
-import SSEService from '../services/SSEService';
+import { useSSE } from '../contexts/SSEContext';
 
 const ProjectsList = () => {
     const { user } = useAuth();
+    const { subscribe } = useSSE();
     const navigate = useNavigate();
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [projectName, setProjectName] = useState('');
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef(null);
-    const sseServiceRef = useRef(null);
+    const refetchRef = useRef(null);
 
     // Query БЕЗ polling (только начальная загрузка)
     const { loading, error, data, refetch } = useQuery(GET_USER_PROJECTS, {
@@ -24,10 +25,15 @@ const ProjectsList = () => {
         pollInterval: 0, // ❌ ОТКЛЮЧЕН polling
     });
 
+    // Сохраняем refetch в ref чтобы использовать в SSE callback
+    useEffect(() => {
+        refetchRef.current = refetch;
+    }, [refetch]);
+
     const [createProject] = useMutation(CREATE_PROJECT);
 
     // 🔄 Подписка на обновления проектов (если WebSocket работает)
-    const { data: projectUpdateData, error: subscriptionError } = useSubscription(PROJECT_UPDATED_SUBSCRIPTION, {
+    const { data: projectUpdateData } = useSubscription(PROJECT_UPDATED_SUBSCRIPTION, {
         skip: !user,
         onError: (err) => {
             console.warn('⚠️ Project subscription error (using SSE):', err.message);
@@ -42,47 +48,37 @@ const ProjectsList = () => {
         }
     }, [projectUpdateData, refetch]);
 
-    // 🆕 SSE подписка на изменения проектов
+    // 🆕 SSE подписка на изменения проектов (используем глобальный контекст)
     useEffect(() => {
         if (!user?.id) return;
 
-        // Инициализируем SSEService если еще не создан
-        if (!sseServiceRef.current) {
-            sseServiceRef.current = new SSEService(user.id);
-            sseServiceRef.current.connect(); // Подключаемся к глобальному каналу
-            console.log('✅ SSEService initialized');
-        }
+        console.log('🎯 ProjectsList subscribing to SSE events');
 
         // Подписываемся на события projects-changed
-        const unsubscribe = sseServiceRef.current.subscribe('projects-changed', (data) => {
-            console.log('📬 Received projects-changed event via SSE:', data);
-            refetch(); // Перезагружаем список проектов
+        const unsubscribeProjects = subscribe('projects-changed', (data) => {
+            console.log('📬 ProjectsList received projects-changed event via SSE:', data);
+            console.log('Calling refetch from refetchRef:', refetchRef.current);
+            if (refetchRef.current) {
+                refetchRef.current();
+            }
         });
 
         // Подписываемся на события project-removed (когда пользователя удалили из проекта)
-        const unsubscribeRemoved = sseServiceRef.current.subscribe('project-removed', (data) => {
-            console.log('📬 Received project-removed event via SSE:', data);
-            alert(data.message || 'Вас исключили из проекта');
-            refetch(); // Перезагружаем список проектов (проект исчезнет)
+        const unsubscribeRemoved = subscribe('project-removed', (data) => {
+            console.log('📬 ProjectsList received project-removed event via SSE:', data);
+            console.log('Calling refetch from refetchRef:', refetchRef.current);
+            if (refetchRef.current) {
+                refetchRef.current();
+            }
         });
 
         // Очищаем подписки при размонтировании
         return () => {
-            unsubscribe();
+            console.log('🔌 ProjectsList unsubscribing from SSE events');
+            unsubscribeProjects();
             unsubscribeRemoved();
         };
-    }, [user?.id, refetch]);
-
-    // Отключаемся от SSE при размонтировании компонента
-    useEffect(() => {
-        return () => {
-            if (sseServiceRef.current) {
-                console.log('🔌 Disconnecting SSE on ProjectsList unmount');
-                // Примечание: не закрываем все соединения, т.к. они нужны другим компонентам
-                // sseServiceRef.current.disconnectAll();
-            }
-        };
-    }, []);
+    }, [user?.id, subscribe]);
 
     useEffect(() => {
         document.body.style.overflow = showCreateModal ? 'hidden' : '';

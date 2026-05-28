@@ -119,7 +119,7 @@ public class TaskSSEController {
     }
 
     /**
-     * Отправить событие о изменении списка проектов
+     * Отправить событие о изменении списка проектов одному пользователю
      */
     public void notifyProjectsListChanged(Long userId) {
         System.out.println("📢 Notifying user " + userId + " about projects list change");
@@ -137,6 +137,33 @@ public class TaskSSEController {
                         })
                         .build());
                 System.out.println("✅ Projects change notification sent to user " + userId);
+            } catch (IOException e) {
+                System.out.println("❌ Failed to send projects change notification to user " + userId);
+                userEmitters.remove(userId);
+            }
+        }
+    }
+
+    /**
+     * Отправить событие о изменении списка проектов ВСЕ пользователям
+     */
+    public void notifyAllProjectsListChanged() {
+        System.out.println("📢 Notifying ALL users about projects list change");
+        
+        for (Long userId : new ArrayList<>(userEmitters.keySet())) {
+            try {
+                SseEmitter emitter = userEmitters.get(userId);
+                if (emitter != null) {
+                    emitter.send(SseEmitter.event()
+                            .id(UUID.randomUUID().toString())
+                            .name("projects-changed")
+                            .data(new Object() {
+                                public String action = "changed";
+                                public long timestamp = System.currentTimeMillis();
+                            })
+                            .build());
+                    System.out.println("✅ Projects change notification sent to user " + userId);
+                }
             } catch (IOException e) {
                 System.out.println("❌ Failed to send projects change notification to user " + userId);
                 userEmitters.remove(userId);
@@ -170,15 +197,15 @@ public class TaskSSEController {
     }
 
     /**
-     * Отправить событие о изменении списка подгрупп в проекте
+     * Отправить событие о изменении списка подгрупп в проекте ВСЕ пользователям
      */
     public void notifySubgroupsChanged(Long projectId) {
-        System.out.println("📢 Notifying about subgroups change in project " + projectId);
+        System.out.println("📢 Notifying ALL users about subgroups change in project " + projectId);
         
-        List<SseEmitter> emitters = projectEmitters.get(projectId);
-        if (emitters != null) {
-            for (SseEmitter emitter : new ArrayList<>(emitters)) {
-                try {
+        for (Long userId : new ArrayList<>(userEmitters.keySet())) {
+            try {
+                SseEmitter emitter = userEmitters.get(userId);
+                if (emitter != null) {
                     emitter.send(SseEmitter.event()
                             .id(UUID.randomUUID().toString())
                             .name("subgroups-changed")
@@ -188,12 +215,12 @@ public class TaskSSEController {
                                 public long timestamp = System.currentTimeMillis();
                             })
                             .build());
-                } catch (IOException e) {
-                    System.out.println("❌ Failed to send subgroups change notification");
-                    emitters.remove(emitter);
+                    System.out.println("✅ Subgroups change notification sent to user " + userId);
                 }
+            } catch (IOException e) {
+                System.out.println("❌ Failed to send subgroups change notification to user " + userId);
+                userEmitters.remove(userId);
             }
-            System.out.println("✅ Subgroups change notification sent to project " + projectId);
         }
     }
 

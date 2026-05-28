@@ -4,7 +4,7 @@ import { GET_SUBGROUPS_BY_PROJECT } from '../graphql/queries';
 import { DELETE_SUBGROUP } from '../graphql/mutations';
 import { PROJECT_UPDATED_SUBSCRIPTION } from '../graphql/subscriptions';
 import { useAuth } from '../contexts/AuthContext';
-import SSEService from '../services/SSEService';
+import { useSSE } from '../contexts/SSEContext';
 import SubgroupSettingsModal from './SubgroupSettingsModal';
 import CreateSubgroupModal from './CreateSubgroupModal';
 import ConfirmModal from './ConfirmModal';
@@ -18,12 +18,13 @@ const SubgroupsPanel = ({
                             onRefreshProject
                         }) => {
     const { user } = useAuth();
+    const { subscribe } = useSSE();
     const [showSettingsFor, setShowSettingsFor] = useState(null);
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [deleteConfirm, setDeleteConfirm] = useState({ isOpen: false, groupId: null });
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef(null);
-    const sseServiceRef = useRef(null);
+    const refetchRef = useRef(null);
 
     // Query БЕЗ polling (только начальная загрузка)
     const { loading, error, data, refetch } = useQuery(GET_SUBGROUPS_BY_PROJECT, {
@@ -31,11 +32,16 @@ const SubgroupsPanel = ({
         fetchPolicy: 'cache-and-network',
         pollInterval: 0, // ❌ ОТКЛЮЧЕН polling
     });
+
+    // Сохраняем refetch в ref чтобы использовать в SSE callback
+    useEffect(() => {
+        refetchRef.current = refetch;
+    }, [refetch]);
     
     const [deleteSubgroup] = useMutation(DELETE_SUBGROUP, { onCompleted: () => refetch() });
 
     // 🔄 Подписка на обновления групп (через обновления проектов, если WebSocket работает)
-    const { data: projectUpdateData, error: subscriptionError } = useSubscription(PROJECT_UPDATED_SUBSCRIPTION, {
+    const { data: projectUpdateData } = useSubscription(PROJECT_UPDATED_SUBSCRIPTION, {
         skip: !projectId,
         onError: (err) => {
             console.warn('⚠️ Project subscription error (using SSE):', err.message);
@@ -50,35 +56,34 @@ const SubgroupsPanel = ({
         }
     }, [projectUpdateData, refetch]);
 
-    // 🆕 SSE подписка на изменения подгрупп в проекте
+    // 🆕 SSE подписка на изменения подгрупп (используем глобальный контекст)
     useEffect(() => {
         if (!user?.id || !projectId) return;
 
-        // Инициализируем SSEService если еще не создан
-        if (!sseServiceRef.current) {
-            sseServiceRef.current = new SSEService(user.id);
-            sseServiceRef.current.connect(); // Подключаемся к глобальному каналу
-            console.log('✅ SSEService initialized for subgroups');
-        }
+        console.log('🎯 SubgroupsPanel subscribing to SSE events for project', projectId);
 
         // Подписываемся на события subgroups-changed для конкретного проекта
-        const unsubscribe = sseServiceRef.current.subscribe('subgroups-changed', (data) => {
-            console.log('📬 Received subgroups-changed event via SSE:', data);
-            refetch(); // Перезагружаем список подгрупп
+        const unsubscribeSubgroups = subscribe('subgroups-changed', (data) => {
+            console.log('📬 SubgroupsPanel received subgroups-changed event via SSE:', data);
+            console.log('Calling refetch from refetchRef:', refetchRef.current);
+            if (refetchRef.current) {
+                refetchRef.current();
+            }
         });
 
         // Подписываемся на события projects-changed (для обновления членов проекта)
-        const unsubscribeProjects = sseServiceRef.current.subscribe('projects-changed', (data) => {
-            console.log('📬 Received projects-changed event via SSE:', data);
+        const unsubscribeProjects = subscribe('projects-changed', (data) => {
+            console.log('📬 SubgroupsPanel received projects-changed event via SSE:', data);
             if (onRefreshProject) onRefreshProject();
         });
 
         // Очищаем подписку при размонтировании
         return () => {
-            unsubscribe();
+            console.log('🔌 SubgroupsPanel unsubscribing from SSE events');
+            unsubscribeSubgroups();
             unsubscribeProjects();
         };
-    }, [user?.id, projectId, refetch, onRefreshProject]);
+    }, [user?.id, projectId, subscribe, onRefreshProject]);
 
     if (loading) return <div className="loading">Загрузка групп...</div>;
     if (error) return <div className="message-error">{error.message}</div>;

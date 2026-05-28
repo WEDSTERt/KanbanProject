@@ -39,9 +39,13 @@ const ProjectSettings = () => {
     const { data: usersData } = useQuery(GET_USERS, { variables: { limit: 100 } });
 
     const [updateProject] = useMutation(UPDATE_PROJECT);
-    const [addMember] = useMutation(ADD_PROJECT_MEMBER);
+    const [addMember] = useMutation(ADD_PROJECT_MEMBER, {
+        refetchQueries: [{ query: GET_PROJECT_DETAILS, variables: { projectId } }],
+    });
     const [updateRole] = useMutation(UPDATE_MEMBER_ROLE);
-    const [removeMember] = useMutation(REMOVE_MEMBER);
+    const [removeMember] = useMutation(REMOVE_MEMBER, {
+        refetchQueries: [{ query: GET_PROJECT_DETAILS, variables: { projectId } }],
+    });
     const [removeSubgroupMember] = useMutation(REMOVE_SUBGROUP_MEMBER);
     const [setTaskAssignees] = useMutation(SET_TASK_ASSIGNEES);
     const [updateTask] = useMutation(UPDATE_TASK);
@@ -218,10 +222,14 @@ const ProjectSettings = () => {
             setDeleteConfirm({ isOpen: false, memberId: null, isProject: false });
             return;
         }
-        await removeMember({ variables: { id: deleteConfirm.memberId } });
-        await refetch();
-        setMessage('Участник удалён');
-        setIsError(false);
+        try {
+            await removeMember({ variables: { id: deleteConfirm.memberId } });
+            setMessage('Участник удалён');
+            setIsError(false);
+        } catch (err) {
+            setMessage('Ошибка удаления: ' + err.message);
+            setIsError(true);
+        }
         setDeleteConfirm({ isOpen: false, memberId: null, isProject: false });
     };
 
@@ -247,7 +255,6 @@ const ProjectSettings = () => {
         }
         try {
             await addMember({ variables: { projectId, userId: foundUser.id, role: newMemberRole } });
-            refetch();
             setNewMemberEmail('');
             setMessage('Участник добавлен');
             setIsError(false);
@@ -513,8 +520,3 @@ const ProjectSettings = () => {
 };
 
 export default ProjectSettings;
-
-
-
-
-

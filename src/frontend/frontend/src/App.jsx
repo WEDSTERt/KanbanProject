@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import {Routes, Route, Navigate} from 'react-router-dom';
 import {useAuth} from './contexts/AuthContext';
 import {NotificationProvider} from './contexts/NotificationContext';
+import {SSEProvider} from './contexts/SSEContext.jsx';
 import Layout from './components/Layout';
 import NotificationCenter from './components/NotificationCenter';
 import StartPage from './components/StartPage';
@@ -50,10 +51,14 @@ const HomePage = () => {
 };
 
 function App() {
+    const { user } = useAuth();
+
     return (
         <NotificationProvider>
-            <AppContent />
-            <NotificationCenter />
+            <SSEProvider userId={user?.id}>
+                <AppContent />
+                <NotificationCenter />
+            </SSEProvider>
         </NotificationProvider>
     );
 }

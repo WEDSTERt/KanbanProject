@@ -1,64 +1,49 @@
 import React, { useState, useEffect } from 'react';
 import {Link, useNavigate} from 'react-router-dom';
-import { useQuery } from '@apollo/client';
 import {useAuth} from '../contexts/AuthContext';
-import { GET_UNREAD_COUNT } from '../graphql/queries';
 import { useNotification } from '../contexts/NotificationContext';
+import { useSSE } from '../contexts/SSEContext';
 import NotificationPanel from './NotificationPanel';
 
 const Layout = ({children}) => {
     const {user, logout} = useAuth();
+    const { subscribe } = useSSE();
     const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
-    const [previousUnreadCount, setPreviousUnreadCount] = useState(0);
     const { addNotification } = useNotification();
 
-    // Начальный запрос на количество непрочитанных уведомлений с polling
-    const { data: countData, startPolling, stopPolling } = useQuery(GET_UNREAD_COUNT, {
-        variables: { userId: user?.id },
-        skip: !user?.id,
-        pollInterval: 3000, // Polling каждые 3 секунды
-    });
-
-    // Обновляем счётчик и показываем уведомление если пришло новое
+    // 🆕 SSE подписка на новые уведомления (используем глобальный контекст)
     useEffect(() => {
-        if (countData?.unreadCount !== undefined) {
-            const newCount = countData.unreadCount;
+        if (!user?.id) return;
+
+        console.log('🎯 Layout subscribing to SSE events');
+
+        // Подписываемся на события notification-received
+        const unsubscribe = subscribe('notification-received', (data) => {
+            console.log('📬 Layout received notification-received event via SSE:', data);
             
-            // Если счётчик увеличился - значит пришло новое уведомление
-            if (newCount > unreadCount && unreadCount > 0) {
-                console.log('📬 New notification! Count increased from', unreadCount, 'to', newCount);
+            const newNotification = data.notification_field;
+            if (newNotification) {
+                // Увеличиваем счетчик
+                setUnreadCount(prev => prev + 1);
+                
+                // Показываем toast уведомление
                 addNotification({
                     type: 'info',
                     title: 'Новое уведомление',
-                    message: `У вас ${newCount} непрочитанное уведомление${newCount > 1 ? 'й' : ''}`,
-                    duration: 5000, // Показать на 5 секунд
+                    message: newNotification.title || 'Вам пришло новое уведомление',
+                    duration: 5000,
                 });
             }
-            
-            setUnreadCount(newCount);
-        }
-    }, [countData?.unreadCount]);
+        });
 
-    // Возобновляем polling когда пользователь возвращается на вкладку
-    useEffect(() => {
-        const handleVisibilityChange = () => {
-            if (!document.hidden) {
-                console.log('🔄 Tab is visible, resuming polling');
-                startPolling(3000);
-            } else {
-                console.log('⏸️ Tab is hidden, stopping polling');
-                stopPolling();
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-        
+        // Очищаем подписку при размонтировании
         return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            console.log('🔌 Layout unsubscribing from SSE events');
+            unsubscribe();
         };
-    }, [startPolling, stopPolling]);
+    }, [user?.id, subscribe, addNotification]);
 
     const handleLogout = () => {
         logout();

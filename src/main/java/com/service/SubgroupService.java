@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class SubgroupService {
@@ -51,23 +52,32 @@ public class SubgroupService {
         try {
             return applicationContext.getBean(TaskSSEController.class);
         } catch (Exception e) {
+            System.err.println("❌ Failed to get SSE Controller: " + e.getMessage());
             return null;
         }
     }
 
     /**
-     * Отправить SSE событие о изменении подгрупп в проекте
+     * Отправить SSE событие о изменении подгрупп в проекте АСИНХРОННО
      */
-    private void notifySubgroupsChanged(Long projectId) {
-        try {
-            TaskSSEController sseController = getSSEController();
-            if (sseController != null) {
-                sseController.notifySubgroupsChanged(projectId);
-                System.out.println("✅ Sent subgroups-changed event to project " + projectId);
+    private void notifySubgroupsChangedAsync(Long projectId) {
+        // Отправляем SSE событие в отдельном потоке
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(100); // Небольшая задержка чтобы убедиться что транзакция коммитилась
+                TaskSSEController sseController = getSSEController();
+                if (sseController != null) {
+                    System.out.println("📡 Sending subgroups-changed event to project " + projectId);
+                    sseController.notifySubgroupsChanged(projectId);
+                    System.out.println("✅ Sent subgroups-changed event to project " + projectId);
+                } else {
+                    System.err.println("❌ SSE Controller is null");
+                }
+            } catch (Exception e) {
+                System.err.println("❌ Error sending subgroups-changed event: " + e.getMessage());
+                e.printStackTrace();
             }
-        } catch (Exception e) {
-            System.err.println("Warning: Failed to send SSE notification: " + e.getMessage());
-        }
+        });
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails"}, allEntries = true)
@@ -87,8 +97,8 @@ public class SubgroupService {
         subgroup = subgroupRepository.save(subgroup);
         addSubgroupMember(subgroup.getId(), creatorUserId, RoleSubgroup.LEADER);
         
-        // 📡 Отправляем SSE событие
-        notifySubgroupsChanged(projectId);
+        // 📡 Отправляем SSE событие АСИНХРОННО
+        notifySubgroupsChangedAsync(projectId);
         
         return subgroup;
     }
@@ -103,8 +113,8 @@ public class SubgroupService {
         if (name != null) subgroup.setName(name);
         subgroup = subgroupRepository.save(subgroup);
         
-        // 📡 Отправляем SSE событие
-        notifySubgroupsChanged(subgroup.getProjectId());
+        // 📡 Отправляем SSE событие АСИНХРОННО
+        notifySubgroupsChangedAsync(subgroup.getProjectId());
         
         return subgroup;
     }
@@ -121,8 +131,8 @@ public class SubgroupService {
             
             subgroupRepository.deleteById(id);
             
-            // 📡 Отправляем SSE событие
-            notifySubgroupsChanged(projectId);
+            // 📡 Отправляем SSE событие АСИНХРОННО
+            notifySubgroupsChangedAsync(projectId);
             
             return true;
         }
@@ -194,8 +204,8 @@ public class SubgroupService {
             System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
         }
 
-        // 📡 Отправляем SSE событие
-        notifySubgroupsChanged(subgroup.getProjectId());
+        // 📡 Отправляем SSE событие АСИНХРОННО
+        notifySubgroupsChangedAsync(subgroup.getProjectId());
 
         return saved;
     }
@@ -247,8 +257,8 @@ public class SubgroupService {
                 System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
             }
 
-            // 📡 Отправляем SSE событие
-            notifySubgroupsChanged(projectId);
+            // 📡 Отправляем SSE событие АСИНХРОННО
+            notifySubgroupsChangedAsync(projectId);
             
             return true;
         }

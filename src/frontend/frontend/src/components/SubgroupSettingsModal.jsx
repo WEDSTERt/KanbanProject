@@ -21,6 +21,8 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
 
     const { data: projectData } = useQuery(GET_PROJECT_DETAILS, { variables: { projectId } });
 
+    // Мутации БЕЗ refetchQueries для add/remove - SSE событие будет обновлять список
+    // Только для updateSubgroup оставляем refetchQueries
     const [updateSubgroup] = useMutation(UPDATE_SUBGROUP);
     const [addMember] = useMutation(ADD_SUBGROUP_MEMBER);
     const [updateMember] = useMutation(UPDATE_SUBGROUP_MEMBER);
@@ -53,7 +55,7 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
             const userInfo = projectMembers.find(m => m.userId === selectedUserId)?.user || { fullName: 'Unknown' };
             setMembers([...members, { ...newMember, user: userInfo }]);
             setSelectedUserId('');
-            onUpdate();
+            console.log('✅ Member added, SSE event will update list');
         } catch (err) {
             console.error(err);
             alert('Ошибка добавления участника: ' + err.message);
@@ -71,6 +73,7 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
         await removeMember({ variables: { id: deleteConfirm.memberId } });
         setMembers(members.filter(m => m.id !== deleteConfirm.memberId));
         setDeleteConfirm({ isOpen: false, memberId: null });
+        console.log('✅ Member removed, SSE event will update list');
         onUpdate();
     };
 
@@ -216,5 +219,3 @@ const SubgroupSettingsModal = ({ subgroup, projectId, isOwner, onClose, onUpdate
 };
 
 export default SubgroupSettingsModal;
-
-

@@ -12,9 +12,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
-
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 
 @Service
 public class ProjectService {
@@ -99,6 +99,8 @@ public class ProjectService {
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public ProjectMember addProjectMemberWithNotification(Long projectId, Long userId, RoleProject role, User addedBy) {
+        System.out.println("👤 Adding user " + userId + " to project " + projectId + " with notification");
+        
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
         User user = userRepository.findById(userId)
@@ -117,6 +119,20 @@ public class ProjectService {
                 System.err.println("Warning: Failed to send notification: " + e.getMessage());
             }
         }
+
+        // 📡 Отправляем SSE событие АСИНХРОННО (в отдельном потоке) ВСЕ пользователям
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(100); // Небольшая задержка чтобы убедиться что транзакция коммитилась
+                com.controller.TaskSSEController sseController = com.controller.TaskSSEController.getInstance();
+                if (sseController != null) {
+                    sseController.notifyAllProjectsListChanged();
+                    System.out.println("✅ Sent projects-changed SSE event to all users after adding member");
+                }
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to send SSE event: " + e.getMessage());
+            }
+        });
 
         return saved;
     }
@@ -142,6 +158,8 @@ public class ProjectService {
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public boolean removeProjectMember(Long memberId) {
+        System.out.println("🗑️ Removing project member " + memberId);
+        
         if (projectMemberRepository.existsById(memberId)) {
             // Получаем ProjectMember перед удалением
             ProjectMember projectMember = projectMemberRepository.findById(memberId)
@@ -160,6 +178,7 @@ public class ProjectService {
 
             // Удаляем ProjectMember
             projectMemberRepository.deleteById(memberId);
+            System.out.println("✅ Project member deleted from DB");
 
             // Отправляем уведомление об удалении из проекта
             try {
@@ -167,6 +186,29 @@ public class ProjectService {
             } catch (Exception e) {
                 System.err.println("Warning: Failed to send removal notification: " + e.getMessage());
             }
+
+            // 📡 Отправляем SSE события АСИНХРОННО (в отдельном потоке)
+            // Это гарантирует что события отправятся даже если клиент отключится сразу после удаления
+            CompletableFuture.runAsync(() -> {
+                try {
+                    Thread.sleep(100); // Небольшая задержка чтобы убедиться что транзакция коммитилась
+                    
+                    // Отправляем событие удаленному пользователю
+                    com.controller.TaskSSEController sseController = com.controller.TaskSSEController.getInstance();
+                    if (sseController != null) {
+                        sseController.notifyUserRemovedFromProject(userId, projectId);
+                        System.out.println("✅ Sent project-removed SSE event to user " + userId);
+                    }
+                    
+                    // Отправляем событие ВСЕ пользователям (обновление списка проектов)
+                    if (sseController != null) {
+                        sseController.notifyAllProjectsListChanged();
+                        System.out.println("✅ Sent projects-changed SSE event to all users after removing member");
+                    }
+                } catch (Exception e) {
+                    System.err.println("Warning: Failed to send SSE events: " + e.getMessage());
+                }
+            });
 
             return true;
         }
