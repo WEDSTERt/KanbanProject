@@ -18,14 +18,38 @@ public class SecurityHeadersConfig implements WebMvcConfigurer {
     public static class SecurityHeadersInterceptor implements HandlerInterceptor {
         @Override
         public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
-            // Не устанавливаем CSP - позволяем CloudPub управлять им
-            // CloudPub имеет встроенный CSP который переопределяет наш
+            // CSP для SSE поддержки
+            // Разрешаем connect-src для:
+            // - 'self' (текущий домен - важно для SSE/EventSource)
+            // - https: (все HTTPS домены для production)
+            // - wss: ws: (WebSocket поддержка)
+            String csp = "default-src 'self'; " +
+                    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://js.turnstile.com; " +
+                    "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://fonts.googleapis.com; " +
+                    "img-src 'self' data: https:; " +
+                    "font-src 'self' https://fonts.gstatic.com; " +
+                    "connect-src 'self' https: wss: ws:; " +
+                    "frame-src https://challenges.cloudflare.com; " +
+                    "object-src 'none'; " +
+                    "base-uri 'self'; " +
+                    "frame-ancestors 'none'; " +
+                    "upgrade-insecure-requests";
             
-            // Устанавливаем только основные security headers
+            // ⚠️ ВАЖНО: На production'е CloudPub может переопределять CSP header
+            // Если это происходит, нужно:
+            // 1. Добавить текущий домен в CSP на уровне CloudPub/reverse proxy
+            // 2. Или использовать X-CSP-Report-Only для debug
+            response.setHeader("Content-Security-Policy", csp);
+            
+            // Для debug: видим какой CSP применяется
+            System.out.println("⚠️ CSP Header Set: " + csp);
+            
+            // Устанавливаем остальные security headers
             response.setHeader("X-Content-Type-Options", "nosniff");
             response.setHeader("X-Frame-Options", "SAMEORIGIN");
             response.setHeader("X-XSS-Protection", "1; mode=block");
             response.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+            response.setHeader("Permissions-Policy", "geolocation=(), microphone=(), camera=()");
 
             return true;
         }

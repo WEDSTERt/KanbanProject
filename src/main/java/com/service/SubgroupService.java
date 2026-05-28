@@ -1,5 +1,6 @@
 package com.service;
 
+import com.controller.TaskSSEController;
 import com.entity.*;
 import com.repository.ProjectRepository;
 import com.repository.SubgroupMemberRepository;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.context.ApplicationContext;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.List;
 import java.util.Optional;
@@ -22,24 +25,56 @@ public class SubgroupService {
     private final SubgroupMemberRepository subgroupMemberRepository;
     private final EmailNotificationService emailNotificationService;
     private final NotificationService notificationService;
+    private final ApplicationContext applicationContext;
 
+    @Autowired
     public SubgroupService(SubgroupRepository subgroupRepository,
                            ProjectRepository projectRepository,
                            UserRepository userRepository,
                            SubgroupMemberRepository subgroupMemberRepository,
                            EmailNotificationService emailNotificationService,
-                           NotificationService notificationService) {
+                           NotificationService notificationService,
+                           ApplicationContext applicationContext) {
         this.subgroupRepository = subgroupRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.subgroupMemberRepository = subgroupMemberRepository;
         this.emailNotificationService = emailNotificationService;
         this.notificationService = notificationService;
+        this.applicationContext = applicationContext;
+    }
+
+    /**
+     * Получить SSE контроллер через ApplicationContext (избегаем циклических зависимостей)
+     */
+    private TaskSSEController getSSEController() {
+        try {
+            return applicationContext.getBean(TaskSSEController.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * Отправить SSE событие о изменении подгрупп в проекте
+     */
+    private void notifySubgroupsChanged(Long projectId) {
+        try {
+            TaskSSEController sseController = getSSEController();
+            if (sseController != null) {
+                sseController.notifySubgroupsChanged(projectId);
+                System.out.println("✅ Sent subgroups-changed event to project " + projectId);
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Failed to send SSE notification: " + e.getMessage());
+        }
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails"}, allEntries = true)
     @Transactional
     public Subgroup createSubgroup(Long projectId, String name, Long creatorUserId) {
+        System.out.println("📝 Creating subgroup: " + name + " in project " + projectId);
+        
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new RuntimeException("Project not found"));
         boolean exists = subgroupRepository.findByProjectId(projectId)
@@ -51,23 +86,44 @@ public class SubgroupService {
         Subgroup subgroup = new Subgroup(name, project);
         subgroup = subgroupRepository.save(subgroup);
         addSubgroupMember(subgroup.getId(), creatorUserId, RoleSubgroup.LEADER);
+        
+        // 📡 Отправляем SSE событие
+        notifySubgroupsChanged(projectId);
+        
         return subgroup;
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails"}, allEntries = true)
     @Transactional
     public Subgroup updateSubgroup(Long id, String name) {
+        System.out.println("✏️ Updating subgroup " + id + " name to: " + name);
+        
         Subgroup subgroup = subgroupRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Subgroup not found"));
         if (name != null) subgroup.setName(name);
-        return subgroupRepository.save(subgroup);
+        subgroup = subgroupRepository.save(subgroup);
+        
+        // 📡 Отправляем SSE событие
+        notifySubgroupsChanged(subgroup.getProjectId());
+        
+        return subgroup;
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public boolean deleteSubgroup(Long id) {
-        if (subgroupRepository.existsById(id)) {
+        System.out.println("🗑️ Deleting subgroup " + id);
+        
+        Optional<Subgroup> subgroupOpt = subgroupRepository.findById(id);
+        if (subgroupOpt.isPresent()) {
+            Subgroup subgroup = subgroupOpt.get();
+            Long projectId = subgroup.getProjectId();
+            
             subgroupRepository.deleteById(id);
+            
+            // 📡 Отправляем SSE событие
+            notifySubgroupsChanged(projectId);
+            
             return true;
         }
         return false;
@@ -86,6 +142,8 @@ public class SubgroupService {
     @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public SubgroupMember addSubgroupMember(Long subgroupId, Long userId, RoleSubgroup role) {
+        System.out.println("👤 Adding user " + userId + " to subgroup " + subgroupId + " as " + role);
+        
         Subgroup subgroup = subgroupRepository.findById(subgroupId)
                 .orElseThrow(() -> new RuntimeException("Subgroup not found"));
         User user = userRepository.findById(userId)
@@ -100,6 +158,8 @@ public class SubgroupService {
     @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public SubgroupMember addSubgroupMemberWithNotification(Long subgroupId, Long userId, RoleSubgroup role, User addedBy) {
+        System.out.println("👤 Adding user " + userId + " to subgroup " + subgroupId + " with notification");
+        
         Subgroup subgroup = subgroupRepository.findById(subgroupId)
                 .orElseThrow(() -> new RuntimeException("Subgroup not found"));
         User user = userRepository.findById(userId)
@@ -134,12 +194,17 @@ public class SubgroupService {
             System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
         }
 
+        // 📡 Отправляем SSE событие
+        notifySubgroupsChanged(subgroup.getProjectId());
+
         return saved;
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public SubgroupMember updateSubgroupMember(Long memberId, RoleSubgroup role) {
+        System.out.println("🔄 Updating subgroup member " + memberId + " role to " + role);
+        
         SubgroupMember sm = subgroupMemberRepository.findById(memberId)
                 .orElseThrow(() -> new RuntimeException("Subgroup member not found"));
         sm.setRole(role);
@@ -149,9 +214,11 @@ public class SubgroupService {
     @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public boolean removeSubgroupMember(Long memberId) {
-        if (subgroupMemberRepository.existsById(memberId)) {
-            SubgroupMember member = subgroupMemberRepository.findById(memberId)
-                    .orElseThrow(() -> new RuntimeException("Subgroup member not found"));
+        System.out.println("🗑️ Removing subgroup member " + memberId);
+        
+        Optional<SubgroupMember> memberOpt = subgroupMemberRepository.findById(memberId);
+        if (memberOpt.isPresent()) {
+            SubgroupMember member = memberOpt.get();
             
             Subgroup subgroup = member.getSubgroup();
             User removedUser = member.getUser();
@@ -179,6 +246,9 @@ public class SubgroupService {
             } catch (Exception e) {
                 System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
             }
+
+            // 📡 Отправляем SSE событие
+            notifySubgroupsChanged(projectId);
             
             return true;
         }

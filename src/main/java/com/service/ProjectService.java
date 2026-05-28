@@ -129,7 +129,7 @@ public class ProjectService {
         pm.setRole(role);
         return projectMemberRepository.save(pm);
     }
-    
+
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public ProjectMember updateProjectNotifications(Long projectId, Long userId, Boolean notificationsEnabled) {
@@ -138,7 +138,7 @@ public class ProjectService {
         pm.setNotificationsEnabled(notificationsEnabled);
         return projectMemberRepository.save(pm);
     }
-    
+
     @CacheEvict(value = {"projects", "projectDetails"}, allEntries = true)
     @Transactional
     public boolean removeProjectMember(Long memberId) {
@@ -146,33 +146,33 @@ public class ProjectService {
             // Получаем ProjectMember перед удалением
             ProjectMember projectMember = projectMemberRepository.findById(memberId)
                     .orElseThrow(() -> new RuntimeException("Project member not found"));
-            
+
             Long projectId = projectMember.getProjectId();
             Long userId = projectMember.getUserId();
-            
+
             Project project = projectRepository.findById(projectId)
                     .orElseThrow(() -> new RuntimeException("Project not found"));
             User removedUser = userRepository.findById(userId)
                     .orElseThrow(() -> new RuntimeException("User not found"));
-            
+
             // Удаляем все SubgroupMemberships этого пользователя из подгрупп этого проекта
             removeUserFromProjectSubgroups(projectId, userId);
-            
+
             // Удаляем ProjectMember
             projectMemberRepository.deleteById(memberId);
-            
+
             // Отправляем уведомление об удалении из проекта
             try {
                 emailNotificationService.notifyUserRemovedFromProject(project, removedUser);
             } catch (Exception e) {
                 System.err.println("Warning: Failed to send removal notification: " + e.getMessage());
             }
-            
+
             return true;
         }
         return false;
     }
-    
+
     /**
      * Удаляет пользователя из всех подгрупп проекта (каскадное удаление)
      */

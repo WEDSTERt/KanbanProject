@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useQuery, useMutation, useApolloClient, gql } from '@apollo/client';
 import { useNotification } from '../contexts/NotificationContext';
 import { GET_NOTIFICATIONS, GET_UNREAD_COUNT } from '../graphql/queries';
+import SSEService from '../services/SSEService';
 import ConfirmModal from './ConfirmModal';
 import '../styles/notification-panel.css';
 
@@ -40,12 +41,13 @@ const NotificationPanel = ({ userId, onClose }) => {
     const [unreadCount, setUnreadCount] = useState(0);
     const [deleteAllConfirm, setDeleteAllConfirm] = useState(false);
     const numericUserId = Number(userId);
+    const sseServiceRef = useRef(null);
 
-    // Query для уведомлений с polling
+    // Query БЕЗ polling (только начальная загрузка)
     const { data: notificationsData, loading, refetch: refetchNotifications } = useQuery(GET_NOTIFICATIONS, {
         variables: { userId: numericUserId },
         skip: !userId,
-        pollInterval: 3000, // Poll every 3 seconds
+        pollInterval: 0, // ❌ ОТКЛЮЧЕН polling
         onError: (err) => {
             console.error('Error loading notifications:', err);
             addNotification({
@@ -56,11 +58,11 @@ const NotificationPanel = ({ userId, onClose }) => {
         },
     });
 
-    // Query для unread count с polling
+    // Query БЕЗ polling для unread count
     const { data: countData, refetch: refetchCount } = useQuery(GET_UNREAD_COUNT, {
         variables: { userId: numericUserId },
         skip: !userId,
-        pollInterval: 3000, // Poll every 3 seconds
+        pollInterval: 0, // ❌ ОТКЛЮЧЕН polling
     });
 
     useEffect(() => {
@@ -74,6 +76,39 @@ const NotificationPanel = ({ userId, onClose }) => {
             setUnreadCount(countData.unreadCount);
         }
     }, [countData]);
+
+    // 🆕 SSE подписка на новые уведомления
+    useEffect(() => {
+        if (!userId) return;
+
+        // Инициализируем SSEService если еще не создан
+        if (!sseServiceRef.current) {
+            sseServiceRef.current = new SSEService(numericUserId);
+            sseServiceRef.current.connect(); // Подключаемся к глобальному каналу
+            console.log('✅ SSEService initialized for notifications');
+        }
+
+        // Подписываемся на события notification-received
+        const unsubscribe = sseServiceRef.current.subscribe('notification-received', (data) => {
+            console.log('📬 Received notification-received event via SSE:', data);
+            
+            // Обновляем список уведомлений
+            refetchNotifications();
+            refetchCount();
+            
+            // Показываем toast-уведомление о новом сообщении
+            addNotification({
+                type: 'info',
+                title: data.title || 'Новое уведомление',
+                message: data.message || 'Вам пришло новое уведомление',
+            });
+        });
+
+        // Очищаем подписку при размонтировании
+        return () => {
+            unsubscribe();
+        };
+    }, [userId, numericUserId, refetchNotifications, refetchCount, addNotification]);
 
     const handleMarkAsRead = async (notificationId) => {
         try {

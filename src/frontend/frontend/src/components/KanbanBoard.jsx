@@ -1,5 +1,5 @@
 /* eslint-disable no-unused-vars */
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import {
@@ -20,6 +20,7 @@ import {
     DELETE_TAG_FROM_PROJECT,
 } from '../graphql/mutations';
 import { useAuth } from '../contexts/AuthContext';
+import SSEService from '../services/SSEService';
 import SubgroupsPanel from './SubgroupsPanel';
 import TaskModal from './TaskModal';
 import ConfirmModal from './ConfirmModal';
@@ -133,6 +134,7 @@ const KanbanBoard = () => {
     });
     const [showFilterModal, setShowFilterModal] = useState(false);
     const [deleteTagConfirm, setDeleteTagConfirm] = useState({ isOpen: false, tagId: null, tagName: '' });
+    const sseServiceRef = useRef(null);
 
     const [createTask] = useMutation(CREATE_TASK);
     const [updateTask] = useMutation(UPDATE_TASK);
@@ -162,7 +164,7 @@ const KanbanBoard = () => {
             skip: !activeSubgroupId || activeSubgroupId === 'my-tasks',
             fetchPolicy: 'cache-and-network',
             notifyOnNetworkStatusChange: true,
-            pollInterval: 5000, // Автообновление каждые 5 секунд
+            pollInterval: 0, // ❌ ОТКЛЮЧЕН polling для SSE
         }
     );
 
@@ -173,7 +175,7 @@ const KanbanBoard = () => {
             skip: activeSubgroupId !== 'my-tasks',
             fetchPolicy: 'cache-and-network',
             notifyOnNetworkStatusChange: true,
-            pollInterval: 5000, // Автообновление каждые 5 секунд
+            pollInterval: 0, // ❌ ОТКЛЮЧЕН polling для SSE
         }
     );
 
@@ -1506,3 +1508,5 @@ const KanbanBoard = () => {
 };
 
 export default KanbanBoard;
+
+

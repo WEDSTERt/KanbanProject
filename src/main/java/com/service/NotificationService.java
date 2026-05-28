@@ -1,5 +1,6 @@
 package com.service;
 
+import com.controller.TaskSSEController;
 import com.dto.NotificationDTO;
 import com.entity.Notification;
 import com.entity.User;
@@ -8,6 +9,7 @@ import com.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.context.ApplicationContext;
 import reactor.core.publisher.Sinks;
 
 import java.time.LocalDateTime;
@@ -23,8 +25,22 @@ public class NotificationService {
     @Autowired
     private UserRepository userRepository;
 
-    // Sinks для каждого пользователя по его ID
+    @Autowired
+    private ApplicationContext applicationContext;
+
+    // Sinks для каждого пользователя по его ID (для GraphQL subscriptions)
     private final java.util.Map<Long, Sinks.Many<NotificationDTO>> userSinks = new java.util.concurrent.ConcurrentHashMap<>();
+
+    /**
+     * Получить SSE контроллер через ApplicationContext (избегаем циклических зависимостей)
+     */
+    private TaskSSEController getSSEController() {
+        try {
+            return applicationContext.getBean(TaskSSEController.class);
+        } catch (Exception e) {
+            return null;
+        }
+    }
 
     public Sinks.Many<NotificationDTO> getUserSink(Long userId) {
         return userSinks.computeIfAbsent(userId, k -> Sinks.many().multicast().onBackpressureBuffer());
@@ -74,10 +90,21 @@ public class NotificationService {
         Notification saved = notificationRepository.findById(notification.getId()).orElse(notification);
         NotificationDTO dto = mapToDTO(saved);
         
-        // Отправляем через subscription
+        // Отправляем через GraphQL subscription (для обратной совместимости)
         Sinks.Many<NotificationDTO> sink = getUserSink(recipientId);
         sink.tryEmitNext(dto);
         System.out.println("✅ Notification broadcast via GraphQL subscriptions");
+        
+        // 📡 Отправляем SSE событие о новом уведомлении
+        try {
+            TaskSSEController sseController = getSSEController();
+            if (sseController != null) {
+                sseController.notifyNotificationReceived(recipientId, dto);
+                System.out.println("✅ Sent notification-received event to user " + recipientId);
+            }
+        } catch (Exception e) {
+            System.err.println("Warning: Failed to send SSE notification: " + e.getMessage());
+        }
         
         return dto;
     }

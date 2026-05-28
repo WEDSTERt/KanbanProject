@@ -35,14 +35,25 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain chain) throws ServletException, IOException {
         try {
-            final String authHeader = request.getHeader("Authorization");
-            String token;
+            String token = null;
             Long userId = null;
 
+            // 1️⃣ Проверяем Authorization header (Bearer token)
+            final String authHeader = request.getHeader("Authorization");
             if (authHeader != null && authHeader.startsWith("Bearer ")) {
                 token = authHeader.substring(7);
                 if (!token.trim().isEmpty() && jwtUtil.validateToken(token)) {
                     userId = jwtUtil.extractUserId(token);
+                }
+            }
+
+            // 2️⃣ Если токена в header нет, проверяем query parameter (для SSE/EventSource)
+            // EventSource не поддерживает custom headers, поэтому используем query param
+            if (userId == null) {
+                token = request.getParameter("token");
+                if (token != null && !token.trim().isEmpty() && jwtUtil.validateToken(token)) {
+                    userId = jwtUtil.extractUserId(token);
+                    System.out.println("✅ JWT extracted from query parameter for user: " + userId);
                 }
             }
 
@@ -54,7 +65,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 } catch (UsernameNotFoundException e) {
-                    // Пользователь не найден - просто логируем и пропускаем (не авторизуем)
                     logger.warn("User with id {} not found, skipping authentication", userId);
                 }
             }

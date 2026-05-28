@@ -6,6 +6,7 @@ import { GET_USER_PROJECTS } from '../graphql/queries';
 import { CREATE_PROJECT } from '../graphql/mutations';
 import { PROJECT_UPDATED_SUBSCRIPTION } from '../graphql/subscriptions';
 import { useAuth } from '../contexts/AuthContext';
+import SSEService from '../services/SSEService';
 
 const ProjectsList = () => {
     const { user } = useAuth();
@@ -14,12 +15,13 @@ const ProjectsList = () => {
     const [projectName, setProjectName] = useState('');
     const [isImporting, setIsImporting] = useState(false);
     const fileInputRef = useRef(null);
+    const sseServiceRef = useRef(null);
 
-    // Query с polling каждые 5 секунд
+    // Query БЕЗ polling (только начальная загрузка)
     const { loading, error, data, refetch } = useQuery(GET_USER_PROJECTS, {
         variables: { userId: user.id },
         fetchPolicy: 'cache-and-network',
-        pollInterval: 5000, // Poll every 5 seconds for auto-updates
+        pollInterval: 0, // ❌ ОТКЛЮЧЕН polling
     });
 
     const [createProject] = useMutation(CREATE_PROJECT);
@@ -28,7 +30,7 @@ const ProjectsList = () => {
     const { data: projectUpdateData, error: subscriptionError } = useSubscription(PROJECT_UPDATED_SUBSCRIPTION, {
         skip: !user,
         onError: (err) => {
-            console.warn('⚠️ Project subscription error (using polling):', err.message);
+            console.warn('⚠️ Project subscription error (using SSE):', err.message);
         },
     });
 
@@ -39,6 +41,48 @@ const ProjectsList = () => {
             refetch();
         }
     }, [projectUpdateData, refetch]);
+
+    // 🆕 SSE подписка на изменения проектов
+    useEffect(() => {
+        if (!user?.id) return;
+
+        // Инициализируем SSEService если еще не создан
+        if (!sseServiceRef.current) {
+            sseServiceRef.current = new SSEService(user.id);
+            sseServiceRef.current.connect(); // Подключаемся к глобальному каналу
+            console.log('✅ SSEService initialized');
+        }
+
+        // Подписываемся на события projects-changed
+        const unsubscribe = sseServiceRef.current.subscribe('projects-changed', (data) => {
+            console.log('📬 Received projects-changed event via SSE:', data);
+            refetch(); // Перезагружаем список проектов
+        });
+
+        // Подписываемся на события project-removed (когда пользователя удалили из проекта)
+        const unsubscribeRemoved = sseServiceRef.current.subscribe('project-removed', (data) => {
+            console.log('📬 Received project-removed event via SSE:', data);
+            alert(data.message || 'Вас исключили из проекта');
+            refetch(); // Перезагружаем список проектов (проект исчезнет)
+        });
+
+        // Очищаем подписки при размонтировании
+        return () => {
+            unsubscribe();
+            unsubscribeRemoved();
+        };
+    }, [user?.id, refetch]);
+
+    // Отключаемся от SSE при размонтировании компонента
+    useEffect(() => {
+        return () => {
+            if (sseServiceRef.current) {
+                console.log('🔌 Disconnecting SSE on ProjectsList unmount');
+                // Примечание: не закрываем все соединения, т.к. они нужны другим компонентам
+                // sseServiceRef.current.disconnectAll();
+            }
+        };
+    }, []);
 
     useEffect(() => {
         document.body.style.overflow = showCreateModal ? 'hidden' : '';
