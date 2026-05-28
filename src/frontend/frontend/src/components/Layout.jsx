@@ -7,7 +7,7 @@ import NotificationPanel from './NotificationPanel';
 
 const Layout = ({children}) => {
     const {user, logout} = useAuth();
-    const { subscribe } = useSSE();
+    const { subscribe, sseService } = useSSE();
     const navigate = useNavigate();
     const [showNotifications, setShowNotifications] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
@@ -35,6 +35,28 @@ const Layout = ({children}) => {
                     message: newNotification.title || 'Вам пришло новое уведомление',
                     duration: 5000,
                 });
+
+                // 🔔 Если участника добавили в проект, переподписываемся на новый проект
+                if (newNotification.type === 'user_added_to_project' && newNotification.projectId) {
+                    console.log('🔌 User was added to project', newNotification.projectId, ', resubscribing...');
+                    if (sseService) {
+                        setTimeout(() => {
+                            sseService.subscribeToProject(newNotification.projectId);
+                            console.log('✅ Resubscribed to project', newNotification.projectId);
+                        }, 500);
+                    }
+                }
+                
+                // 🔔 Если участника добавили в группу, проверяем что он подписан на проект
+                if (newNotification.type === 'SUBGROUP_MEMBER_ADDED' && newNotification.projectId) {
+                    console.log('🔌 User was added to subgroup in project', newNotification.projectId, ', ensuring project subscription...');
+                    if (sseService) {
+                        setTimeout(() => {
+                            sseService.subscribeToProject(newNotification.projectId);
+                            console.log('✅ Ensured subscription to project', newNotification.projectId);
+                        }, 500);
+                    }
+                }
             }
         });
 
@@ -43,7 +65,7 @@ const Layout = ({children}) => {
             console.log('🔌 Layout unsubscribing from SSE events');
             unsubscribe();
         };
-    }, [user?.id, subscribe, addNotification]);
+    }, [user?.id, addNotification, subscribe, sseService]);
 
     const handleLogout = () => {
         logout();

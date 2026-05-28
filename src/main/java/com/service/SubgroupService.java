@@ -24,7 +24,6 @@ public class SubgroupService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final SubgroupMemberRepository subgroupMemberRepository;
-    private final EmailNotificationService emailNotificationService;
     private final NotificationService notificationService;
     private final ApplicationContext applicationContext;
 
@@ -33,14 +32,12 @@ public class SubgroupService {
                            ProjectRepository projectRepository,
                            UserRepository userRepository,
                            SubgroupMemberRepository subgroupMemberRepository,
-                           EmailNotificationService emailNotificationService,
                            NotificationService notificationService,
                            ApplicationContext applicationContext) {
         this.subgroupRepository = subgroupRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.subgroupMemberRepository = subgroupMemberRepository;
-        this.emailNotificationService = emailNotificationService;
         this.notificationService = notificationService;
         this.applicationContext = applicationContext;
     }
@@ -180,32 +177,28 @@ public class SubgroupService {
         SubgroupMember sm = new SubgroupMember(subgroup, user, role != null ? role : RoleSubgroup.MEMBER);
         SubgroupMember saved = subgroupMemberRepository.save(sm);
 
-        // Отправляем email уведомление
-        if (addedBy != null && !addedBy.getId().equals(userId)) {
-            try {
-                emailNotificationService.notifyUserAddedToSubgroup(subgroup, user, addedBy, role != null ? role.name() : "MEMBER");
-            } catch (Exception e) {
-                System.err.println("Warning: Failed to send email notification: " + e.getMessage());
-            }
-        }
+        // Загружаем данные ПЕРЕД асинхронным вызовом
+        Long projectId = subgroup.getProjectId();
+        String subgroupName = subgroup.getName();
+        String addedByName = addedBy != null ? addedBy.getFullName() : "Администратор";
         
         // Отправляем in-app уведомление
         try {
-            String addedByName = addedBy != null ? addedBy.getFullName() : "Администратор";
             notificationService.createNotification(
                 userId,
                 "SUBGROUP_MEMBER_ADDED",
                 "Добавлены в группу",
-                addedByName + " добавил вас в группу \"" + subgroup.getName() + "\"",
+                addedByName + " добавил вас в группу \"" + subgroupName + "\"",
                 null,
-                subgroup.getProjectId()
+                projectId
             );
         } catch (Exception e) {
             System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
         }
 
-        // 📡 Отправляем SSE событие АСИНХРОННО
-        notifySubgroupsChangedAsync(subgroup.getProjectId());
+        // 📡 Отправляем SSE событие АСИНХРОННО ко ВСЕМ подписчикам проекта
+        System.out.println("📢 Notifying all project subscribers that subgroups changed");
+        notifySubgroupsChangedAsync(projectId);
 
         return saved;
     }
@@ -218,7 +211,14 @@ public class SubgroupService {
         SubgroupMember sm = subgroupMemberRepository.findById(memberId)
                 .orElseThrow(() -> new RuntimeException("Subgroup member not found"));
         sm.setRole(role);
-        return subgroupMemberRepository.save(sm);
+        SubgroupMember saved = subgroupMemberRepository.save(sm);
+        
+        // 📡 Отправляем SSE событие при изменении роли участника
+        Long projectId = sm.getSubgroup().getProjectId();
+        System.out.println("📢 Notifying project about member role update");
+        notifySubgroupsChangedAsync(projectId);
+        
+        return saved;
     }
 
     @CacheEvict(value = {"subgroups", "projectDetails", "tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
@@ -233,23 +233,17 @@ public class SubgroupService {
             Subgroup subgroup = member.getSubgroup();
             User removedUser = member.getUser();
             Long projectId = subgroup.getProjectId();
+            String subgroupName = subgroup.getName();
 
             subgroupMemberRepository.deleteById(memberId);
             
-            // Отправляем email уведомление
-            try {
-                emailNotificationService.notifyUserRemovedFromSubgroup(subgroup, removedUser);
-            } catch (Exception e) {
-                System.err.println("Warning: Failed to send email notification: " + e.getMessage());
-            }
-            
-            // Отправляем in-app уведомление
+            // ℹ️ Отправляем in-app уведомление
             try {
                 notificationService.createNotification(
                     removedUser.getId(),
                     "SUBGROUP_MEMBER_REMOVED",
                     "Удалены из группы",
-                    "Вы удалены из группы \"" + subgroup.getName() + "\"",
+                    "Вы удалены из группы \"" + subgroupName + "\"",
                     null,
                     projectId
                 );
@@ -257,7 +251,8 @@ public class SubgroupService {
                 System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
             }
 
-            // 📡 Отправляем SSE событие АСИНХРОННО
+            // 📡 Отправляем SSE событие ко ВСЕМ подписчикам проекта о изменении групп
+            System.out.println("📢 Notifying all project subscribers that member was removed from subgroup");
             notifySubgroupsChangedAsync(projectId);
             
             return true;

@@ -78,7 +78,7 @@ const ProjectsList = () => {
             unsubscribeProjects();
             unsubscribeRemoved();
         };
-    }, [user?.id, subscribe]);
+    }, [user?.id]);
 
     useEffect(() => {
         document.body.style.overflow = showCreateModal ? 'hidden' : '';
@@ -318,3 +318,4 @@ const ProjectsList = () => {
 };
 
 export default ProjectsList;
+

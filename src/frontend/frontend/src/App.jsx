@@ -54,12 +54,12 @@ function App() {
     const { user } = useAuth();
 
     return (
-        <NotificationProvider>
-            <SSEProvider userId={user?.id}>
+        <SSEProvider userId={user?.id}>
+            <NotificationProvider>
                 <AppContent />
                 <NotificationCenter />
-            </SSEProvider>
-        </NotificationProvider>
+            </NotificationProvider>
+        </SSEProvider>
     );
 }
 

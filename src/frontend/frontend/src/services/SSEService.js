@@ -9,6 +9,7 @@
  * - project-removed: Пользователя удалили из проекта
  * - notification-received: Новое уведомление
  * - subgroups-changed: Изменения в списке групп проекта
+ * - task-created: Новая задача
  * - task-updated: Задача обновлена
  * - task-deleted: Задача удалена
  */
@@ -20,15 +21,17 @@ class SSEService {
     // 🔧 PRODUCTION FIX: Use relative URLs to avoid CSP issues
     // Relative URLs are treated as 'self' in Content-Security-Policy
     // This works even if CloudPub overrides the CSP header
-    this.baseUrl = '';  // Empty string = use current origin
+    this.baseUrl = '/api/sse';
     
     this.token = localStorage.getItem('jwtToken');
     
-    // Хранилище подписчиков: eventName -> [callbacks]
-    this.subscribers = new Map();
+    // Хранилище обработчиков: eventName -> [callbacks]
+    this.handlers = {};
+    this.subscribers = this.handlers;  // Alias for compatibility
     
     // Хранилище EventSource объектов
-    this.eventSources = new Map();
+    this.connections = {};
+    this.eventSources = this.connections;  // Alias for compatibility
     
     // Попытки переподключения
     this.reconnectAttempts = 0;
@@ -42,125 +45,103 @@ class SSEService {
   /**
    * Подключиться к глобальному каналу (проекты, уведомления)
    */
-  connect() {
-    if (!this.token) {
-      console.error('❌ No JWT token found');
-      return;
-    }
+  async subscribeToGlobal() {
+    return this._subscribe('global', `${this.baseUrl}/subscribe/${this.userId}`);
+  }
 
-    // ✅ Relative URL for CSP compatibility
-    const url = `/api/sse/subscribe/${this.userId}?token=${this.token}`;
-    console.log('🔌 Connecting to global SSE channel:', url);
-
-    try {
-      const eventSource = new EventSource(url);
-      this.eventSources.set('global', eventSource);
-
-      eventSource.addEventListener('projects-changed', (event) => {
-        console.log('📬 Projects list changed:', event.data);
-        this.notifySubscribers('projects-changed', JSON.parse(event.data));
-      });
-
-      eventSource.addEventListener('project-removed', (event) => {
-        console.log('📬 You were removed from project:', event.data);
-        this.notifySubscribers('project-removed', JSON.parse(event.data));
-      });
-
-      eventSource.addEventListener('notification-received', (event) => {
-        console.log('📬 Notification received:', event.data);
-        const data = JSON.parse(event.data);
-        this.notifySubscribers('notification-received', data);
-      });
-
-      eventSource.addEventListener('error', (event) => {
-        console.error('❌ SSE connection error:', event);
-        this.handleConnectionError(eventSource, 'global');
-      });
-
-      eventSource.onopen = () => {
-        console.log('✅ SSE Global connection established');
-        this.reconnectAttempts = 0;
-      };
-
-    } catch (error) {
-      console.error('❌ Failed to establish SSE connection:', error);
-    }
+  /**
+   * Основной метод подписки на канал
+   */
+  async connect() {
+    return this.subscribeToGlobal();
   }
 
   /**
    * Подписаться на события конкретного проекта (подгруппы)
    */
-  subscribeToProject(projectId) {
-    if (!this.token) {
-      console.error('❌ No JWT token found');
-      return;
-    }
-
-    // ✅ Relative URL for CSP compatibility
-    const url = `/api/sse/subscribe-project/${projectId}?token=${this.token}`;
-    console.log('🔌 Subscribing to project:', projectId, '→', url);
-
-    try {
-      const eventSource = new EventSource(url);
-      this.eventSources.set(`project-${projectId}`, eventSource);
-
-      eventSource.addEventListener('subgroups-changed', (event) => {
-        console.log(`📬 Subgroups changed in project ${projectId}:`, event.data);
-        this.notifySubscribers('subgroups-changed', JSON.parse(event.data));
-      });
-
-      eventSource.addEventListener('error', (event) => {
-        console.error(`❌ SSE project-${projectId} error:`, event);
-        this.handleConnectionError(eventSource, `project-${projectId}`);
-      });
-
-      eventSource.onopen = () => {
-        console.log(`✅ SSE Project-${projectId} connection established`);
-      };
-
-    } catch (error) {
-      console.error('❌ Failed to subscribe to project:', error);
-    }
+  async subscribeToProject(projectId) {
+    return this._subscribe(`project-${projectId}`, `${this.baseUrl}/subscribe-project/${projectId}`);
   }
 
   /**
    * Подписаться на события конкретной подгруппы (задачи)
    */
-  subscribeToSubgroup(subgroupId) {
-    if (!this.token) {
-      console.error('❌ No JWT token found');
-      return;
-    }
+  async subscribeToSubgroup(subgroupId) {
+    return this._subscribe(`subgroup-${subgroupId}`, `${this.baseUrl}/subscribe-subgroup/${subgroupId}`);
+  }
 
-    // ✅ Relative URL for CSP compatibility
-    const url = `/api/sse/subscribe-subgroup/${subgroupId}?token=${this.token}`;
-    console.log('🔌 Subscribing to subgroup:', subgroupId, '→', url);
+  /**
+   * Internal subscribe method
+   */
+  _subscribe(connectionKey, url) {
+    return new Promise((resolve, reject) => {
+      try {
+        // Если уже подписаны, не создавать новое соединение
+        if (this.connections[connectionKey]) {
+          resolve(this.connections[connectionKey]);
+          return;
+        }
 
-    try {
-      const eventSource = new EventSource(url);
-      this.eventSources.set(`subgroup-${subgroupId}`, eventSource);
+        const eventSource = new EventSource(url);
+        this.connections[connectionKey] = eventSource;
 
-      eventSource.addEventListener('task-updated', (event) => {
-        console.log(`📬 Task updated in subgroup ${subgroupId}:`, event.data);
-        this.notifySubscribers('task-updated', JSON.parse(event.data));
+        // Set up event listeners for all event types
+        const eventTypes = [
+          'projects-changed',
+          'project-removed',
+          'notification-received',
+          'subgroups-changed',
+          'task-created',
+          'task-updated',
+          'task-deleted',
+          'message',  // For generic messages
+          'test'      // For testing
+        ];
+
+        eventTypes.forEach(eventType => {
+          // Use arrow function to preserve 'this' context
+          eventSource.addEventListener(eventType, (event) => {
+            try {
+              // Parse the data from SSE event
+              const data = JSON.parse(event.data);
+              // Emit to subscribers using the event type
+              this._emit(eventType, data);
+            } catch (error) {
+              console.error('Error parsing SSE message:', error, event.data);
+            }
+          });
+        });
+
+        eventSource.addEventListener('error', (event) => {
+          console.error(`❌ SSE connection error for ${connectionKey}:`, event);
+          this.handleConnectionError(eventSource, connectionKey);
+        });
+
+        eventSource.onopen = () => {
+          console.log(`✅ SSE ${connectionKey} connection established`);
+          this.reconnectAttempts = 0;
+        };
+
+        resolve(eventSource);
+      } catch (error) {
+        console.error(`Failed to subscribe to ${connectionKey}:`, error);
+        reject(error);
+      }
+    });
+  }
+
+  /**
+   * Emit event to all subscribers
+   */
+  _emit(eventName, data) {
+    if (this.handlers[eventName]) {
+      this.handlers[eventName].forEach(handler => {
+        try {
+          handler(data);
+        } catch (error) {
+          console.error(`Error in handler for ${eventName}:`, error);
+        }
       });
-
-      eventSource.addEventListener('task-deleted', (event) => {
-        console.log(`📬 Task deleted in subgroup ${subgroupId}:`, event.data);
-        this.notifySubscribers('task-deleted', JSON.parse(event.data));
-      });
-
-      eventSource.addEventListener('error', (event) => {
-        console.error(`❌ SSE subgroup-${subgroupId} error:`, event);
-        this.handleConnectionError(eventSource, `subgroup-${subgroupId}`);
-      });
-
-      eventSource.onopen = () => {
-        console.log(`✅ SSE Subgroup-${subgroupId} connection established`);
-      };
-
-    } catch (error) {
-      console.error('❌ Failed to subscribe to subgroup:', error);
     }
   }
 
@@ -168,14 +149,14 @@ class SSEService {
    * Зарегистрировать обработчик события
    */
   subscribe(eventName, callback) {
-    if (!this.subscribers.has(eventName)) {
-      this.subscribers.set(eventName, []);
+    if (!this.handlers[eventName]) {
+      this.handlers[eventName] = [];
     }
-    this.subscribers.get(eventName).push(callback);
+    this.handlers[eventName].push(callback);
 
     // Возвращаем функцию для отписки
     return () => {
-      const callbacks = this.subscribers.get(eventName);
+      const callbacks = this.handlers[eventName];
       const index = callbacks.indexOf(callback);
       if (index > -1) {
         callbacks.splice(index, 1);
@@ -187,14 +168,7 @@ class SSEService {
    * Оповестить всех подписчиков о событии
    */
   notifySubscribers(eventName, data) {
-    const callbacks = this.subscribers.get(eventName) || [];
-    callbacks.forEach(callback => {
-      try {
-        callback(data);
-      } catch (error) {
-        console.error(`Error in subscriber for ${eventName}:`, error);
-      }
-    });
+    this._emit(eventName, data);
   }
 
   /**
@@ -204,7 +178,7 @@ class SSEService {
     console.log(`⏱️ SSE ${channelName} connection timeout/error, attempting to reconnect...`);
     
     eventSource.close();
-    this.eventSources.delete(channelName);
+    delete this.connections[channelName];
 
     if (this.reconnectAttempts < this.maxReconnectAttempts) {
       this.reconnectAttempts++;
@@ -232,10 +206,10 @@ class SSEService {
    * Закрыть конкретное соединение
    */
   disconnect(channelName) {
-    const eventSource = this.eventSources.get(channelName);
+    const eventSource = this.connections[channelName];
     if (eventSource) {
       eventSource.close();
-      this.eventSources.delete(channelName);
+      delete this.connections[channelName];
       console.log(`🔌 Disconnected from ${channelName}`);
     }
   }
@@ -245,12 +219,12 @@ class SSEService {
    */
   disconnectAll() {
     console.log('🔌 Disconnecting all SSE connections...');
-    this.eventSources.forEach((eventSource, channelName) => {
-      eventSource.close();
+    Object.keys(this.connections).forEach(channelName => {
+      this.connections[channelName].close();
       console.log(`✅ Closed ${channelName}`);
     });
-    this.eventSources.clear();
-    this.subscribers.clear();
+    this.connections = {};
+    this.handlers = {};
   }
 
   /**
@@ -258,9 +232,9 @@ class SSEService {
    */
   getConnectionStatus() {
     return {
-      isConnected: this.eventSources.size > 0,
-      channels: Array.from(this.eventSources.keys()),
-      subscribers: Object.fromEntries(this.subscribers),
+      isConnected: Object.keys(this.connections).length > 0,
+      channels: Object.keys(this.connections),
+      subscribers: this.handlers,
     };
   }
 }

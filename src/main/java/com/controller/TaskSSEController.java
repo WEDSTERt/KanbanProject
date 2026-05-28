@@ -75,19 +75,34 @@ public class TaskSSEController {
         System.out.println("📡 Subscribing to project " + projectId + " events");
         
         SseEmitter emitter = new SseEmitter(TIMEOUT);
-        projectEmitters.computeIfAbsent(projectId, k -> new CopyOnWriteArrayList<>()).add(emitter);
+        List<SseEmitter> emittersList = projectEmitters.computeIfAbsent(projectId, k -> new CopyOnWriteArrayList<>());
+        emittersList.add(emitter);
+        
+        System.out.println("✅ Added emitter for project " + projectId + ", total subscribers: " + emittersList.size());
         
         emitter.onCompletion(() -> {
             System.out.println("✅ Project " + projectId + " subscription completed");
-            projectEmitters.get(projectId).remove(emitter);
+            List<SseEmitter> list = projectEmitters.get(projectId);
+            if (list != null) {
+                list.remove(emitter);
+                System.out.println("   Remaining subscribers for project " + projectId + ": " + list.size());
+            }
         });
         emitter.onTimeout(() -> {
             System.out.println("⏱️ Project " + projectId + " subscription timeout");
-            projectEmitters.get(projectId).remove(emitter);
+            List<SseEmitter> list = projectEmitters.get(projectId);
+            if (list != null) {
+                list.remove(emitter);
+                System.out.println("   Remaining subscribers for project " + projectId + ": " + list.size());
+            }
         });
         emitter.onError(throwable -> {
-            System.out.println("❌ Project " + projectId + " subscription error");
-            projectEmitters.get(projectId).remove(emitter);
+            System.out.println("❌ Project " + projectId + " subscription error: " + throwable.getMessage());
+            List<SseEmitter> list = projectEmitters.get(projectId);
+            if (list != null) {
+                list.remove(emitter);
+                System.out.println("   Remaining subscribers for project " + projectId + ": " + list.size());
+            }
         });
         
         return emitter;
@@ -197,15 +212,16 @@ public class TaskSSEController {
     }
 
     /**
-     * Отправить событие о изменении списка подгрупп в проекте ВСЕ пользователям
+     * Отправить событие о изменении списка подгрупп в проекте всем подписчикам проекта
      */
     public void notifySubgroupsChanged(Long projectId) {
-        System.out.println("📢 Notifying ALL users about subgroups change in project " + projectId);
+        System.out.println("📢 Notifying project " + projectId + " subscribers about subgroups change");
         
-        for (Long userId : new ArrayList<>(userEmitters.keySet())) {
-            try {
-                SseEmitter emitter = userEmitters.get(userId);
-                if (emitter != null) {
+        List<SseEmitter> emitters = projectEmitters.get(projectId);
+        if (emitters != null && !emitters.isEmpty()) {
+            System.out.println("   Project " + projectId + " has " + emitters.size() + " active subscribers");
+            for (SseEmitter emitter : new ArrayList<>(emitters)) {
+                try {
                     emitter.send(SseEmitter.event()
                             .id(UUID.randomUUID().toString())
                             .name("subgroups-changed")
@@ -215,12 +231,14 @@ public class TaskSSEController {
                                 public long timestamp = System.currentTimeMillis();
                             })
                             .build());
-                    System.out.println("✅ Subgroups change notification sent to user " + userId);
+                    System.out.println("✅ Subgroups change notification sent to project " + projectId + " subscriber");
+                } catch (IOException e) {
+                    System.out.println("❌ Failed to send subgroups change notification");
+                    emitters.remove(emitter);
                 }
-            } catch (IOException e) {
-                System.out.println("❌ Failed to send subgroups change notification to user " + userId);
-                userEmitters.remove(userId);
             }
+        } else {
+            System.out.println("⚠️ No active subscribers for project " + projectId);
         }
     }
 

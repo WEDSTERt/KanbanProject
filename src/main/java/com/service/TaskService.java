@@ -1,5 +1,6 @@
 package com.service;
 
+import com.controller.TaskSSEController;
 import com.entity.*;
 import com.repository.*;
 import org.hibernate.Hibernate;
@@ -19,6 +20,8 @@ import java.util.concurrent.*;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.scheduling.annotation.Async;
+import org.springframework.context.ApplicationContext;
+import org.springframework.beans.factory.annotation.Autowired;
 
 @Service
 public class TaskService {
@@ -29,23 +32,129 @@ public class TaskService {
     private final AttachmentRepository attachmentRepository;
     private final EmailNotificationService emailNotificationService;
     private final TagRepository tagRepository;
+    private final ApplicationContext applicationContext;
 
     // Хранилище отложенных изменений (taskId -> PendingChanges)
     private final Map<Long, PendingChanges> pendingChanges = new ConcurrentHashMap<>();
     private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(5);
 
+    @Autowired
     public TaskService(TaskRepository taskRepository,
                        SubgroupRepository subgroupRepository,
                        UserRepository userRepository,
                        AttachmentRepository attachmentRepository,
                        EmailNotificationService emailNotificationService,
-                       TagRepository tagRepository) {
+                       TagRepository tagRepository,
+                       ApplicationContext applicationContext) {
         this.taskRepository = taskRepository;
         this.subgroupRepository = subgroupRepository;
         this.userRepository = userRepository;
         this.attachmentRepository = attachmentRepository;
         this.emailNotificationService = emailNotificationService;
         this.tagRepository = tagRepository;
+        this.applicationContext = applicationContext;
+    }
+
+    /**
+     * Получить SSE контроллер через ApplicationContext
+     */
+    private TaskSSEController getSSEController() {
+        try {
+            return applicationContext.getBean(TaskSSEController.class);
+        } catch (Exception e) {
+            System.err.println("❌ Failed to get SSE Controller: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Отправить SSE событие о создании задачи АСИНХРОННО
+     */
+    private void notifyTaskCreatedAsync(Long subgroupId, Task task) {
+        // Инициализируем все коллекции ДО асинхронной отправки
+        Hibernate.initialize(task.getTags());
+        Hibernate.initialize(task.getAssignees());
+        Hibernate.initialize(task.getAttachments());
+        
+        // Создаем DTO с полностью загруженными данными
+        Map<String, Object> taskData = new HashMap<>();
+        taskData.put("id", task.getId());
+        taskData.put("title", task.getTitle());
+        taskData.put("description", task.getDescription());
+        taskData.put("status", task.getStatus());
+        taskData.put("dueDate", task.getDueDate());
+        taskData.put("value", task.getValue());
+        taskData.put("subgroupId", subgroupId);
+        
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(100);
+                TaskSSEController sseController = getSSEController();
+                if (sseController != null) {
+                    System.out.println("📡 Sending task-created event for subgroup " + subgroupId);
+                    sseController.notifyTaskUpdated(subgroupId, taskData);
+                    System.out.println("✅ Sent task-created event for subgroup " + subgroupId);
+                }
+            } catch (Exception e) {
+                System.err.println("❌ Error sending task-created event: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+    }
+
+    /**
+     * Отправить SSE событие об обновлении задачи АСИНХРОННО
+     */
+    private void notifyTaskUpdatedAsync(Long subgroupId, Task task) {
+        // Инициализируем все коллекции ДО асинхронной отправки
+        Hibernate.initialize(task.getTags());
+        Hibernate.initialize(task.getAssignees());
+        Hibernate.initialize(task.getAttachments());
+        
+        // Создаем DTO с полностью загруженными данными
+        Map<String, Object> taskData = new HashMap<>();
+        taskData.put("id", task.getId());
+        taskData.put("title", task.getTitle());
+        taskData.put("description", task.getDescription());
+        taskData.put("status", task.getStatus());
+        taskData.put("dueDate", task.getDueDate());
+        taskData.put("value", task.getValue());
+        taskData.put("subgroupId", subgroupId);
+        
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(100);
+                TaskSSEController sseController = getSSEController();
+                if (sseController != null) {
+                    System.out.println("📡 Sending task-updated event for subgroup " + subgroupId);
+                    sseController.notifyTaskUpdated(subgroupId, taskData);
+                    System.out.println("✅ Sent task-updated event for subgroup " + subgroupId);
+                }
+            } catch (Exception e) {
+                System.err.println("❌ Error sending task-updated event: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
+    }
+
+    /**
+     * Отправить SSE событие об удалении задачи АСИНХРОННО
+     */
+    private void notifyTaskDeletedAsync(Long subgroupId, Long taskId) {
+        CompletableFuture.runAsync(() -> {
+            try {
+                Thread.sleep(100);
+                TaskSSEController sseController = getSSEController();
+                if (sseController != null) {
+                    System.out.println("📡 Sending task-deleted event for subgroup " + subgroupId);
+                    sseController.notifyTaskDeleted(subgroupId, taskId);
+                    System.out.println("✅ Sent task-deleted event for subgroup " + subgroupId);
+                }
+            } catch (Exception e) {
+                System.err.println("❌ Error sending task-deleted event: " + e.getMessage());
+                e.printStackTrace();
+            }
+        });
     }
 
     // Класс для хранения отложенных изменений
@@ -232,6 +341,9 @@ public class TaskService {
             emailNotificationService.notifyTaskCreated(savedTask, createdBy, assignees);
         }
 
+        // 📡 Отправляем SSE событие АСИНХРОННО
+        notifyTaskCreatedAsync(subgroupId, savedTask);
+
         return savedTask;
     }
 
@@ -242,6 +354,8 @@ public class TaskService {
                            Long createdByUserId, Long parentTaskId) {
         Task task = taskRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
+        Long oldSubgroupId = task.getSubgroup() != null ? task.getSubgroup().getId() : null;
+        
         if (subgroupId != null) {
             Subgroup subgroup = subgroupRepository.findById(subgroupId)
                     .orElseThrow(() -> new RuntimeException("Subgroup not found"));
@@ -271,7 +385,18 @@ public class TaskService {
             }
         }
 
-        return taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
+        
+        // 📡 Отправляем SSE событие в оба канала если задача перемещена между подгруппами
+        Long newSubgroupId = savedTask.getSubgroup() != null ? savedTask.getSubgroup().getId() : null;
+        if (oldSubgroupId != null) {
+            notifyTaskUpdatedAsync(oldSubgroupId, savedTask);
+        }
+        if (newSubgroupId != null && !newSubgroupId.equals(oldSubgroupId)) {
+            notifyTaskUpdatedAsync(newSubgroupId, savedTask);
+        }
+
+        return savedTask;
     }
 
     @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
@@ -347,6 +472,12 @@ public class TaskService {
             addChangeWithDelay(id, "Статус: " + oldStatus + " → " + newStatusText, changedBy, notificationData);
         }
 
+        // 📡 Отправляем SSE событие об обновлении статуса
+        Long subgroupId = savedTask.getSubgroup() != null ? savedTask.getSubgroup().getId() : null;
+        if (subgroupId != null) {
+            notifyTaskUpdatedAsync(subgroupId, savedTask);
+        }
+
         return savedTask;
     }
 
@@ -354,7 +485,16 @@ public class TaskService {
     @Transactional
     public boolean deleteTask(Long id) {
         if (taskRepository.existsById(id)) {
+            Task task = taskRepository.findById(id).orElse(null);
+            Long subgroupId = task != null && task.getSubgroup() != null ? task.getSubgroup().getId() : null;
+            
             taskRepository.deleteById(id);
+            
+            // 📡 Отправляем SSE событие об удалении задачи
+            if (subgroupId != null) {
+                notifyTaskDeletedAsync(subgroupId, id);
+            }
+            
             return true;
         }
         return false;
@@ -484,7 +624,16 @@ public class TaskService {
         if (!task.getAssignees().contains(user)) {
             task.getAssignees().add(user);
         }
-        return taskRepository.save(task);
+        
+        Task savedTask = taskRepository.save(task);
+        
+        // 📡 Отправляем SSE событие об обновлении задачи
+        Long subgroupId = savedTask.getSubgroup() != null ? savedTask.getSubgroup().getId() : null;
+        if (subgroupId != null) {
+            notifyTaskUpdatedAsync(subgroupId, savedTask);
+        }
+        
+        return savedTask;
     }
 
     @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
@@ -510,7 +659,16 @@ public class TaskService {
                 addChangeWithDelay(taskId, "Добавлен исполнитель: " + user.getFullName(), assignedBy, notificationData);
             }
         }
-        return taskRepository.save(task);
+        
+        Task savedTask = taskRepository.save(task);
+        
+        // 📡 Отправляем SSE событие об обновлении задачи
+        Long subgroupId = savedTask.getSubgroup() != null ? savedTask.getSubgroup().getId() : null;
+        if (subgroupId != null) {
+            notifyTaskUpdatedAsync(subgroupId, savedTask);
+        }
+        
+        return savedTask;
     }
 
     @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
@@ -521,7 +679,16 @@ public class TaskService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
         task.getAssignees().remove(user);
-        return taskRepository.save(task);
+        
+        Task savedTask = taskRepository.save(task);
+        
+        // 📡 Отправляем SSE событие об обновлении задачи
+        Long subgroupId = savedTask.getSubgroup() != null ? savedTask.getSubgroup().getId() : null;
+        if (subgroupId != null) {
+            notifyTaskUpdatedAsync(subgroupId, savedTask);
+        }
+        
+        return savedTask;
     }
 
     @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
@@ -531,7 +698,16 @@ public class TaskService {
                 .orElseThrow(() -> new RuntimeException("Task not found"));
         List<User> assignees = userRepository.findAllById(userIds);
         task.setAssignees(assignees);
-        return taskRepository.save(task);
+        
+        Task savedTask = taskRepository.save(task);
+        
+        // 📡 Отправляем SSE событие об обновлении задачи
+        Long subgroupId = savedTask.getSubgroup() != null ? savedTask.getSubgroup().getId() : null;
+        if (subgroupId != null) {
+            notifyTaskUpdatedAsync(subgroupId, savedTask);
+        }
+        
+        return savedTask;
     }
 
     @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
@@ -566,7 +742,15 @@ public class TaskService {
             }
         }
 
-        return taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
+        
+        // 📡 Отправляем SSE событие об обновлении задачи
+        Long subgroupId = savedTask.getSubgroup() != null ? savedTask.getSubgroup().getId() : null;
+        if (subgroupId != null) {
+            notifyTaskUpdatedAsync(subgroupId, savedTask);
+        }
+        
+        return savedTask;
     }
 
     // ============ ВЛОЖЕНИЯ ============
@@ -600,6 +784,12 @@ public class TaskService {
 
         if (currentUser != null) {
             addChangeWithDelay(taskId, "Прикреплён файл: " + file.getOriginalFilename(), currentUser, notificationData);
+        }
+
+        // 📡 Отправляем SSE событие об обновлении задачи
+        Long subgroupId = task.getSubgroup() != null ? task.getSubgroup().getId() : null;
+        if (subgroupId != null) {
+            notifyTaskUpdatedAsync(subgroupId, task);
         }
 
         return savedAttachment;
@@ -642,6 +832,12 @@ public class TaskService {
 
         if (currentUser != null) {
             addChangeWithDelay(task.getId(), "Удалён файл: " + fileName, currentUser, notificationData);
+        }
+        
+        // 📡 Отправляем SSE событие об обновлении задачи
+        Long subgroupId = task.getSubgroup() != null ? task.getSubgroup().getId() : null;
+        if (subgroupId != null) {
+            notifyTaskUpdatedAsync(subgroupId, task);
         }
     }
 

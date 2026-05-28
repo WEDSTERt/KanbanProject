@@ -5,11 +5,9 @@ export const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
     const [notifications, setNotifications] = useState([]);
-    const [notificationCounter, setNotificationCounter] = useState(0);
 
     const addNotification = useCallback((notification) => {
-        const id = `${Date.now()}-${notificationCounter}`;
-        setNotificationCounter(prev => prev + 1);
+        const id = `${Date.now()}-${Math.random()}`;
         const completeNotification = {
             id,
             timestamp: new Date(),
@@ -24,7 +22,7 @@ export const NotificationProvider = ({ children }) => {
         }, timeout);
 
         return id;
-    }, [notificationCounter]);
+    }, []);
 
     const removeNotification = useCallback((id) => {
         setNotifications(prev => prev.filter(n => n.id !== id));

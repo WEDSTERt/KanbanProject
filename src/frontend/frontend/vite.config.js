@@ -10,7 +10,8 @@ export default defineConfig({
         allowedHosts: [
             'kanbandocky.ru',
             'pitilessly-tidy-louse.cloudpub.ru',
-            'localhost'
+            'localhost',
+            '127.0.0.1'
         ],
         proxy: {
             '/graphql': {
