@@ -23,4 +23,9 @@ public interface NotificationRepository extends JpaRepository<Notification, Long
     @Modifying
     @Query("DELETE FROM Notification n WHERE n.createdAt < :before")
     void deleteOldNotifications(@Param("before") LocalDateTime before);
+    
+    // ✅ НОВОЕ: Удалить все уведомления пользователя
+    @Modifying
+    @Query("DELETE FROM Notification n WHERE n.recipient.id = :userId")
+    void deleteAllByUserId(@Param("userId") Long userId);
 }

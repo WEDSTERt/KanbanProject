@@ -10,8 +10,6 @@ const VerifyEmail = () => {
     const [status, setStatus] = useState('loading');
     const [errorMessage, setErrorMessage] = useState('');
     
-    // ✅ ИСПРАВЛЕНО: Используем ref чтобы отследить был ли уже запрос
-    // React Strict Mode вызывает эффекты дважды, нам нужно это предотвратить
     const verificationAttemptedRef = useRef(false);
 
     const [verifyEmail, { loading: verifying }] = useMutation(VERIFY_EMAIL);
@@ -27,7 +25,6 @@ const VerifyEmail = () => {
             return;
         }
 
-        // ✅ ИСПРАВЛЕНО: Проверяем что верификация ещё не попытана
         if (verificationAttemptedRef.current) {
             console.log('⏭️ Verification already attempted, skipping duplicate call');
             return;
@@ -47,8 +44,10 @@ const VerifyEmail = () => {
                     setStatus('success');
                     console.log('🎉 Email verified successfully!');
                     
+                    // ✅ ИСПРАВЛЕНО: Перезагружаем страницу вместо навигации
+                    // Это очищает auth state и позволяет правильно перейти на /login
                     setTimeout(() => {
-                        navigate('/login');
+                        window.location.href = '/login';
                     }, 3000);
                 } else if (data?.verifyEmail === false) {
                     setStatus('error');
@@ -75,7 +74,6 @@ const VerifyEmail = () => {
             }
         };
 
-        // ✅ Отмечаем что попытка верификации началась
         verificationAttemptedRef.current = true;
         verify();
     }, [token, verifyEmail, navigate]);
@@ -128,14 +126,14 @@ const VerifyEmail = () => {
                     <div style={{ marginTop: '20px' }}>
                         <button 
                             className="btn" 
-                            onClick={() => navigate('/login')}
+                            onClick={() => window.location.href = '/login'}
                             style={{ marginRight: '10px' }}
                         >
                             Перейти на страницу входа
                         </button>
                         <button 
                             className="btn" 
-                            onClick={() => navigate('/register')}
+                            onClick={() => window.location.href = '/register'}
                             style={{ background: '#666' }}
                         >
                             Зарегистрироваться заново

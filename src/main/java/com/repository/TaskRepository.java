@@ -56,8 +56,6 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "WHERE t.subgroupId = :subgroupId AND (t.parentTaskId IS NULL OR t.parentTaskId = 0)")
     List<Task> findRootTasksBySubgroup(@Param("subgroupId") Long subgroupId);
 
-    // ✅ ИСПРАВЛЕНО: Только ONE LEFT JOIN FETCH (без tags и attachments)
-    // Они загружаются отдельно в TaskService
     @Query("SELECT DISTINCT t FROM Task t " +
             "LEFT JOIN FETCH t.assignees " +
             "WHERE t.subgroupId = :subgroupId AND (t.parentTaskId IS NULL OR t.parentTaskId = 0) " +
@@ -90,11 +88,6 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     @Query("SELECT t.parentTaskId, COUNT(t) FROM Task t WHERE t.parentTaskId IN :taskIds GROUP BY t.parentTaskId")
     List<Object[]> countSubTasksByParentIds(@Param("taskIds") List<Long> taskIds);
 
-    /**
-     * ✅ ИСПРАВЛЕНИЕ: Используем подзапрос вместо DISTINCT + JOIN
-     * DISTINCT с JOIN на многие-ко-многим вызывает проблемы - загружает только одного assignee
-     * Решение: найти ID всех задач, где пользователь - assignee, затем загрузить их со всеми assignees
-     */
     @Query("SELECT DISTINCT t FROM Task t " +
             "LEFT JOIN FETCH t.assignees " +
             "WHERE t.id IN (SELECT DISTINCT t2.id FROM Task t2 " +
@@ -130,4 +123,9 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "WHERE sg.project_id = :projectId) AND user_id = :userId", nativeQuery = true)
     int removeUserFromAllTaskAssigneesInProject(@Param("projectId") Long projectId,
                                                 @Param("userId") Long userId);
+    
+    // ✅ НОВОЕ: Удалить пользователя из всех задач вообще
+    @Modifying
+    @Query(value = "DELETE FROM task_assignees WHERE user_id = :userId", nativeQuery = true)
+    int removeUserFromAllTaskAssignees(@Param("userId") Long userId);
 }

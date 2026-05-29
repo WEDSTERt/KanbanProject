@@ -28,4 +28,9 @@ public interface SubgroupMemberRepository extends JpaRepository<SubgroupMember, 
     @Query("SELECT sm FROM SubgroupMember sm WHERE sm.userId = :userId AND sm.subgroupId IN " +
             "(SELECT s.id FROM Subgroup s WHERE s.projectId = :projectId)")
     List<SubgroupMember> findByUserIdAndProjectId(@Param("userId") Long userId, @Param("projectId") Long projectId);
+    
+    // ✅ НОВОЕ: Удалить пользователя из всех групп
+    @Modifying
+    @Query("DELETE FROM SubgroupMember sm WHERE sm.userId = :userId")
+    int deleteByUserId(@Param("userId") Long userId);
 }

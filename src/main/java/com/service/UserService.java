@@ -1,7 +1,7 @@
 package com.service;
 
-import com.entity.User;
-import com.repository.UserRepository;
+import com.entity.*;
+import com.repository.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -24,9 +24,14 @@ import java.util.UUID;
 public class UserService {
 
     private final UserRepository userRepository;
+    private final NotificationRepository notificationRepository;
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final TurnstileService turnstileService;
+    private final ProjectRepository projectRepository;
+    private final ProjectMemberRepository projectMemberRepository;
+    private final SubgroupMemberRepository subgroupMemberRepository;
+    private final TaskRepository taskRepository;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
@@ -40,11 +45,21 @@ public class UserService {
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
                        JavaMailSender mailSender,
-                       TurnstileService turnstileService) {
+                       TurnstileService turnstileService,
+                       NotificationRepository notificationRepository,
+                       ProjectRepository projectRepository,
+                       ProjectMemberRepository projectMemberRepository,
+                       SubgroupMemberRepository subgroupMemberRepository,
+                       TaskRepository taskRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailSender = mailSender;
         this.turnstileService = turnstileService;
+        this.notificationRepository = notificationRepository;
+        this.projectRepository = projectRepository;
+        this.projectMemberRepository = projectMemberRepository;
+        this.subgroupMemberRepository = subgroupMemberRepository;
+        this.taskRepository = taskRepository;
     }
 
     @CacheEvict(value = {"users", "currentUser"}, allEntries = true)
@@ -130,12 +145,12 @@ public class UserService {
         mailSender.send(message);
     }
 
-    @CacheEvict(value = {"users", "currentUser"}, allEntries = true)
+    @CacheEvict(value = {"users"}, key = "#id")
     @Transactional
     public User updateUser(Long id, String fullName, String email, String password) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found"));
-        if (fullName != null) user.setFullName(fullName);
+        if (fullName != null) { user.setFullName(fullName); System.out.println("📝 Updated fullName to: " + fullName); }
         if (email != null) user.setEmail(email);
         if (password != null) user.setUserPassword(passwordEncoder.encode(password));
         // НЕ ТРОГАЕМ emailNotificationsEnabled здесь!
@@ -154,20 +169,138 @@ public class UserService {
     @CacheEvict(value = {"users", "currentUser", "projects", "projectDetails"}, allEntries = true)
     @Transactional
     public boolean deleteUser(Long id) {
-        if (userRepository.existsById(id)) {
-            User user = userRepository.findById(id).orElse(null);
-            if (user != null) {
-                user.getProjectMemberships().clear();
-                user.getOwnedProjects().clear();
-                user.getSubgroupMemberships().clear();
-                user.getAssignedTasks().clear();
-                user.getCreatedTasks().clear();
-                userRepository.save(user);
-            }
-            userRepository.deleteById(id);
-            return true;
+        System.out.println("\n═══════════════════════════════════════════════════════════════");
+        System.out.println("🗑️ DELETE USER PROCESS STARTED: User ID = " + id);
+        System.out.println("═══════════════════════════════════════════════════════════════");
+
+        if (!userRepository.existsById(id)) {
+            System.out.println("❌ User not found");
+            return false;
         }
-        return false;
+
+        User user = userRepository.findById(id).orElse(null);
+        if (user == null) {
+            System.out.println("❌ Could not load user");
+            return false;
+        }
+
+        System.out.println("📧 User: " + user.getEmail());
+
+        // STEP 1: Удалить все уведомления
+        System.out.println("\n[STEP 1] Deleting all notifications...");
+        try {
+            notificationRepository.deleteAllByUserId(id);
+            System.out.println("✅ Deleted all notifications");
+        } catch (Exception e) {
+            System.err.println("⚠️ Warning: " + e.getMessage());
+        }
+
+        // STEP 2: Обработать проекты (если пользователь владелец)
+        System.out.println("\n[STEP 2] Processing owned projects...");
+        try {
+            List<Project> ownedProjects = projectRepository.findByOwnerUserId(id);
+            System.out.println("   Found " + ownedProjects.size() + " owned projects");
+
+            for (Project project : ownedProjects) {
+                System.out.println("   Processing project: " + project.getName() + " (ID: " + project.getId() + ")");
+
+                // Найти другого админа в проекте
+                List<ProjectMember> admins = projectMemberRepository.findAdminsByProjectId(project.getId(), id);
+                
+                if (!admins.isEmpty()) {
+                    // Передать проект первому админу
+                    ProjectMember newOwner = admins.get(0);
+                    System.out.println("      ✓ Transferring to admin: " + newOwner.getUser().getFullName());
+                    project.setOwner(newOwner.getUser());
+                    projectRepository.save(project);
+                } else {
+                    // Удалить проект если нет других админов
+                    System.out.println("      ✓ No other admins, deleting project...");
+                    projectRepository.deleteById(project.getId());
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error processing owned projects: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        // STEP 3: Удалить задачи созданные пользователем
+        System.out.println("\n[STEP 3] Processing tasks created by user...");
+        try {
+            List<Task> createdTasks = taskRepository.findByCreatedByUserId(id);
+            System.out.println("   Found " + createdTasks.size() + " created tasks");
+
+            for (Task task : createdTasks) {
+                // Передать задачу другому админу проекта
+                Long projectId = task.getSubgroup().getProject().getId();
+                List<ProjectMember> projectAdmins = projectMemberRepository.findAdminsByProjectId(projectId, id);
+
+                if (!projectAdmins.isEmpty()) {
+                    // Передать админу
+                    task.setCreatedBy(projectAdmins.get(0).getUser());
+                    System.out.println("      ✓ Task '" + task.getTitle() + "' transferred to: " + projectAdmins.get(0).getUser().getFullName());
+                    taskRepository.save(task);
+                } else {
+                    // Если нет админов, найти кого-нибудь в проекте
+                    List<ProjectMember> anyMembers = projectMemberRepository.findByProjectIdAndNotUserId(projectId, id);
+                    if (!anyMembers.isEmpty()) {
+                        task.setCreatedBy(anyMembers.get(0).getUser());
+                        System.out.println("      ✓ Task '" + task.getTitle() + "' transferred to: " + anyMembers.get(0).getUser().getFullName());
+                        taskRepository.save(task);
+                    } else {
+                        // Удалить задачу если нет никого
+                        System.out.println("      ✓ No other members, deleting task: " + task.getTitle());
+                        taskRepository.deleteById(task.getId());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("❌ Error processing created tasks: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        // STEP 4: Удалить из всех групп
+        System.out.println("\n[STEP 4] Removing from all subgroups...");
+        try {
+            int removed = subgroupMemberRepository.deleteByUserId(id);
+            System.out.println("✅ Removed from " + removed + " subgroups");
+        } catch (Exception e) {
+            System.err.println("❌ Error: " + e.getMessage());
+        }
+
+        // STEP 5: Удалить из всех проектов
+        System.out.println("\n[STEP 5] Removing from all projects...");
+        try {
+            int removed = projectMemberRepository.deleteByUserId(id);
+            System.out.println("✅ Removed from " + removed + " projects");
+        } catch (Exception e) {
+            System.err.println("❌ Error: " + e.getMessage());
+        }
+
+        // STEP 6: Удалить пользователя из задач (как исполнитель)
+        System.out.println("\n[STEP 6] Removing from task assignees...");
+        try {
+            int removed = taskRepository.removeUserFromAllTaskAssignees(id);
+            System.out.println("✅ Removed from " + removed + " task assignees");
+        } catch (Exception e) {
+            System.err.println("❌ Error: " + e.getMessage());
+        }
+
+        // STEP 7: Удалить самого пользователя
+        System.out.println("\n[STEP 7] Deleting user from database...");
+        try {
+            userRepository.deleteById(id);
+            System.out.println("✅ User deleted");
+        } catch (Exception e) {
+            System.err.println("❌ Error deleting user: " + e.getMessage());
+            e.printStackTrace();
+            return false;
+        }
+
+        System.out.println("\n═══════════════════════════════════════════════════════════════");
+        System.out.println("✅ USER DELETION COMPLETED SUCCESSFULLY");
+        System.out.println("═══════════════════════════════════════════════════════════════\n");
+        return true;
     }
 
     @Cacheable(value = "users", key = "#id")
@@ -206,7 +339,6 @@ public class UserService {
 
     @Transactional
     public boolean verifyEmail(String token) {
-        // ✅ ИСПРАВЛЕНО: Логирование и проверки вместо исключений
         if (token == null || token.isEmpty()) {
             System.out.println("❌ Verification failed: token is null or empty");
             return false;
@@ -224,7 +356,6 @@ public class UserService {
         User user = userOpt.get();
         System.out.println("📧 Found user: " + user.getEmail());
 
-        // Проверить что токен не истёк
         if (user.getVerificationTokenExpiry() == null) {
             System.out.println("❌ Verification failed: token expiry is null for user: " + user.getEmail());
             return false;
@@ -237,15 +368,12 @@ public class UserService {
             return false;
         }
 
-        // Проверить что email ещё не верифицирован
         if (user.getEmailVerified()) {
             System.out.println("⚠️ Email already verified for user: " + user.getEmail());
-            return true; // Считаем успехом
+            return true;
         }
 
-        // ИСПРАВЛЕНО: Подтвердить email БЕЗ удаления токена
         user.setEmailVerified(true);
-        // НЕ удаляем токен - нужно для повторных запросов
         userRepository.save(user);
 
         System.out.println("✅ Email verified successfully for user: " + user.getEmail());
@@ -321,11 +449,3 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }
-
-
-
-
-
-
-
-

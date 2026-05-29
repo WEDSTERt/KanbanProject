@@ -9,10 +9,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
 import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
+import org.springframework.security.oauth2.core.OAuth2AccessToken;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
 
 import java.io.IOException;
 import java.util.Map;
@@ -24,13 +28,18 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
 
     private final UserService userService;
     private final JwtUtil jwtUtil;
+    private final RestTemplate restTemplate;
+    private final OAuth2AuthorizedClientService authorizedClientService;
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
-    public OAuth2LoginSuccessHandler(UserService userService, JwtUtil jwtUtil) {
+    public OAuth2LoginSuccessHandler(UserService userService, JwtUtil jwtUtil, RestTemplate restTemplate,
+                                     OAuth2AuthorizedClientService authorizedClientService) {
         this.userService = userService;
         this.jwtUtil = jwtUtil;
+        this.restTemplate = restTemplate;
+        this.authorizedClientService = authorizedClientService;
     }
 
     @Override
@@ -58,9 +67,23 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 if (fullName == null) fullName = (String) attributes.get("display_name");
                 logger.info("Yandex user: {}, {}", email, fullName);
             } else if ("github".equals(registrationId)) {
-                email = oAuth2User.getAttribute("email");
-                fullName = oAuth2User.getAttribute("name");
+                // ✅ ИСПРАВЛЕНО: Получаем реальный email от GitHub API
                 String login = oAuth2User.getAttribute("login");
+                
+                // Получаем access token
+                OAuth2AuthorizedClient authorizedClient = authorizedClientService.loadAuthorizedClient(
+                    registrationId, 
+                    token.getName()
+                );
+                
+                String accessToken = null;
+                if (authorizedClient != null && authorizedClient.getAccessToken() != null) {
+                    accessToken = authorizedClient.getAccessToken().getTokenValue();
+                }
+                
+                // Пытаемся получить email через API
+                email = getGitHubEmail(accessToken);
+                fullName = oAuth2User.getAttribute("name");
                 
                 if (email == null || email.isEmpty()) {
                     email = login + "@github.com";
@@ -68,7 +91,7 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
                 if (fullName == null || fullName.isEmpty()) {
                     fullName = login;
                 }
-                logger.info("GitHub user: {}, {}", email, fullName);
+                logger.info("GitHub user: {}, {} (login: {})", email, fullName, login);
             } else {
                 throw new RuntimeException("Unsupported provider: " + registrationId);
             }
@@ -121,6 +144,80 @@ public class OAuth2LoginSuccessHandler extends SimpleUrlAuthenticationSuccessHan
             } catch (IOException ex) {
                 logger.error("Failed to redirect on error", ex);
             }
+        }
+    }
+
+    /**
+     * ✅ НОВОЕ: Получает реальный email пользователя от GitHub API
+     * GitHub по умолчанию не возвращает email через OAuth2,
+     * нужно запросить через /user/emails endpoint
+     */
+    private String getGitHubEmail(String accessToken) {
+        try {
+            if (accessToken == null || accessToken.isEmpty()) {
+                logger.warn("❌ No access token provided");
+                return null;
+            }
+            
+            logger.info("📧 Fetching GitHub user emails via API...");
+            
+            // Создаём простой HTTP запрос с заголовками
+            org.springframework.http.HttpHeaders httpHeaders = new org.springframework.http.HttpHeaders();
+            httpHeaders.set("Authorization", "Bearer " + accessToken);
+            httpHeaders.set("Accept", "application/vnd.github.v3+json");
+            
+            org.springframework.http.HttpEntity<String> entity = new org.springframework.http.HttpEntity<>(httpHeaders);
+            
+            org.springframework.http.ResponseEntity<java.util.Map[]> response = restTemplate.exchange(
+                "https://api.github.com/user/emails",
+                org.springframework.http.HttpMethod.GET,
+                entity,
+                java.util.Map[].class
+            );
+            
+            if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
+                java.util.Map[] emails = response.getBody();
+                logger.info("📧 Found {} email(s) from GitHub", emails.length);
+                
+                // Ищем primary verified email
+                for (java.util.Map email : emails) {
+                    Boolean primary = (Boolean) email.get("primary");
+                    Boolean verified = (Boolean) email.get("verified");
+                    String emailAddress = (String) email.get("email");
+                    
+                    logger.info("   - {}: primary={}, verified={}", emailAddress, primary, verified);
+                    
+                    if (primary != null && primary && verified != null && verified) {
+                        logger.info("✅ Using primary verified email: {}", emailAddress);
+                        return emailAddress;
+                    }
+                }
+                
+                // Если primary не найден, берём первый verified
+                for (java.util.Map email : emails) {
+                    Boolean verified = (Boolean) email.get("verified");
+                    String emailAddress = (String) email.get("email");
+                    
+                    if (verified != null && verified) {
+                        logger.info("✅ Using first verified email: {}", emailAddress);
+                        return emailAddress;
+                    }
+                }
+                
+                // Если ничего не найдено, берём любой
+                if (emails.length > 0) {
+                    String emailAddress = (String) emails[0].get("email");
+                    logger.info("⚠️ No primary/verified email, using: {}", emailAddress);
+                    return emailAddress;
+                }
+            }
+            
+            logger.warn("❌ Could not fetch GitHub emails");
+            return null;
+            
+        } catch (Exception e) {
+            logger.error("❌ Error fetching GitHub emails: {}", e.getMessage(), e);
+            return null;
         }
     }
 }
