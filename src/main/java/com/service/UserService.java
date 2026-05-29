@@ -111,7 +111,7 @@ public class UserService {
     }
 
     private void sendVerificationEmail(String email, String token) {
-        String verificationUrl = frontendUrl + "/verify-email?token=" + token;
+        String verificationUrl = frontendUrl + "/verify-email/" + token;
 
         SimpleMailMessage message = new SimpleMailMessage();
         message.setTo(email);
@@ -206,18 +206,49 @@ public class UserService {
 
     @Transactional
     public boolean verifyEmail(String token) {
-        User user = userRepository.findByVerificationToken(token)
-                .orElseThrow(() -> new RuntimeException("Invalid verification token"));
-
-        if (user.getVerificationTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new RuntimeException("Verification token has expired");
+        // ✅ ИСПРАВЛЕНО: Логирование и проверки вместо исключений
+        if (token == null || token.isEmpty()) {
+            System.out.println("❌ Verification failed: token is null or empty");
+            return false;
         }
 
+        System.out.println("🔍 Verifying email with token: " + token);
+
+        Optional<User> userOpt = userRepository.findByVerificationToken(token);
+        if (userOpt.isEmpty()) {
+            System.out.println("❌ Verification failed: user not found with token: " + token);
+            System.out.println("   Searching in database for any matching token...");
+            return false;
+        }
+
+        User user = userOpt.get();
+        System.out.println("📧 Found user: " + user.getEmail());
+
+        // Проверить что токен не истёк
+        if (user.getVerificationTokenExpiry() == null) {
+            System.out.println("❌ Verification failed: token expiry is null for user: " + user.getEmail());
+            return false;
+        }
+
+        if (user.getVerificationTokenExpiry().isBefore(LocalDateTime.now())) {
+            System.out.println("❌ Verification failed: token expired for user: " + user.getEmail());
+            System.out.println("   Expiry time: " + user.getVerificationTokenExpiry());
+            System.out.println("   Current time: " + LocalDateTime.now());
+            return false;
+        }
+
+        // Проверить что email ещё не верифицирован
+        if (user.getEmailVerified()) {
+            System.out.println("⚠️ Email already verified for user: " + user.getEmail());
+            return true; // Считаем успехом
+        }
+
+        // ИСПРАВЛЕНО: Подтвердить email БЕЗ удаления токена
         user.setEmailVerified(true);
-        user.setVerificationToken(null);
-        user.setVerificationTokenExpiry(null);
+        // НЕ удаляем токен - нужно для повторных запросов
         userRepository.save(user);
 
+        System.out.println("✅ Email verified successfully for user: " + user.getEmail());
         return true;
     }
 
@@ -290,3 +321,11 @@ public class UserService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 }
+
+
+
+
+
+
+
+

@@ -50,7 +50,6 @@ const HomePage = () => {
     return <StartPage/>;
 };
 
-// ✅ ИСПРАВЛЕНИЕ: SSEProvider ВНУТРИ, чтобы он получал userId от useAuth()
 function App() {
     return (
         <SSEProvider>
@@ -72,6 +71,7 @@ function AppContent() {
 
             {/* Публичные маршруты */}
             <Route path="/verify-email" element={<VerifyEmail/>}/>
+            <Route path="/verify-email/:token" element={<VerifyEmail/>}/>
             <Route path="/login" element={<PublicRoute><LoginForm/></PublicRoute>}/>
             <Route path="/register" element={<PublicRoute><RegisterForm/></PublicRoute>}/>
             
