@@ -1,9 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { useQuery, useMutation, useSubscription } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { useNavigate } from 'react-router-dom';
 import { GET_SUBGROUPS_BY_PROJECT } from '../graphql/queries';
 import { DELETE_SUBGROUP } from '../graphql/mutations';
-import { PROJECT_UPDATED_SUBSCRIPTION } from '../graphql/subscriptions';
 import { useAuth } from '../contexts/AuthContext';
 import { useSSE } from '../contexts/SSEContext';
 import SubgroupSettingsModal from './SubgroupSettingsModal';
@@ -43,22 +42,6 @@ const SubgroupsPanel = ({
     }, [refetch]);
     
     const [deleteSubgroup] = useMutation(DELETE_SUBGROUP, { onCompleted: () => refetch() });
-
-    // 🔄 Подписка на обновления групп (через обновления проектов, если WebSocket работает)
-    const { data: projectUpdateData } = useSubscription(PROJECT_UPDATED_SUBSCRIPTION, {
-        skip: !projectId,
-        onError: (err) => {
-            console.warn('⚠️ Project subscription error (using SSE):', err.message);
-        },
-    });
-
-    // Обновить группы когда пришло обновление через subscription
-    useEffect(() => {
-        if (projectUpdateData?.projectUpdated) {
-            console.log('📨 Project updated via subscription, refreshing subgroups:', projectUpdateData.projectUpdated);
-            refetch();
-        }
-    }, [projectUpdateData, refetch]);
 
     // 🆕 SSE подписка на изменения подгрупп - регистрируем слушатель
     useEffect(() => {

@@ -17,8 +17,6 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.OffsetDateTime;
 import java.util.List;
-import org.springframework.graphql.data.method.annotation.SubscriptionMapping;
-import reactor.core.publisher.Flux;
 
 @Controller
 public class GraphQLController {
@@ -434,7 +432,6 @@ public class GraphQLController {
         return true;
     }
 
-
     // ============ SCHEMA MAPPINGS ============
 
     @SchemaMapping(typeName = "User", field = "ownedProjects")
@@ -573,13 +570,4 @@ public class GraphQLController {
     public List<Task> tasksByAssigneeAndProject(@Argument Long userId, @Argument Long projectId) {
         return taskService.findTasksByAssigneeAndProject(userId, projectId);
     }
-    @SubscriptionMapping
-    public Flux<com.dto.NotificationDTO> notificationCreated(@Argument Long userId) {
-        return Flux.from(notificationService.getUserSink(userId).asFlux());
-    }
 }
-
-
-
-
-

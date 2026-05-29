@@ -3,7 +3,10 @@ import { useQuery, useMutation, useApolloClient } from '@apollo/client';
 import {
     GET_PROJECT_DETAILS,
     GET_TASKS_BY_SUBGROUP,
+    GET_TASKS_BY_SUBGROUP_LITE,
     GET_TASKS_BY_ASSIGNEE_AND_PROJECT,
+    GET_TASKS_BY_ASSIGNEE_AND_PROJECT_LITE,
+    GET_TASKS_BY_IDS,
     GET_ALL_SUBTASKS,
     GET_TAGS,
 } from '../graphql/queries';
@@ -22,6 +25,7 @@ import { normalizeStatus } from '../components/kanban/utils';
 export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
     const client = useApolloClient();
     const subTasksCacheRef = useRef({});
+    const [isLowBandwidth, setIsLowBandwidth] = useState(false);
 
     // State
     const [activeSubgroupId, setActiveSubgroupId] = useState(null);
@@ -57,6 +61,23 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
     const [showFilterModal, setShowFilterModal] = useState(false);
     const [deleteTagConfirm, setDeleteTagConfirm] = useState({ isOpen: false, tagId: null, tagName: '' });
 
+    // ✅ Детектирование низкой скорости интернета
+    useEffect(() => {
+        if (navigator.connection) {
+            const updateConnectionStatus = () => {
+                const effectiveType = navigator.connection.effectiveType;
+                setIsLowBandwidth(effectiveType === '2g' || effectiveType === '3g');
+            };
+            
+            navigator.connection.addEventListener('change', updateConnectionStatus);
+            updateConnectionStatus();
+            
+            return () => {
+                navigator.connection.removeEventListener('change', updateConnectionStatus);
+            };
+        }
+    }, []);
+
     // Mutations
     const [createTask] = useMutation(CREATE_TASK);
     const [updateTask] = useMutation(UPDATE_TASK);
@@ -81,15 +102,28 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
         fetchPolicy: 'cache-first',
     });
 
+    // ✅ ОПТИМИЗАЦИЯ: Используем LITE версию если низкая скорость или первая загрузка
     const { loading: tasksLoading, data: tasksData, refetch: refetchTasks, networkStatus: tasksNetworkStatus } = useQuery(
-        GET_TASKS_BY_SUBGROUP,
-        { variables: { subgroupId: activeSubgroupId }, skip: !activeSubgroupId || activeSubgroupId === 'my-tasks', fetchPolicy: 'cache-and-network', notifyOnNetworkStatusChange: true, pollInterval: 0 }
+        isLowBandwidth ? GET_TASKS_BY_SUBGROUP_LITE : GET_TASKS_BY_SUBGROUP,
+        { 
+            variables: { subgroupId: activeSubgroupId }, 
+            skip: !activeSubgroupId || activeSubgroupId === 'my-tasks', 
+            fetchPolicy: 'cache-and-network', 
+            notifyOnNetworkStatusChange: true, 
+            pollInterval: 0 
+        }
     );
 
-    // ✅ ИСПРАВЛЕНИЕ: Для "мои задачи" используем network-only чтобы избежать кэша
+    // ✅ ОПТИМИЗАЦИЯ: Облегченная версия для "мои задачи" при низкой скорости
     const { loading: myTasksLoading, data: myTasksData, refetch: refetchMyTasks, networkStatus: myTasksNetworkStatus } = useQuery(
-        GET_TASKS_BY_ASSIGNEE_AND_PROJECT,
-        { variables: { userId: user.id, projectId: projectId }, skip: activeSubgroupId !== 'my-tasks' || !user.id || !projectId, fetchPolicy: 'network-only', notifyOnNetworkStatusChange: true, pollInterval: 0 }
+        isLowBandwidth ? GET_TASKS_BY_ASSIGNEE_AND_PROJECT_LITE : GET_TASKS_BY_ASSIGNEE_AND_PROJECT,
+        { 
+            variables: { userId: user.id, projectId: projectId }, 
+            skip: activeSubgroupId !== 'my-tasks' || !user.id || !projectId, 
+            fetchPolicy: 'cache-and-network', 
+            notifyOnNetworkStatusChange: true, 
+            pollInterval: 0 
+        }
     );
 
     const refetchCurrentTasks = useCallback(async () => {
@@ -101,7 +135,37 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
     if (activeSubgroupId === 'my-tasks') tasks = myTasksData?.tasksByAssigneeAndProject || [];
     else if (activeSubgroupId && tasksData?.tasksBySubgroup) tasks = tasksData.tasksBySubgroup;
 
-    // Загрузка подзадач
+    // ✅ ОПТИМИЗАЦИЯ: Частичное обновление задач после SSE событий
+    const updateTasksFromSSE = useCallback(async (changedTaskIds) => {
+        if (!changedTaskIds.length || !client) return;
+        
+        try {
+            const { data } = await client.query({
+                query: GET_TASKS_BY_IDS,
+                variables: { ids: changedTaskIds },
+                fetchPolicy: 'network-only', // Всегда получаем свежие данные
+            });
+
+            if (data?.tasksByIds) {
+                // Обновляем кэш Apollo автоматически
+                data.tasksByIds.forEach(updatedTask => {
+                    client.cache.writeQuery({
+                        query: GET_TASKS_BY_SUBGROUP,
+                        variables: { subgroupId: activeSubgroupId },
+                        data: {
+                            tasksBySubgroup: tasks.map(t => 
+                                t.id === updatedTask.id ? updatedTask : t
+                            )
+                        }
+                    });
+                });
+            }
+        } catch (err) {
+            console.error('Ошибка обновления задач из SSE:', err);
+        }
+    }, [client, activeSubgroupId, tasks]);
+
+    // ✅ Оптимизированная загрузка подзадач с умным кэшированием и батчингом
     const loadSubTaskBatch = useCallback(async (taskIds, force = false) => {
         if (!taskIds.length) return;
         
@@ -111,7 +175,7 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
         
         if (!idsToLoad.length) return;
 
-        const batchSize = 5;
+        const batchSize = 3;
         for (let i = 0; i < idsToLoad.length; i += batchSize) {
             const batch = idsToLoad.slice(i, i + batchSize);
             
@@ -147,7 +211,7 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
             }
 
             if (i + batchSize < idsToLoad.length) {
-                await new Promise(resolve => setTimeout(resolve, 100));
+                await new Promise(resolve => setTimeout(resolve, 50));
             }
         }
     }, [client, loadingSubTasks]);
@@ -179,46 +243,48 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
         } finally { setLoadingSubTasks(prev => ({ ...prev, [taskId]: false })); }
     }, [client]);
 
-    // Фильтрация и сортировка
+    // ✅ Оптимизированная фильтрация
     const applyFilters = useCallback((tasksArray) => {
         let filtered = [...tasksArray];
         if (filters.priority.length > 0) {
             filtered = filtered.filter(task => {
                 const priority = task.value || 2;
-                if (filters.priority.includes('high') && priority === 3) return true;
-                if (filters.priority.includes('medium') && priority === 2) return true;
-                if (filters.priority.includes('low') && priority === 1) return true;
-                return false;
+                return filters.priority.some(p => 
+                    (p === 'high' && priority === 3) ||
+                    (p === 'medium' && priority === 2) ||
+                    (p === 'low' && priority === 1)
+                );
             });
         }
         if (filters.dateFrom || filters.dateTo) {
             filtered = filtered.filter(task => {
                 if (!task.dueDate) return false;
-                const dueDate = new Date(task.dueDate);
-                if (filters.dateFrom && dueDate < filters.dateFrom) return false;
-                if (filters.dateTo && dueDate > filters.dateTo) return false;
+                const dueDate = new Date(task.dueDate).getTime();
+                if (filters.dateFrom && dueDate < filters.dateFrom.getTime()) return false;
+                if (filters.dateTo && dueDate > filters.dateTo.getTime()) return false;
                 return true;
             });
         }
         if (filters.assignee) {
             filtered = filtered.filter(task => task.assignees?.some(a => a.id === filters.assignee));
         }
-        if (filters.tags && filters.tags.length > 0) {
+        if (filters.tags?.length > 0) {
             filtered = filtered.filter(task => task.tags?.some(tag => filters.tags.includes(tag.id)));
         }
         return filtered;
     }, [filters]);
 
+    // ✅ Оптимизированная сортировка
     const sortTasks = useCallback((tasksArray) => {
         if (!tasksArray.length) return tasksArray;
         const sorted = [...tasksArray];
+        
         switch (sortBy) {
             case 'dueDate':
                 sorted.sort((a, b) => {
-                    if (!a.dueDate && !b.dueDate) return 0;
-                    if (!a.dueDate) return 1;
-                    if (!b.dueDate) return -1;
-                    return sortOrder === 'asc' ? new Date(a.dueDate) - new Date(b.dueDate) : new Date(b.dueDate) - new Date(a.dueDate);
+                    const dateA = a.dueDate ? new Date(a.dueDate).getTime() : Infinity;
+                    const dateB = b.dueDate ? new Date(b.dueDate).getTime() : Infinity;
+                    return sortOrder === 'asc' ? dateA - dateB : dateB - dateA;
                 });
                 break;
             case 'priority':
@@ -286,8 +352,10 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
         fetchSubTasksForTask,
         applyFilters,
         sortTasks,
+        updateTasksFromSSE,
         
         // Refs
         subTasksCacheRef,
+        isLowBandwidth,
     };
 };

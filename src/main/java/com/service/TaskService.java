@@ -510,41 +510,37 @@ public class TaskService {
         return taskRepository.findAllByIdsWithDetails(ids);
     }
 
-    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee", "tasksByIds"}, allEntries = true)
-    @Cacheable(value = "tasksBySubgroup", key = "#subgroupId")
+            // ✅ ИСПРАВЛЕНО: Убрал @CacheEvict! Он сразу же стирал кэш!
+    @Cacheable(value = "tasksBySubgroup", key = "#subgroupId", unless = "#result == null")
+    @Transactional(readOnly = true)
     public List<Task> findTasksBySubgroup(Long subgroupId) {
-        // 1. Загружаем задачи с исполнителями (без тегов)
-        List<Task> tasks = taskRepository.findRootTasksBySubgroup(subgroupId);
+        // ✅ Шаг 1: Загрузить все задачи с assignees (одна коллекция - OK)
+        List<Task> tasks = taskRepository.findRootTasksBySubgroupWithDetails(subgroupId);
 
         if (tasks == null || tasks.isEmpty()) {
             return tasks;
         }
 
-        // 2. Собираем ID задач
+        // ✅ Шаг 2: Собрать ID задач для батч-загрузки тегов
         List<Long> taskIds = tasks.stream()
                 .map(Task::getId)
                 .collect(Collectors.toList());
 
-        // 3. Отдельным запросом загружаем задачи с тегами
+        // ✅ Шаг 3: Загрузить ВСЕ теги за один запрос (не N+1!)
         List<Task> tasksWithTags = taskRepository.findTasksWithTagsByIds(taskIds);
+        Map<Long, List<Tag>> tagsMap = tasksWithTags.stream()
+                .collect(Collectors.toMap(Task::getId, Task::getTags));
 
-        // 4. Создаем мапу taskId -> tags
-        Map<Long, List<Tag>> tagsMap = new HashMap<>();
-        for (Task taskWithTags : tasksWithTags) {
-            // Важно: инициализируем коллекцию через Hibernate.initialize
-            Hibernate.initialize(taskWithTags.getTags());
-            tagsMap.put(taskWithTags.getId(), new ArrayList<>(taskWithTags.getTags()));
-        }
-
-        // 5. Присоединяем теги к исходным задачам
+        // ✅ Шаг 4: Присоединить теги к задачам
         for (Task task : tasks) {
             List<Tag> tags = tagsMap.get(task.getId());
             if (tags != null && !tags.isEmpty()) {
-                // Важно: инициализируем коллекцию перед очисткой
-                Hibernate.initialize(task.getTags());
                 task.getTags().clear();
                 task.getTags().addAll(tags);
             }
+            // Инициализировать остальные коллекции для GraphQL
+            Hibernate.initialize(task.getAssignees());
+            Hibernate.initialize(task.getAttachments());
         }
 
         return tasks;
@@ -964,3 +960,5 @@ public class TaskService {
         return saved;
     }
 }
+
+

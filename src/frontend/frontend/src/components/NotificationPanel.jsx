@@ -1,38 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { useQuery, useMutation, useApolloClient, gql } from '@apollo/client';
+import { useQuery, useApolloClient } from '@apollo/client';
 import { useNotification } from '../contexts/NotificationContext';
-import { GET_NOTIFICATIONS, GET_UNREAD_COUNT } from '../graphql/queries';
+import { GET_NOTIFICATIONS, GET_UNREAD_COUNT, MARK_NOTIFICATION_AS_READ, MARK_ALL_AS_READ, DELETE_NOTIFICATION, DELETE_ALL_NOTIFICATIONS } from '../graphql/notificationQueries';
 import { useSSE } from '../contexts/SSEContext';
 import ConfirmModal from './ConfirmModal';
 import '../styles/notification-panel.css';
-
-const MARK_NOTIFICATION_AS_READ = gql`
-    mutation MarkAsRead($userId: Long!, $notificationId: Long!) {
-        markNotificationAsRead(userId: $userId, notificationId: $notificationId) {
-            id
-            isRead
-            readAt
-        }
-    }
-`;
-
-const MARK_ALL_AS_READ = gql`
-    mutation MarkAllAsRead($userId: Long!) {
-        markAllAsRead(userId: $userId)
-    }
-`;
-
-const DELETE_NOTIFICATION = gql`
-    mutation DeleteNotification($userId: Long!, $notificationId: Long!) {
-        deleteNotification(userId: $userId, notificationId: $notificationId)
-    }
-`;
-
-const DELETE_ALL_NOTIFICATIONS = gql`
-    mutation DeleteAllNotifications($userId: Long!) {
-        deleteAllNotifications(userId: $userId)
-    }
-`;
 
 const NotificationPanel = ({ userId, onClose }) => {
     const { addNotification } = useNotification();

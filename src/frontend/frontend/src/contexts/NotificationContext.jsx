@@ -1,5 +1,4 @@
-import React, { createContext, useState, useCallback, useEffect } from 'react';
-import WebSocketService from '../services/WebSocketService';
+import React, { createContext, useState, useCallback } from 'react';
 
 export const NotificationContext = createContext();
 
@@ -31,23 +30,6 @@ export const NotificationProvider = ({ children }) => {
     const clearAll = useCallback(() => {
         setNotifications([]);
     }, []);
-
-    // WebSocket слушатель для in-app уведомлений
-    useEffect(() => {
-        const handleWebSocketNotification = (notification) => {
-            addNotification({
-                type: 'info',
-                title: notification.title,
-                message: notification.message,
-            });
-        };
-
-        WebSocketService.subscribe(handleWebSocketNotification);
-
-        return () => {
-            WebSocketService.unsubscribe(handleWebSocketNotification);
-        };
-    }, [addNotification]);
 
     const value = {
         notifications,

@@ -65,9 +65,6 @@ function App() {
 function AppContent() {
     const { user } = useAuth();
 
-    // GraphQL subscriptions используются автоматически через Apollo Client
-    // WebSocket соединение устанавливается при первой подписке
-
     return (
         <Routes>
             {/* OAuth2 редирект */}

@@ -81,6 +81,7 @@ export const GET_TASK_ATTACHMENTS = gql`
     }
 `;
 
+// ✅ ОПТИМИЗАЦИЯ: Основной запрос для загрузки задач подгруппы
 export const GET_TASKS_BY_SUBGROUP = gql`
     query GetTasksBySubgroup($subgroupId: ID!) {
         tasksBySubgroup(subgroupId: $subgroupId) {
@@ -90,8 +91,46 @@ export const GET_TASKS_BY_SUBGROUP = gql`
             dueDate
             status
             value
-            createdAt
-            updatedAt
+            parentTaskId
+            subTasksCount
+            createdBy { id fullName }
+            assignees { id fullName email }
+            attachments { id }
+            tags { id name color }
+        }
+    }
+`;
+
+// ✅ ОПТИМИЗАЦИЯ: Облегченная версия для быстрой загрузки (без описания)
+// Используется при первой загрузке, кэшируется и обновляется полной версией
+export const GET_TASKS_BY_SUBGROUP_LITE = gql`
+    query GetTasksBySubgroupLite($subgroupId: ID!) {
+        tasksBySubgroup(subgroupId: $subgroupId) {
+            id
+            title
+            status
+            value
+            dueDate
+            parentTaskId
+            subTasksCount
+            createdBy { id fullName }
+            assignees { id fullName }
+            tags { id name color }
+        }
+    }
+`;
+
+// ✅ ОПТИМИЗАЦИЯ: Пакетная версия для получения/обновления конкретных задач
+// Используется для синхронизации после SSE событий (только ID тех что изменились)
+export const GET_TASKS_BY_IDS = gql`
+    query GetTasksByIds($ids: [ID!]!) {
+        tasksByIds(ids: $ids) {
+            id
+            title
+            description
+            dueDate
+            status
+            value
             parentTaskId
             subTasksCount
             createdBy { id fullName }
@@ -123,8 +162,6 @@ export const GET_TASKS_BY_ASSIGNEE = gql`
             dueDate
             status
             value
-            createdAt
-            updatedAt
             parentTaskId
             subTasksCount
             createdBy { id fullName }
@@ -137,6 +174,27 @@ export const GET_TASKS_BY_ASSIGNEE = gql`
     }
 `;
 
+// ✅ ОПТИМИЗАЦИЯ: Облегченная версия задач пользователя (без описания)
+export const GET_TASKS_BY_ASSIGNEE_LITE = gql`
+    query GetTasksByAssigneeLite($userId: ID!) {
+        tasksByAssignee(userId: $userId) {
+            id
+            title
+            status
+            value
+            dueDate
+            parentTaskId
+            subTasksCount
+            createdBy { id fullName }
+            assignees { id fullName }
+            subgroupId
+            subgroup { id name }
+            tags { id name color }
+        }
+    }
+`;
+
+// ✅ ОПТИМИЗАЦИЯ: Основной запрос задач пользователя в проекте
 export const GET_TASKS_BY_ASSIGNEE_AND_PROJECT = gql`
     query GetTasksByAssigneeAndProject($userId: ID!, $projectId: ID!) {
         tasksByAssigneeAndProject(userId: $userId, projectId: $projectId) {
@@ -146,8 +204,6 @@ export const GET_TASKS_BY_ASSIGNEE_AND_PROJECT = gql`
             dueDate
             status
             value
-            createdAt
-            updatedAt
             parentTaskId
             subTasksCount
             createdBy { id fullName }
@@ -160,6 +216,27 @@ export const GET_TASKS_BY_ASSIGNEE_AND_PROJECT = gql`
     }
 `;
 
+// ✅ ОПТИМИЗАЦИЯ: Облегченная версия для быстрой загрузки "мои задачи"
+export const GET_TASKS_BY_ASSIGNEE_AND_PROJECT_LITE = gql`
+    query GetTasksByAssigneeAndProjectLite($userId: ID!, $projectId: ID!) {
+        tasksByAssigneeAndProject(userId: $userId, projectId: $projectId) {
+            id
+            title
+            status
+            value
+            dueDate
+            parentTaskId
+            subTasksCount
+            createdBy { id fullName }
+            assignees { id fullName }
+            subgroupId
+            subgroup { id name }
+            tags { id name color }
+        }
+    }
+`;
+
+// ✅ ОПТИМИЗАЦИЯ: Загрузка подзадач пакетом
 export const GET_ALL_SUBTASKS = gql`
     query GetAllSubTasks($taskIds: [ID!]!) {
         tasksByIds(ids: $taskIds) {
@@ -171,8 +248,6 @@ export const GET_ALL_SUBTASKS = gql`
                 dueDate
                 status
                 value
-                createdAt
-                updatedAt
                 parentTaskId
                 createdBy { id fullName }
                 assignees { id fullName email }
@@ -192,8 +267,6 @@ export const GET_TASK_SUBTASKS = gql`
             dueDate
             status
             value
-            createdAt
-            updatedAt
             parentTaskId
             createdBy { id fullName }
             assignees { id fullName email }

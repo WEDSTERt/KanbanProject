@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { useQuery, useMutation, useSubscription } from '@apollo/client';
+import { useQuery, useMutation } from '@apollo/client';
 import { useNavigate } from 'react-router-dom';
 import { GET_USER_PROJECTS } from '../graphql/queries';
 import { CREATE_PROJECT } from '../graphql/mutations';
-import { PROJECT_UPDATED_SUBSCRIPTION } from '../graphql/subscriptions';
 import { useAuth } from '../contexts/AuthContext';
 import { useSSE } from '../contexts/SSEContext';
 
@@ -31,22 +30,6 @@ const ProjectsList = () => {
     }, [refetch]);
 
     const [createProject] = useMutation(CREATE_PROJECT);
-
-    // 🔄 Подписка на обновления проектов (если WebSocket работает)
-    const { data: projectUpdateData } = useSubscription(PROJECT_UPDATED_SUBSCRIPTION, {
-        skip: !user,
-        onError: (err) => {
-            console.warn('⚠️ Project subscription error (using SSE):', err.message);
-        },
-    });
-
-    // Обновить список проектов когда пришло обновление через subscription
-    useEffect(() => {
-        if (projectUpdateData?.projectUpdated) {
-            console.log('📨 Project updated via subscription:', projectUpdateData.projectUpdated);
-            refetch();
-        }
-    }, [projectUpdateData, refetch]);
 
     // 🆕 SSE подписка на изменения проектов (используем глобальный контекст)
     // ✅ ИСПРАВЛЕНИЕ: Ждем когда SSE будет готов (isReady = true)
