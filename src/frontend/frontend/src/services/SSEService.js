@@ -30,8 +30,6 @@ class SSEService {
     // Таймеры проверки живого соединения
     this.healthCheckIntervals = {};
     this.healthCheckInterval = 5000; // Проверяем каждые 5 сек
-
-    console.log('📡 SSEService initialized for user:', userId);
   }
 
   /**
@@ -47,10 +45,6 @@ class SSEService {
     // 2 = CLOSED
     const isAlive = es.readyState === 0 || es.readyState === 1;
     
-    if (!isAlive) {
-      console.log(`🔴 Connection ${channelName} is dead (readyState=${es.readyState})`);
-    }
-    
     return isAlive;
   }
 
@@ -62,12 +56,9 @@ class SSEService {
     if (this.healthCheckIntervals[channelName]) {
       return;
     }
-
-    console.log(`⚕️ Starting health check for ${channelName}`);
     
     this.healthCheckIntervals[channelName] = setInterval(() => {
       if (!this._isConnectionAlive(channelName)) {
-        console.log(`🔴 Health check: ${channelName} is dead, will reconnect`);
         this.handleConnectionError(channelName);
       }
     }, this.healthCheckInterval);
@@ -80,7 +71,6 @@ class SSEService {
     if (this.healthCheckIntervals[channelName]) {
       clearInterval(this.healthCheckIntervals[channelName]);
       delete this.healthCheckIntervals[channelName];
-      console.log(`✅ Stopped health check for ${channelName}`);
     }
   }
 
@@ -118,7 +108,7 @@ class SSEService {
   _subscribe(connectionKey, url) {
     return new Promise((resolve, reject) => {
       try {
-        // ✅ КРИТИЧНОЕ ИСПРАВЛЕНИЕ: Проверяем что соединение живо
+        // КРИТИЧНОЕ ИСПРАВЛЕНИЕ: Проверяем что соединение живо
         if (this.connections[connectionKey]) {
           if (this._isConnectionAlive(connectionKey)) {
             console.log(`📡 Already subscribed to ${connectionKey}, reusing alive connection`);
@@ -126,7 +116,6 @@ class SSEService {
             return;
           } else {
             // Соединение мертво - удаляем и создаем новое
-            console.log(`🔄 Connection to ${connectionKey} is dead, reconnecting...`);
             this._stopHealthCheck(connectionKey);
             try {
               this.connections[connectionKey].close();
@@ -137,8 +126,6 @@ class SSEService {
             delete this.reconnectAttempts[connectionKey];
           }
         }
-
-        console.log(`📡 Connecting to ${connectionKey}...`);
         const eventSource = new EventSource(url);
         this.connections[connectionKey] = eventSource;
 
@@ -163,21 +150,17 @@ class SSEService {
           eventSource.addEventListener(eventType, (event) => {
             try {
               const data = JSON.parse(event.data);
-              console.log(`📨 Event received: ${eventType} from ${connectionKey}`, data);
               this._emit(eventType, data);
             } catch (error) {
-              console.error(`Error parsing SSE message for ${eventType}:`, error, event.data);
             }
           });
         });
 
         eventSource.addEventListener('error', (event) => {
-          console.error(`❌ SSE connection error for ${connectionKey}:`, event);
           this.handleConnectionError(connectionKey);
         });
 
         eventSource.onopen = () => {
-          console.log(`✅ SSE ${connectionKey} connection established (readyState=${eventSource.readyState})`);
           this.reconnectAttempts[connectionKey] = 0;
           // Запускаем health check для этого соединения
           this._startHealthCheck(connectionKey);
@@ -185,7 +168,6 @@ class SSEService {
 
         resolve(eventSource);
       } catch (error) {
-        console.error(`Failed to subscribe to ${connectionKey}:`, error);
         reject(error);
       }
     });
@@ -201,13 +183,12 @@ class SSEService {
 
     // Копируем массив чтобы избежать проблем при удалении во время итерации
     const handlersToCall = [...this.handlers[eventName]];
-    console.log(`🔔 Emitting ${eventName} to ${handlersToCall.length} subscribers`);
     
     handlersToCall.forEach(handler => {
       try {
         handler(data);
       } catch (error) {
-        console.error(`Error in handler for ${eventName}:`, error);
+
       }
     });
   }
@@ -223,12 +204,10 @@ class SSEService {
     // Проверяем дубликаты
     const isDuplicate = this.handlers[eventName].some(h => h === callback);
     if (isDuplicate) {
-      console.warn(`⚠️ Duplicate subscription for ${eventName} detected, skipping`);
       return () => {};
     }
 
     this.handlers[eventName].push(callback);
-    console.log(`✅ Handler registered for ${eventName}, total: ${this.handlers[eventName].length}`);
 
     // Гарантируем однократный вызов unsubscribe
     let unsubscribed = false;
@@ -244,7 +223,6 @@ class SSEService {
       const index = callbacks.indexOf(callback);
       if (index > -1) {
         callbacks.splice(index, 1);
-        console.log(`🔌 Handler unregistered for ${eventName}, remaining: ${callbacks.length}`);
       }
     };
   }
@@ -260,7 +238,6 @@ class SSEService {
    * Обработка ошибки с переподключением
    */
   handleConnectionError(channelName) {
-    console.log(`⏱️ SSE ${channelName} connection error, attempting to reconnect...`);
 
     // Остановим health check
     this._stopHealthCheck(channelName);
@@ -298,11 +275,8 @@ class SSEService {
             this.subscribeToSubgroup(subgroupId).catch(err => console.error('Reconnect failed:', err));
           }
         } catch (e) {
-          console.error('Error during reconnect:', e);
         }
       }, delay);
-    } else {
-      console.error(`❌ Failed to reconnect to ${channelName} after ${this.maxReconnectAttempts} attempts`);
     }
   }
 
@@ -321,7 +295,6 @@ class SSEService {
       }
       delete this.connections[channelName];
       delete this.reconnectAttempts[channelName];
-      console.log(`🔌 Disconnected from ${channelName}`);
     }
   }
 
@@ -329,14 +302,11 @@ class SSEService {
    * Закрыть все соединения
    */
   disconnectAll() {
-    console.log('🔌 Disconnecting all SSE connections...');
     Object.keys(this.connections).forEach(channelName => {
       this._stopHealthCheck(channelName);
       try {
         this.connections[channelName].close();
-        console.log(`✅ Closed ${channelName}`);
       } catch (e) {
-        console.error(`Error closing ${channelName}:`, e);
       }
     });
     this.connections = {};

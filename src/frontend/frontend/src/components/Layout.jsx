@@ -26,19 +26,15 @@ const Layout = ({children}) => {
         }
     }, [countData]);
     
-    // 🆕 SSE подписка на новые уведомления (используем глобальный контекст)
-    // ✅ ИСПРАВЛЕНИЕ: Ждем когда SSE будет готов (isReady = true)
+    // SSE подписка на новые уведомления (используем глобальный контекст)
+    // Ждем когда SSE будет готов (isReady = true)
     useEffect(() => {
         if (!user?.id || !isReady) {
-            console.log('⏳ Layout: Waiting for SSE to be ready... (user:', user?.id, ', isReady:', isReady, ')');
             return;
         }
 
-        console.log('🎯 Layout subscribing to SSE events');
-
         // Подписываемся на события notification-received
         const unsubscribe = subscribe('notification-received', (data) => {
-            console.log('📬 Layout received notification-received event via SSE:', data);
 
             const newNotification = data.notification_field;
             if (newNotification) {
@@ -55,22 +51,18 @@ const Layout = ({children}) => {
 
                 // 🔔 Если участника добавили в проект, переподписываемся на новый проект
                 if (newNotification.type === 'user_added_to_project' && newNotification.projectId) {
-                    console.log('🔌 User was added to project', newNotification.projectId, ', resubscribing...');
                     if (sseService) {
                         setTimeout(() => {
                             sseService.subscribeToProject(newNotification.projectId);
-                            console.log('✅ Resubscribed to project', newNotification.projectId);
                         }, 500);
                     }
                 }
 
                 // 🔔 Если участника добавили в группу, проверяем что он подписан на проект
                 if (newNotification.type === 'SUBGROUP_MEMBER_ADDED' && newNotification.projectId) {
-                    console.log('🔌 User was added to subgroup in project', newNotification.projectId, ', ensuring project subscription...');
                     if (sseService) {
                         setTimeout(() => {
                             sseService.subscribeToProject(newNotification.projectId);
-                            console.log('✅ Ensured subscription to project', newNotification.projectId);
                         }, 500);
                     }
                 }
@@ -79,7 +71,6 @@ const Layout = ({children}) => {
 
         // Очищаем подписку при размонтировании
         return () => {
-            console.log('🔌 Layout unsubscribing from SSE events');
             unsubscribe();
         };
     }, [user?.id, isReady, addNotification, subscribe, sseService, refetchCount]);

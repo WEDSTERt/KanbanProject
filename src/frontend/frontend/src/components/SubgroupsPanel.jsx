@@ -43,60 +43,47 @@ const SubgroupsPanel = ({
     
     const [deleteSubgroup] = useMutation(DELETE_SUBGROUP, { onCompleted: () => refetch() });
 
-    // 🆕 SSE подписка на изменения подгрупп - регистрируем слушатель
+    // SSE подписка на изменения подгрупп - регистрируем слушатель
     useEffect(() => {
         if (!user?.id || !projectId || !subscribe) return;
 
-        console.log('🎯 SubgroupsPanel: registering subgroups-changed listener for project', projectId);
-
         // Подписываемся на события subgroups-changed для конкретного проекта
         const unsubscribeSubgroups = subscribe('subgroups-changed', (data) => {
-            console.log('📬 SubgroupsPanel received subgroups-changed event via SSE:', data);
             // Проверяем что событие относится к нашему проекту (сравнить как числа)
             const eventProjectId = Number(data.projectId_field) || Number(data.projectId);
             const currentProjectId = Number(projectId);
             
             if (eventProjectId === currentProjectId || !data.projectId_field) {
-                console.log('✅ Event matches our project (', currentProjectId, '), refetching subgroups...');
                 // Добавляем debounce чтобы не спамить refetch запросами
                 if (refetchRef.current) {
                     setTimeout(() => {
                         if (refetchRef.current) {
-                            console.log('🔄 Refetching subgroups after SSE event');
                             refetchRef.current().catch((err) => {
                                 // Проверяем если это ошибка доступа (пользователя исключили из проекта)
                                 if (err?.networkError?.status === 500 || err?.message?.includes('not found') || err?.message?.includes('not authenticated')) {
-                                    console.error('❌ Access denied or user removed from project:', err.message);
                                     // Перенаправляем на главную страницу
                                     navigate('/');
-                                } else {
-                                    console.warn('⚠️ Refetch error (ignored):', err.message);
                                 }
                             });
                         }
                     }, 200);
                 }
-            } else {
-                console.log('⏭️ Event is for a different project (expecting', currentProjectId, ', got', eventProjectId, '), skipping');
             }
         });
 
         // Подписываемся на события projects-changed (для обновления членов проекта)
         const unsubscribeProjects = subscribe('projects-changed', (data) => {
-            console.log('📬 SubgroupsPanel received projects-changed event via SSE:', data);
             if (onRefreshProject) onRefreshProject();
         });
 
         // Подписываемся на событие project-removed (пользователя исключили из проекта)
         const unsubscribeProjectRemoved = subscribe('project-removed', (data) => {
-            console.log('❌ SubgroupsPanel received project-removed event via SSE - user was removed from project:', data);
             // Перенаправляем на главную страницу
             navigate('/');
         });
 
         // Очищаем подписку при размонтировании
         return () => {
-            console.log('🔌 SubgroupsPanel: unregistering event listeners');
             unsubscribeSubgroups();
             unsubscribeProjects();
             unsubscribeProjectRemoved();
@@ -107,27 +94,21 @@ const SubgroupsPanel = ({
     // Этот effect срабатывает только когда sseService становится доступным
     useEffect(() => {
         if (!user?.id || !projectId) {
-            console.log('🔌 SubgroupsPanel: skipping project subscription (user or projectId not ready)');
             return;
         }
 
         if (!sseService) {
-            console.warn('⚠️ SubgroupsPanel: sseService not available yet, will retry on next render');
             return;
         }
-
-        console.log('🔌 SubgroupsPanel: subscribing to project via SSEService for project', projectId);
         
         // Проверяем что мы еще не подписались на этот проект
         if (!projectSubscribedRef.current) {
-            console.log('✅ SubgroupsPanel: calling sseService.subscribeToProject()');
             sseService.subscribeToProject(projectId);
             projectSubscribedRef.current = true;
         }
 
         return () => {
             // При размонтировании или смене projectId, отписываемся от проекта
-            console.log('🔌 SubgroupsPanel: disconnecting from project', projectId);
             if (sseService) {
                 sseService.disconnect(`project-${projectId}`);
             }
@@ -184,7 +165,6 @@ const SubgroupsPanel = ({
             if (onRefreshProject) onRefreshProject();
             onSelectSubgroup(data.id);
         } catch (err) {
-            console.error(err);
             alert('Ошибка импорта группы: ' + err.message);
         } finally {
             setIsImporting(false);

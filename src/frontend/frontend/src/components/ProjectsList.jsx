@@ -31,20 +31,15 @@ const ProjectsList = () => {
 
     const [createProject] = useMutation(CREATE_PROJECT);
 
-    // 🆕 SSE подписка на изменения проектов (используем глобальный контекст)
-    // ✅ ИСПРАВЛЕНИЕ: Ждем когда SSE будет готов (isReady = true)
+    // SSE подписка на изменения проектов (используем глобальный контекст)
+    // ИСПРАВЛЕНИЕ: Ждем когда SSE будет готов (isReady = true)
     useEffect(() => {
         if (!user?.id || !isReady) {
-            console.log('⏳ ProjectsList: Waiting for SSE to be ready... (user:', user?.id, ', isReady:', isReady, ')');
             return;
         }
 
-        console.log('🎯 ProjectsList subscribing to SSE events');
-
         // Подписываемся на события projects-changed
         const unsubscribeProjects = subscribe('projects-changed', (data) => {
-            console.log('📬 ProjectsList received projects-changed event via SSE:', data);
-            console.log('Calling refetch from refetchRef:', refetchRef.current);
             if (refetchRef.current) {
                 refetchRef.current();
             }
@@ -52,8 +47,6 @@ const ProjectsList = () => {
 
         // Подписываемся на события project-removed (когда пользователя удалили из проекта)
         const unsubscribeRemoved = subscribe('project-removed', (data) => {
-            console.log('📬 ProjectsList received project-removed event via SSE:', data);
-            console.log('Calling refetch from refetchRef:', refetchRef.current);
             if (refetchRef.current) {
                 refetchRef.current();
             }
@@ -61,7 +54,6 @@ const ProjectsList = () => {
 
         // Очищаем подписки при размонтировании
         return () => {
-            console.log('🔌 ProjectsList unsubscribing from SSE events');
             unsubscribeProjects();
             unsubscribeRemoved();
         };
@@ -130,7 +122,6 @@ const ProjectsList = () => {
             await refetch();
             navigate(`/board?projectId=${importedProject.id}&subgroupId=my-tasks`);
         } catch (err) {
-            console.error(err);
             alert('Ошибка импорта проекта: ' + err.message);
         } finally {
             setIsImporting(false);

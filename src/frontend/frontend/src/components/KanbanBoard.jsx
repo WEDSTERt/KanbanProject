@@ -38,39 +38,32 @@ const KanbanBoard = () => {
         } else { logic.setActiveSubgroupId('my-tasks'); setSearchParams({ projectId, subgroupId: 'my-tasks' }); }
     }, [logic.projectData, urlSubgroupId, projectId, setSearchParams]);
 
-    // ✅ ИСПРАВЛЕННАЯ SSE подписка - ОДИН useEffect, правильная синхронизация
-    // ✅ НОВОЕ: Ждем пока SSE будет готов (isReady = true)
+    // ИСПРАВЛЕННАЯ SSE подписка - ОДИН useEffect, правильная синхронизация
+    // НОВОЕ: Ждем пока SSE будет готов (isReady = true)
     useEffect(() => {
         if (!user?.id || !logic.activeSubgroupId || logic.activeSubgroupId === 'my-tasks' || !subscribe || !sseService || !isReady) {
-            if (!isReady) {
-                console.log('⏳ KanbanBoard: Waiting for SSE to be ready...');
-            }
             return;
         }
 
-        console.log('📡 KanbanBoard: Setting up SSE for subgroup', logic.activeSubgroupId);
-
-        // ✅ Подписываем на subgroup в backend (один раз)
+        // Подписываем на subgroup в backend (один раз)
         sseService.subscribeToSubgroup(logic.activeSubgroupId)
-            .catch(err => console.error('Failed to subscribe to subgroup:', err));
+            .catch();
 
-        // ✅ Используем ОДИН дебаунс таймер для ВСЕХ событий
+        // Используем ОДИН дебаунс таймер для ВСЕХ событий
         let updateTimeout = null;
         const scheduleRefetch = () => {
             clearTimeout(updateTimeout);
             updateTimeout = setTimeout(() => {
-                console.log('🔄 KanbanBoard: Refetching tasks for subgroup', logic.activeSubgroupId);
                 if (logic.refetchCurrentTasks) {
-                    logic.refetchCurrentTasks().catch(err => console.error('Refetch error:', err));
+                    logic.refetchCurrentTasks().catch();
                 }
             }, 100);
         };
 
-        // ✅ Подписываемся на events и вызываем общий дебаунс
+        // Подписываемся на events и вызываем общий дебаунс
         const unsubscribeTaskUpdated = subscribe('task-updated', (data) => {
             const eventSubgroupId = Number(data.subgroupId_field);
             const currentSubgroupId = Number(logic.activeSubgroupId);
-            console.log('📨 task-updated event:', { eventSubgroupId, currentSubgroupId, match: eventSubgroupId === currentSubgroupId });
             
             if (eventSubgroupId === currentSubgroupId) {
                 scheduleRefetch();
@@ -80,33 +73,24 @@ const KanbanBoard = () => {
         const unsubscribeTaskDeleted = subscribe('task-deleted', (data) => {
             const eventSubgroupId = Number(data.subgroupId_field);
             const currentSubgroupId = Number(logic.activeSubgroupId);
-            console.log('📨 task-deleted event:', { eventSubgroupId, currentSubgroupId, match: eventSubgroupId === currentSubgroupId });
             
             if (eventSubgroupId === currentSubgroupId) {
                 scheduleRefetch();
             }
         });
 
-        // ✅ НОВОЕ: Обработка смены статуса (перетаскивание + смена в модальном окне)
+        // Обработка смены статуса (перетаскивание + смена в модальном окне)
         const unsubscribeTaskStatusChanged = subscribe('task-status-changed', (data) => {
             const eventSubgroupId = Number(data.subgroupId_field);
             const currentSubgroupId = Number(logic.activeSubgroupId);
-            console.log('📨 task-status-changed event:', { 
-                eventSubgroupId, 
-                currentSubgroupId, 
-                taskId: data.taskId_field,
-                newStatus: data.newStatus_field,
-                match: eventSubgroupId === currentSubgroupId 
-            });
             
             if (eventSubgroupId === currentSubgroupId) {
                 scheduleRefetch();
             }
         });
 
-        // ✅ Cleanup: отписываемся от ВСЕХ events и закрываем соединение
+        //  отписываемся от ВСЕХ events и закрываем соединение
         return () => {
-            console.log('🔌 KanbanBoard: Cleaning up SSE subscriptions for subgroup', logic.activeSubgroupId);
             clearTimeout(updateTimeout);
             
             // Отписываемся от events
@@ -269,7 +253,7 @@ const KanbanBoard = () => {
             logic.setExpandedTaskIds(new Set());
             await logic.refetchCurrentTasks();
             logic.setShowTaskModal(false);
-        } catch (err) { console.error('Ошибка сохранения задачи:', err); alert('Ошибка: ' + err.message); }
+        } catch (err) {}
     };
 
     const handleDragStart = (e, taskId, fromStatus) => {
@@ -300,7 +284,7 @@ const KanbanBoard = () => {
         }
     };
 
-    // ✅ Обработчик для добавления подзадачи из контекстного меню
+    // Обработчик для добавления подзадачи из контекстного меню
     const handleCreateSubtaskFromContext = async (subtaskTitle) => {
         if (!logic.contextMenuTask) return;
         try {
@@ -321,12 +305,10 @@ const KanbanBoard = () => {
             await logic.fetchSubTasksForTask(logic.contextMenuTask.id, true);
             await logic.refetchCurrentTasks();
         } catch (err) {
-            console.error('Ошибка создания подзадачи:', err);
-            alert('Ошибка: ' + err.message);
         }
     };
 
-    // ✅ Обработчик для удаления задачи из контекстного меню
+    // Обработчик для удаления задачи из контекстного меню
     const handleDeleteTaskFromContext = async () => {
         if (!logic.contextMenuTask) return;
         if (window.confirm('Вы уверены, что хотите удалить эту задачу?')) {
@@ -335,29 +317,24 @@ const KanbanBoard = () => {
                 logic.setShowContextMenu(false);
                 await logic.refetchCurrentTasks();
             } catch (err) {
-                console.error('Ошибка удаления задачи:', err);
-                alert('Ошибка: ' + err.message);
             }
         }
     };
 
-    // ✅ Обработчик для переключения тега на задаче
+    // Обработчик для переключения тега на задаче
     const handleTagToggle = async (tagId) => {
         if (!logic.contextMenuTask) return;
         try {
-            console.log('🔄 handleTagToggle START:', { taskId: logic.contextMenuTask.id, tagId });
             
             const hasTag = logic.contextMenuTask.tags?.some(t => t.id === tagId);
             
             if (hasTag) {
-                console.log('❌ Removing tag:', tagId);
                 const { data } = await logic.removeTagFromTask({ variables: { taskId: logic.contextMenuTask.id, tagId } });
                 if (data?.removeTagFromTask) {
-                    console.log('✅ Tag removed, new tags:', data.removeTagFromTask.tags);
-                    // ✅ Обновляем контекстное меню И кэш Apollo сразу
+                    // Обновляем контекстное меню И кэш Apollo сразу
                     logic.setContextMenuTask(data.removeTagFromTask);
                     
-                    // ✅ Обновляем кэш для текущего представления
+                    // Обновляем кэш для текущего представления
                     client.cache.writeQuery({
                         query: logic.activeSubgroupId === 'my-tasks' ? GET_TASKS_BY_ASSIGNEE_AND_PROJECT : GET_TASKS_BY_SUBGROUP,
                         variables: logic.activeSubgroupId === 'my-tasks' 
@@ -369,14 +346,12 @@ const KanbanBoard = () => {
                     });
                 }
             } else {
-                console.log('✅ Adding tag:', tagId);
                 const { data } = await logic.addTagToTask({ variables: { taskId: logic.contextMenuTask.id, tagId } });
                 if (data?.addTagToTask) {
-                    console.log('✅ Tag added, new tags:', data.addTagToTask.tags);
-                    // ✅ Обновляем контекстное меню И кэш Apollo сразу
+                    // Обновляем контекстное меню И кэш Apollo сразу
                     logic.setContextMenuTask(data.addTagToTask);
                     
-                    // ✅ Обновляем кэш для текущего представления
+                    // Обновляем кэш для текущего представления
                     client.cache.writeQuery({
                         query: logic.activeSubgroupId === 'my-tasks' ? GET_TASKS_BY_ASSIGNEE_AND_PROJECT : GET_TASKS_BY_SUBGROUP,
                         variables: logic.activeSubgroupId === 'my-tasks'
@@ -388,15 +363,11 @@ const KanbanBoard = () => {
                     });
                 }
             }
-            
-            console.log('✅ handleTagToggle COMPLETE');
         } catch (err) {
-            console.error('Ошибка переключения тега:', err);
-            alert('Ошибка: ' + err.message);
         }
     };
 
-    // ✅ Обработчик для создания нового тега
+    // Обработчик для создания нового тега
     const handleCreateNewTag = async (tagName, tagColor) => {
         if (!tagName.trim()) {
             alert('Название тега не может быть пустым');
@@ -417,7 +388,7 @@ const KanbanBoard = () => {
                 const { data: tagData } = await logic.addTagToTask({ variables: { taskId: logic.contextMenuTask.id, tagId: newTag.id } });
                 
                 if (tagData?.addTagToTask) {
-                    // ✅ Обновляем контекстное меню с новыми полными данными
+                    // Обновляем контекстное меню с новыми полными данными
                     logic.setContextMenuTask(tagData.addTagToTask);
                 }
                 
@@ -426,13 +397,11 @@ const KanbanBoard = () => {
                 logic.setNewTagColor('#3b82f6');
                 logic.setShowCreateTag(false);
                 
-                // ✅ ИСПРАВЛЕНИЕ: Обновляем список тегов и задачи с network-first
+                // ИСПРАВЛЕНИЕ: Обновляем список тегов и задачи с network-first
                 await logic.refetchTags();
                 await logic.refetchCurrentTasks();
             }
         } catch (err) {
-            console.error('Ошибка создания тега:', err);
-            alert('Ошибка: ' + err.message);
         }
     };
 
@@ -543,7 +512,7 @@ const KanbanBoard = () => {
                         onMouseEnter={() => { if (logic.highlightedTask) { logic.setHighlightedTask(null); searchParams.delete('highlightTask'); setSearchParams(searchParams); } }}
                         searchParams={searchParams}
                         setSearchParams={setSearchParams}
-                        // ✅ Context menu props
+                        // Context menu props
                         showContextMenu={logic.showContextMenu}
                         contextMenuPosition={logic.contextMenuPosition}
                         contextMenuTask={logic.contextMenuTask}
