@@ -91,9 +91,7 @@ public class TaskService {
                 Thread.sleep(100);
                 TaskSSEController sseController = getSSEController();
                 if (sseController != null) {
-                    System.out.println("📡 Sending task-created event for subgroup " + subgroupId);
                     sseController.notifyTaskUpdated(subgroupId, taskData);
-                    System.out.println("✅ Sent task-created event for subgroup " + subgroupId);
                 }
             } catch (Exception e) {
                 System.err.println("❌ Error sending task-created event: " + e.getMessage());
@@ -126,9 +124,7 @@ public class TaskService {
                 Thread.sleep(100);
                 TaskSSEController sseController = getSSEController();
                 if (sseController != null) {
-                    System.out.println("📡 Sending task-updated event for subgroup " + subgroupId);
                     sseController.notifyTaskUpdated(subgroupId, taskData);
-                    System.out.println("✅ Sent task-updated event for subgroup " + subgroupId);
                 }
             } catch (Exception e) {
                 System.err.println("❌ Error sending task-updated event: " + e.getMessage());
@@ -146,9 +142,7 @@ public class TaskService {
                 Thread.sleep(100);
                 TaskSSEController sseController = getSSEController();
                 if (sseController != null) {
-                    System.out.println("📡 Sending task-deleted event for subgroup " + subgroupId);
                     sseController.notifyTaskDeleted(subgroupId, taskId);
-                    System.out.println("✅ Sent task-deleted event for subgroup " + subgroupId);
                 }
             } catch (Exception e) {
                 System.err.println("❌ Error sending task-deleted event: " + e.getMessage());
@@ -535,8 +529,8 @@ public class TaskService {
         for (Task task : tasks) {
             List<Tag> tags = tagsMap.get(task.getId());
             if (tags != null && !tags.isEmpty()) {
-                task.getTags().clear();
-                task.getTags().addAll(tags);
+                // Не вызываем clear() - просто заменяем всю коллекцию
+                task.setTags(new java.util.ArrayList<>(tags));
             }
             // Инициализировать остальные коллекции для GraphQL
             Hibernate.initialize(task.getAssignees());
@@ -575,8 +569,25 @@ public class TaskService {
     }
 
     @Cacheable(value = "tasksByAssignee", key = "#userId")
+    @Transactional(readOnly = true)
     public List<Task> findTasksByAssignee(Long userId) {
-        return taskRepository.findRootTasksByAssignee(userId);
+        List<Task> tasks = taskRepository.findRootTasksByAssignee(userId);
+        if (tasks == null || tasks.isEmpty()) return tasks;
+        
+        List<Long> taskIds = tasks.stream().map(Task::getId).collect(Collectors.toList());
+        List<Task> tasksWithTags = taskRepository.findTasksWithTagsByIds(taskIds);
+        Map<Long, List<Tag>> tagsMap = tasksWithTags.stream()
+                .collect(Collectors.toMap(Task::getId, Task::getTags));
+        for (Task task : tasks) {
+            List<Tag> tags = tagsMap.get(task.getId());
+            if (tags != null && !tags.isEmpty()) {
+                task.getTags().clear();
+                task.getTags().addAll(tags);
+            }
+            Hibernate.initialize(task.getAssignees());
+            Hibernate.initialize(task.getAttachments());
+        }
+        return tasks;
     }
 
     public List<Task> findTasksByCreator(Long createdByUserId) {
@@ -838,8 +849,26 @@ public class TaskService {
     }
 
     @Cacheable(value = "tasksByAssignee", key = "#userId + '_' + #projectId")
+    @Transactional(readOnly = true)
     public List<Task> findTasksByAssigneeAndProject(Long userId, Long projectId) {
-        return taskRepository.findRootTasksByAssigneeAndProject(userId, projectId);
+        List<Task> tasks = taskRepository.findRootTasksByAssigneeAndProject(userId, projectId);
+        if (tasks == null || tasks.isEmpty()) return tasks;
+        
+        // Загружаем теги батч-запросом
+        List<Long> taskIds = tasks.stream().map(Task::getId).collect(Collectors.toList());
+        List<Task> tasksWithTags = taskRepository.findTasksWithTagsByIds(taskIds);
+        Map<Long, List<Tag>> tagsMap = tasksWithTags.stream()
+                .collect(Collectors.toMap(Task::getId, Task::getTags));
+        
+        for (Task task : tasks) {
+            List<Tag> tags = tagsMap.get(task.getId());
+            if (tags != null && !tags.isEmpty()) {
+                task.setTags(new java.util.ArrayList<>(tags));
+            }
+            Hibernate.initialize(task.getAssignees());
+            Hibernate.initialize(task.getAttachments());
+        }
+        return tasks;
     }
 
     public List<Attachment> getAttachmentsByTask(Long taskId) {
@@ -851,8 +880,6 @@ public class TaskService {
     @Async
     @Transactional
     public void checkOverdueTasksAndNotify() {
-        System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        System.out.println("🔍 Checking for overdue tasks at " + OffsetDateTime.now());
 
         List<Task> overdueTasks;
         try {
@@ -864,37 +891,25 @@ public class TaskService {
         }
 
         if (overdueTasks == null || overdueTasks.isEmpty()) {
-            System.out.println("✅ No overdue tasks found");
-            System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             return;
         }
-
-        System.out.println("📋 Found " + overdueTasks.size() + " overdue tasks");
 
         int notificationSent = 0;
         int errors = 0;
 
         for (Task task : overdueTasks) {
             try {
-                System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-                System.out.println("📧 Processing overdue task ID: " + task.getId());
-                System.out.println("   Title: " + task.getTitle());
-                System.out.println("   Due date: " + task.getDueDate());
 
                 List<User> assignees = task.getAssignees();
                 if (assignees == null || assignees.isEmpty()) {
-                    System.out.println("   ⏭️ Task has no assignees, skipping");
                     taskRepository.markOverdueNotified(task.getId());
                     continue;
                 }
-
-                System.out.println("   👥 Assignees: " + assignees.size());
 
                 for (User assignee : assignees) {
                     try {
                         emailNotificationService.notifyTaskOverdue(task, assignee);
                         notificationSent++;
-                        System.out.println("   ✅ Sent to: " + assignee.getEmail());
                     } catch (Exception e) {
                         System.err.println("   ❌ Failed to send to " + assignee.getEmail() + ": " + e.getMessage());
                         errors++;
@@ -902,7 +917,6 @@ public class TaskService {
                 }
 
                 taskRepository.markOverdueNotified(task.getId());
-                System.out.println("   📝 Marked task as notified");
 
             } catch (Exception e) {
                 System.err.println("❌ Error processing task " + task.getId() + ": " + e.getMessage());
@@ -911,9 +925,6 @@ public class TaskService {
             }
         }
 
-        System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-        System.out.println("📊 Summary: " + notificationSent + " notifications sent, " + errors + " errors");
-        System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
     // ============ ВСПОМОГАТЕЛЬНЫЕ МЕТОДЫ ============
@@ -960,5 +971,4 @@ public class TaskService {
         return saved;
     }
 }
-
 

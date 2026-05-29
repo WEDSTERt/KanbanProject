@@ -2,6 +2,8 @@ package com.service;
 
 import com.entity.*;
 import com.repository.*;
+import org.hibernate.Hibernate;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -28,6 +30,8 @@ public class TagService {
         return tagRepository.findByProjectId(projectId);
     }
 
+    // ✅ ИСПРАВЛЕНО: Добавлен @CacheEvict
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Tag createTag(Long projectId, String name, String color) {
         Project project = projectRepository.findById(projectId)
@@ -41,6 +45,8 @@ public class TagService {
         return tagRepository.save(tag);
     }
 
+    // ✅ ИСПРАВЛЕНО: Добавлен @CacheEvict
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Tag updateTag(Long id, String name, String color) {
         Tag tag = tagRepository.findById(id)
@@ -54,6 +60,8 @@ public class TagService {
         return tagRepository.save(tag);
     }
 
+    // ✅ ИСПРАВЛЕНО: Добавлен @CacheEvict
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public void deleteTag(Long id) {
         Tag tag = tagRepository.findById(id).orElse(null);
@@ -68,12 +76,17 @@ public class TagService {
         }
     }
 
+    // ✅ ИСПРАВЛЕНО: Добавлен @CacheEvict
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task addTagToTask(Long taskId, Long tagId) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
         Tag tag = tagRepository.findById(tagId)
                 .orElseThrow(() -> new RuntimeException("Tag not found"));
+
+        // ✅ Инициализируем теги для Hibernate
+        Hibernate.initialize(task.getTags());
 
         List<Tag> tags = task.getTags();
         if (tags == null) {
@@ -97,6 +110,8 @@ public class TagService {
         return savedTask;
     }
 
+    // ✅ ИСПРАВЛЕНО: Добавлен @CacheEvict
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task removeTagFromTask(Long taskId, Long tagId) {
         Task task = taskRepository.findById(taskId)
@@ -134,10 +149,14 @@ public class TagService {
         return savedTask;
     }
 
+    // ✅ ИСПРАВЛЕНО: Добавлен @CacheEvict
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task addMultipleTagsToTask(Long taskId, List<Long> tagIds) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
+
+        Hibernate.initialize(task.getTags());
 
         List<Tag> tags = task.getTags();
         if (tags == null) {
@@ -155,10 +174,14 @@ public class TagService {
         return taskRepository.saveAndFlush(task);
     }
 
+    // ✅ ИСПРАВЛЕНО: Добавлен @CacheEvict
+    @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
     public Task setTaskTags(Long taskId, List<Long> tagIds) {
         Task task = taskRepository.findById(taskId)
                 .orElseThrow(() -> new RuntimeException("Task not found"));
+
+        Hibernate.initialize(task.getTags());
 
         List<Tag> tags = task.getTags();
         if (tags == null) {

@@ -89,10 +89,12 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
     const [deleteTagFromProject] = useMutation(DELETE_TAG_FROM_PROJECT);
 
     // Queries
+    // ✅ ИСПРАВЛЕНИЕ: Используем cache-and-network для полноценного обновления тегов при их изменении
     const { data: tagsData, refetch: refetchTags } = useQuery(GET_TAGS, {
         variables: { projectId },
         skip: !projectId,
-        fetchPolicy: 'cache-first',
+        fetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
     });
     const availableTags = tagsData?.tags || [];
 
@@ -102,34 +104,44 @@ export const useKanbanLogic = (projectId, urlSubgroupId, user) => {
         fetchPolicy: 'cache-first',
     });
 
-    // ✅ ОПТИМИЗАЦИЯ: Используем LITE версию если низкая скорость или первая загрузка
+    // ✅ Обновленные queries с network-first fetchPolicy для обеспечения свежих данных
     const { loading: tasksLoading, data: tasksData, refetch: refetchTasks, networkStatus: tasksNetworkStatus } = useQuery(
         isLowBandwidth ? GET_TASKS_BY_SUBGROUP_LITE : GET_TASKS_BY_SUBGROUP,
         { 
             variables: { subgroupId: activeSubgroupId }, 
             skip: !activeSubgroupId || activeSubgroupId === 'my-tasks', 
-            fetchPolicy: 'cache-and-network', 
+            fetchPolicy: 'network-first',  // ✅ ОБЕСПЕЧИВАЕТ свежие данные о тегах
             notifyOnNetworkStatusChange: true, 
             pollInterval: 0 
         }
     );
 
-    // ✅ ОПТИМИЗАЦИЯ: Облегченная версия для "мои задачи" при низкой скорости
+    // ✅ Обновленные queries с network-first fetchPolicy для обеспечения свежих данных
     const { loading: myTasksLoading, data: myTasksData, refetch: refetchMyTasks, networkStatus: myTasksNetworkStatus } = useQuery(
         isLowBandwidth ? GET_TASKS_BY_ASSIGNEE_AND_PROJECT_LITE : GET_TASKS_BY_ASSIGNEE_AND_PROJECT,
         { 
             variables: { userId: user.id, projectId: projectId }, 
             skip: activeSubgroupId !== 'my-tasks' || !user.id || !projectId, 
-            fetchPolicy: 'cache-and-network', 
+            fetchPolicy: 'network-first',  // ✅ ОБЕСПЕЧИВАЕТ свежие данные о тегах
             notifyOnNetworkStatusChange: true, 
             pollInterval: 0 
         }
     );
 
     const refetchCurrentTasks = useCallback(async () => {
-        if (activeSubgroupId === 'my-tasks') await refetchMyTasks();
-        else if (activeSubgroupId) await refetchTasks();
-    }, [activeSubgroupId, refetchMyTasks, refetchTasks]);
+        try {
+            // ✅ Обновляем с network-first, чтобы обеспечить свежие данные
+            if (activeSubgroupId === 'my-tasks') {
+                await refetchMyTasks({ fetchPolicy: 'network-first' });
+            } else if (activeSubgroupId) {
+                await refetchTasks({ fetchPolicy: 'network-first' });
+            }
+            // Обновляем теги
+            await refetchTags({ fetchPolicy: 'network-first' });
+        } catch (err) {
+            console.error('Ошибка рефреша задач:', err);
+        }
+    }, [activeSubgroupId, refetchMyTasks, refetchTasks, refetchTags]);
 
     let tasks = [];
     if (activeSubgroupId === 'my-tasks') tasks = myTasksData?.tasksByAssigneeAndProject || [];

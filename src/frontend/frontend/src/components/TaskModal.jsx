@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useApolloClient } from '@apollo/client';
-import { GET_TASK_ATTACHMENTS, GET_TASK_SUBTASKS, GET_TAGS } from '../graphql/queries';
+import { GET_TASK_ATTACHMENTS, GET_TASK_SUBTASKS, GET_TAGS, GET_TASK_BY_ID } from '../graphql/queries';
 import { UPDATE_TASK, DELETE_TASK, CREATE_TAG, ADD_TAG_TO_TASK, REMOVE_TAG_FROM_TASK, DELETE_TAG_FROM_PROJECT, SET_TASK_ASSIGNEES } from '../graphql/mutations';
 import AttachmentList from './AttachmentList';
 import ConfirmModal from './ConfirmModal';
@@ -41,18 +41,34 @@ const TaskModal = ({
 
     const users = assignableUsers || [];
 
+    // ✅ Все useQuery должны идти ПЕРЕД использованием их данных
+    const { data: fullTaskData, refetch: refetchFullTask } = useQuery(GET_TASK_BY_ID, {
+        variables: { taskId: task?.id },
+        skip: !task?.id,
+        fetchPolicy: 'network-first',
+        onCompleted: (data) => {
+            console.log('✅ GET_TASK_BY_ID completed for task', data?.task?.id, '- tags:', data?.task?.tags?.length || 0, data?.task?.tags);
+        },
+        onError: (error) => {
+            console.error('❌ GET_TASK_BY_ID error:', error);
+        },
+    });
+
     const { data: attachmentsData, refetch: refetchAttachments } = useQuery(GET_TASK_ATTACHMENTS, {
         variables: { taskId: task?.id },
         skip: !task?.id,
     });
+
     const { data: subTasksData, refetch: refetchSubTasks } = useQuery(GET_TASK_SUBTASKS, {
         variables: { taskId: task?.id },
         skip: !task?.id,
     });
+    
     const { data: tagsData, refetch: refetchTags } = useQuery(GET_TAGS, {
         variables: { projectId },
         skip: !projectId,
-        fetchPolicy: 'network-only',
+        fetchPolicy: 'cache-and-network',
+        notifyOnNetworkStatusChange: true,
     });
     const availableTags = tagsData?.tags || [];
 
@@ -64,22 +80,32 @@ const TaskModal = ({
     const [deleteTagFromProject] = useMutation(DELETE_TAG_FROM_PROJECT);
     const [setTaskAssignees] = useMutation(SET_TASK_ASSIGNEES);
 
+    // ✅ ИСПРАВЛЕНИЕ: Теперь fullTask использует уже объявленные переменные
+    const fullTask = subTasksData?.task || fullTaskData?.task || task;
+
     useEffect(() => {
         if (task?.id && attachmentsData?.taskAttachments) setAttachments(attachmentsData.taskAttachments);
         else setAttachments([]);
     }, [attachmentsData, task?.id]);
 
+    // ✅ Используем теги из ПОЛНОЙ задачи
     useEffect(() => {
-        if (task?.tags) setSelectedTagIds(task.tags.map((t) => t.id));
-    }, [task]);
+        if (fullTask?.tags) {
+            console.log('📌 TaskModal: Теги загружены:', fullTask.tags);
+            setSelectedTagIds(fullTask.tags.map((t) => t.id));
+        } else {
+            console.log('⚠️ TaskModal: Теги не найдены в fullTask');
+            setSelectedTagIds([]);
+        }
+    }, [fullTask?.tags]);
 
     useEffect(() => {
-        if (task) {
-            setTitle(task.title || '');
-            setDescription(task.description || '');
-            setDueDate(task.dueDate ? new Date(task.dueDate) : null);
-            if (task.dueDate) {
-                const date = new Date(task.dueDate);
+        if (fullTask) {
+            setTitle(fullTask.title || '');
+            setDescription(fullTask.description || '');
+            setDueDate(fullTask.dueDate ? new Date(fullTask.dueDate) : null);
+            if (fullTask.dueDate) {
+                const date = new Date(fullTask.dueDate);
                 const year = date.getFullYear();
                 const month = String(date.getMonth() + 1).padStart(2, '0');
                 const day = String(date.getDate()).padStart(2, '0');
@@ -89,13 +115,13 @@ const TaskModal = ({
             } else {
                 setDueDateInput('');
             }
-            let rawStatus = task.status;
+            let rawStatus = fullTask.status;
             if (typeof rawStatus === 'number') rawStatus = rawStatus === 0 ? 'TODO' : rawStatus === 1 ? 'IN_PROGRESS' : 'REVIEW';
             else if (typeof rawStatus === 'string') rawStatus = rawStatus.toUpperCase().replace('INPROGRESS', 'IN_PROGRESS');
             setStatus(['TODO', 'IN_PROGRESS', 'REVIEW'].includes(rawStatus) ? rawStatus : 'TODO');
-            setPriority(task.value || 2);
-            setAssigneeIds(task.assignees?.map((a) => a.id) || []);
-            setCreatorId(task.createdBy?.id || null);
+            setPriority(fullTask.value || 2);
+            setAssigneeIds(fullTask.assignees?.map((a) => a.id) || []);
+            setCreatorId(fullTask.createdBy?.id || null);
             setIsEditing(false);
         } else {
             setTitle('');
@@ -108,12 +134,12 @@ const TaskModal = ({
             setCreatorId(null);
             setIsEditing(true);
         }
-    }, [task, initialAssigneeIds]);
+    }, [fullTask, initialAssigneeIds]);
 
     const handleStatusChange = async (newStatus) => {
-        if (!task || isViewer) return;
+        if (!fullTask || isViewer) return;
         try {
-            await updateTask({ variables: { id: task.id, status: newStatus } });
+            await updateTask({ variables: { id: fullTask.id, status: newStatus } });
             setStatus(newStatus);
             if (onSave) onSave({ status: newStatus });
         } catch (err) {
@@ -158,6 +184,7 @@ const TaskModal = ({
             if (typeof statusVal === 'number') statusVal = statusVal === 0 ? 'TODO' : statusVal === 1 ? 'IN_PROGRESS' : 'REVIEW';
             statusVal = statusVal.toUpperCase().replace('INPROGRESS', 'IN_PROGRESS');
 
+            console.log('💾 handleSubmit onSave with:', { title, selectedTagIds });
             await onSave({
                 title: title.trim(),
                 description: description.trim() || null,
@@ -167,7 +194,17 @@ const TaskModal = ({
                 assigneeIds,
                 creatorId,
             });
-            if (refetchCurrentTasks) await refetchCurrentTasks();
+            console.log('✅ onSave complete');
+            
+            // ИСПРАВЛЕНО: Дождаться refetch перед закрытием модала
+            // Это гарантирует, что теги будут загружены из бэка
+            if (refetchFullTask) {
+                console.log('⏳ Waiting for refetchFullTask...');
+                const result = await refetchFullTask();
+                console.log('✅ refetchFullTask done, tags:', result?.data?.task?.tags?.length);
+            }
+            
+            // Затем закрываем модал
             onClose();
         } catch (err) {
             console.error(err);
@@ -178,28 +215,22 @@ const TaskModal = ({
     };
 
     const handleAssigneeToggle = async (userId) => {
-        // Calculate new assignee list
         const newIds = assigneeIds.includes(userId) 
             ? assigneeIds.filter((id) => id !== userId) 
             : [...assigneeIds, userId];
         
-        // Immediate UI update
         setAssigneeIds(newIds);
         
-        // Immediate save if editing existing task
-        if (task && task.id) {
+        if (fullTask && fullTask.id) {
             try {
-                await setTaskAssignees({ variables: { taskId: task.id, userIds: newIds } });
-                // Clear Apollo cache to force refetch
+                await setTaskAssignees({ variables: { taskId: fullTask.id, userIds: newIds } });
                 client.cache.evict({ fieldName: 'tasksBySubgroup' });
                 client.cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
                 client.cache.gc();
-                // Refetch to get fresh data
                 if (refetchCurrentTasks) await refetchCurrentTasks();
             } catch (err) {
                 console.error('Ошибка обновления исполнителей:', err);
                 alert('Ошибка: ' + err.message);
-                // Revert change on error
                 setAssigneeIds(assigneeIds);
             }
         }
@@ -213,7 +244,7 @@ const TaskModal = ({
         formData.append('file', file);
         try {
             const token = localStorage.getItem('jwtToken');
-            const res = await fetch(`/api/files/upload/${task.id}`, {
+            const res = await fetch(`/api/files/upload/${fullTask.id}`, {
                 method: 'POST',
                 headers: { Authorization: token ? `Bearer ${token}` : '' },
                 body: formData,
@@ -243,42 +274,62 @@ const TaskModal = ({
     const handleCreateTag = async () => {
         if (!newTagName.trim()) return;
         try {
-            await createTag({ variables: { projectId: parseInt(projectId), name: newTagName.trim(), color: newTagColor } });
+            const { data } = await createTag({ 
+                variables: { 
+                    projectId: parseInt(projectId), 
+                    name: newTagName.trim(), 
+                    color: newTagColor 
+                } 
+            });
+            
+            if (data?.createTag) {
+                client.cache.evict({ fieldName: 'tags' });
+                client.cache.gc();
+            }
+            
             setNewTagName('');
             setNewTagColor('#3b82f6');
             setShowCreateTag(false);
             await refetchTags();
-            if (refetchProjectTags) refetchProjectTags();
+            if (refetchProjectTags) await refetchProjectTags();
         } catch (err) {
             alert('Ошибка создания тега: ' + err.message);
         }
     };
 
     const handleToggleTag = async (tagId) => {
-        if (!task?.id) return;
+        if (!fullTask?.id) return;
         try {
+            console.log('🔄 handleToggleTag START:', { fullTaskId: fullTask.id, tagId, currentSelectedTags: selectedTagIds });
+            
             if (selectedTagIds.includes(tagId)) {
-                await removeTagFromTask({ variables: { taskId: parseInt(task.id), tagId: parseInt(tagId) } });
+                console.log('❌ Удаляю тег:', tagId);
+                await removeTagFromTask({ variables: { taskId: parseInt(fullTask.id), tagId: parseInt(tagId) } });
                 setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
             } else {
-                await addTagToTask({ variables: { taskId: parseInt(task.id), tagId: parseInt(tagId) } });
+                console.log('✅ Добавляю тег:', tagId);
+                await addTagToTask({ variables: { taskId: parseInt(fullTask.id), tagId: parseInt(tagId) } });
                 setSelectedTagIds((prev) => [...prev, tagId]);
             }
-            await refetchTags();
-            if (refetchProjectTags) refetchProjectTags();
+            
+            console.log('🎉 handleToggleTag COMPLETE');
         } catch (err) {
-            console.error(err);
+            console.error('❌ handleToggleTag ERROR:', err);
             alert('Ошибка изменения тега');
         }
-    };
+    };;
 
     const handleDeleteTagFromProject = async (tagId, tagName) => {
         if (!window.confirm(`Удалить тег "${tagName}" из проекта?`)) return;
         try {
             await deleteTagFromProject({ variables: { tagId: parseInt(tagId), projectId: parseInt(projectId) } });
+            
+            // ИСПРАВЛЕНИЕ: Используем network-first для полного обновления
             await refetchTags();
-            if (refetchProjectTags) refetchProjectTags();
+            if (refetchProjectTags) await refetchProjectTags();
             setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
+            if (refetchCurrentTasks) await refetchCurrentTasks();
+            if (refetchFullTask) await refetchFullTask();
         } catch (err) {
             alert('Ошибка удаления тега: ' + err.message);
         }
@@ -295,29 +346,29 @@ const TaskModal = ({
     const completedCount = subTasks.filter((st) => st.status === 2).length;
 
     // Режим просмотра
-    if (task && !isEditing) {
+    if (fullTask && !isEditing) {
         return (
             <div className="modal-overlay" onClick={onClose}>
                 <div className="modal-content task-view-modal" onClick={(e) => e.stopPropagation()}>
                     <button className="modal-close" onClick={onClose}>✕</button>
                     <h3>Просмотр задачи</h3>
                     <div className="task-timestamps">
-                        <div><i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}</div>
-                        <div><i className="fas fa-edit"></i> Обновлено: {formatDateTime(task.updatedAt)}</div>
+                        <div><i className="fas fa-plus-circle"></i> Создано: {formatDateTime(fullTask.createdAt)}</div>
+                        <div><i className="fas fa-edit"></i> Обновлено: {formatDateTime(fullTask.updatedAt)}</div>
                     </div>
-                    <div className="form-group"><label>Название</label><div className="form-input" style={{ background: '#f8fafc' }}>{task.title}</div></div>
-                    <div className="form-group"><label>Описание</label><div className="form-input" style={{ background: '#f8fafc', whiteSpace: 'pre-wrap', wordWrap: 'break-word', lineHeight: '1.5', minHeight: '80px' }}>{task.description || '—'}</div></div>
-                    {task.tags?.length > 0 && (
+                    <div className="form-group"><label>Название</label><div className="form-input" style={{ background: '#f8fafc' }}>{fullTask.title}</div></div>
+                    <div className="form-group"><label>Описание</label><div className="form-input" style={{ background: '#f8fafc', whiteSpace: 'pre-wrap', wordWrap: 'break-word', lineHeight: '1.5', minHeight: '80px' }}>{fullTask.description || '—'}</div></div>
+                    {fullTask.tags?.length > 0 && (
                         <div className="form-group">
                             <label><i className="fas fa-tags"></i> Теги</label>
                             <div className="form-input" style={{ background: '#f8fafc', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-                                {task.tags.map((tag) => (
+                                {fullTask.tags.map((tag) => (
                                     <span key={tag.id} style={{ backgroundColor: tag.color, color: 'white', padding: '4px 12px', borderRadius: '20px', fontSize: '0.8rem' }}>{tag.name}</span>
                                 ))}
                             </div>
                         </div>
                     )}
-                    <div className="form-group"><label>Дедлайн</label><div className="form-input" style={{ background: '#f8fafc' }}>{task.dueDate ? new Date(task.dueDate).toLocaleString() : '—'}</div></div>
+                    <div className="form-group"><label>Дедлайн</label><div className="form-input" style={{ background: '#f8fafc' }}>{fullTask.dueDate ? new Date(fullTask.dueDate).toLocaleString() : '—'}</div></div>
                     <div className="form-group">
                         <label>Статус</label>
                         <select className="form-select" style={{background: 'white'}} value={status} onChange={(e) => handleStatusChange(e.target.value)} disabled={isViewer}>
@@ -327,8 +378,8 @@ const TaskModal = ({
                         </select>
                     </div>
                     <div className="form-group"><label>Важность</label><div className="form-input" style={{ background: '#f8fafc' }}>{priority === 1 ? 'Низкая' : priority === 2 ? 'Средняя' : 'Высокая'}</div></div>
-                    {task.createdBy && (
-                        <div className="form-group"><label>Создатель</label><div className="form-input" style={{ background: '#f8fafc' }}><i className="fas fa-user"></i> {task.createdBy.fullName}</div></div>
+                    {fullTask.createdBy && (
+                        <div className="form-group"><label>Создатель</label><div className="form-input" style={{ background: '#f8fafc' }}><i className="fas fa-user"></i> {fullTask.createdBy.fullName}</div></div>
                     )}
                     <div className="form-group"><label>Исполнители</label><div className="form-input" style={{ background: '#f8fafc' }}>{users.filter(u => assigneeIds.includes(u.userId)).map(u => u.user?.fullName).join(', ') || '—'}</div></div>
                     {subTasks.length > 0 && (
@@ -354,11 +405,11 @@ const TaskModal = ({
         <div className="modal-overlay" onClick={onClose}>
             <div className="modal-content" onClick={(e) => e.stopPropagation()}>
                 <button className="modal-close" onClick={onClose}>✕</button>
-                <h3>{task ? 'Редактировать задачу' : 'Новая задача'}</h3>
-                {task && (
+                <h3>{fullTask ? 'Редактировать задачу' : 'Новая задача'}</h3>
+                {fullTask && (
                     <div className="task-timestamps">
-                        <div><i className="fas fa-plus-circle"></i> Создано: {formatDateTime(task.createdAt)}</div>
-                        <div><i className="fas fa-edit"></i> Обновлено: {formatDateTime(task.updatedAt)}</div>
+                        <div><i className="fas fa-plus-circle"></i> Создано: {formatDateTime(fullTask.createdAt)}</div>
+                        <div><i className="fas fa-edit"></i> Обновлено: {formatDateTime(fullTask.updatedAt)}</div>
                     </div>
                 )}
                 <form onSubmit={handleSubmit}>
@@ -373,7 +424,7 @@ const TaskModal = ({
 
                     {/* Теги с автопереносом */}
                     <div className="form-group">
-                        <label><i className="fas fa-tags"></i> Теги</label>
+                        <label><i className="fas fa-tags"></i> Теги ({selectedTagIds.length})</label>
                         <div className="tags-container" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginBottom: '8px', maxWidth: '100%', overflow: 'hidden' }}>
                             {availableTags.map((tag) => {
                                 const isSelected = selectedTagIds.includes(tag.id);
@@ -450,7 +501,7 @@ const TaskModal = ({
                             <option value="3">Высокая</option>
                         </select>
                     </div>
-                    {task && (
+                    {fullTask && (
                         <div className="form-group">
                             <label htmlFor="task-creator">Создатель задачи</label>
                             <select className="form-select editable-field" id="task-creator" value={creatorId ? String(creatorId) : ''} onChange={(e) => setCreatorId(e.target.value ? parseInt(e.target.value) : null)}>
@@ -472,7 +523,7 @@ const TaskModal = ({
                             ))}
                         </div>
                     </fieldset>
-                    {task && (
+                    {fullTask && (
                         <div className="form-group">
                             <AttachmentList attachments={attachments} onDelete={handleDeleteFile} isEditMode={true} />
                             <div className="attachment-upload">
@@ -485,8 +536,8 @@ const TaskModal = ({
                         </div>
                     )}
                     <div className="modal-actions">
-                        {task && <button type="button" className="btn btn--secondary" onClick={() => setIsEditing(false)}>Назад</button>}
-                        {task && !isMyTasksGroup && <button type="button" className="btn btn--danger" onClick={() => setShowDeleteConfirm(true)}>Удалить задачу</button>}
+                        {fullTask && <button type="button" className="btn btn--secondary" onClick={() => setIsEditing(false)}>Назад</button>}
+                        {fullTask && !isMyTasksGroup && <button type="button" className="btn btn--danger" onClick={() => setShowDeleteConfirm(true)}>Удалить задачу</button>}
                         <button type="submit" className="btn" disabled={isSaving}>Сохранить</button>
                     </div>
                 </form>
@@ -495,7 +546,7 @@ const TaskModal = ({
                 isOpen={showDeleteConfirm}
                 title="Удаление задачи"
                 message="Вы уверены?"
-                onConfirm={() => { onDeleteTask(task.id); setShowDeleteConfirm(false); }}
+                onConfirm={() => { onDeleteTask(fullTask.id); setShowDeleteConfirm(false); }}
                 onCancel={() => setShowDeleteConfirm(false)}
             />
         </div>

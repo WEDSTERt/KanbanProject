@@ -141,6 +141,28 @@ export const GET_TASKS_BY_IDS = gql`
     }
 `;
 
+// ✅ НОВОЕ: Запрос для загрузки ПОЛНОЙ информации о конкретной задаче (для TaskModal)
+export const GET_TASK_BY_ID = gql`
+    query GetTaskById($taskId: ID!) {
+        task(id: $taskId) {
+            id
+            title
+            description
+            dueDate
+            status
+            value
+            parentTaskId
+            subTasksCount
+            createdAt
+            updatedAt
+            createdBy { id fullName }
+            assignees { id fullName email }
+            attachments { id }
+            tags { id name color }
+        }
+    }
+`;
+
 export const GET_CURRENT_USER = gql`
     query GetCurrentUser {
         me {
@@ -258,8 +280,26 @@ export const GET_ALL_SUBTASKS = gql`
     }
 `;
 
+// ✅ ИСПРАВЛЕНО: Теперь запрашиваем саму родительскую задачу со всеми полями
+// Это предотвращает потерю тегов при загрузке подзадач
 export const GET_TASK_SUBTASKS = gql`
     query GetTaskSubTasks($taskId: ID!) {
+        task(id: $taskId) {
+            id
+            title
+            description
+            dueDate
+            status
+            value
+            parentTaskId
+            subTasksCount
+            createdAt
+            updatedAt
+            createdBy { id fullName }
+            assignees { id fullName email }
+            attachments { id }
+            tags { id name color }
+        }
         taskSubTasks(taskId: $taskId) {
             id
             title

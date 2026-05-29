@@ -15,6 +15,8 @@ import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
+import org.hibernate.Hibernate;
+
 import java.time.OffsetDateTime;
 import java.util.List;
 
@@ -95,21 +97,36 @@ public class GraphQLController {
     }
 
     @QueryMapping
+    @Transactional(readOnly = true)
     public List<Task> tasksByIds(@Argument List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        return taskService.findAllByIds(ids);
+        List<Task> tasks = taskService.findAllByIds(ids);
+        for (Task task : tasks) {
+            Hibernate.initialize(task.getTags());
+        }
+        return tasks;
     }
 
     @QueryMapping
+    @Transactional(readOnly = true)
     public List<Task> tasksBySubgroup(@Argument Long subgroupId) {
-        return taskService.findTasksBySubgroup(subgroupId);
+        List<Task> tasks = taskService.findTasksBySubgroup(subgroupId);
+        for (Task task : tasks) {
+            Hibernate.initialize(task.getTags());
+        }
+        return tasks;
     }
 
     @QueryMapping
+    @Transactional(readOnly = true)
     public List<Task> tasksByAssignee(@Argument Long userId) {
-        return taskService.findTasksByAssignee(userId);
+        List<Task> tasks = taskService.findTasksByAssignee(userId);
+        for (Task task : tasks) {
+            Hibernate.initialize(task.getTags());
+        }
+        return tasks;
     }
 
     @QueryMapping
@@ -151,19 +168,11 @@ public class GraphQLController {
                                   @Argument String turnstileToken,
                                   @Argument String clientIp) {
 
-        System.out.println("📝 === CREATE USER ===");
-        System.out.println("Full name: " + fullName);
-        System.out.println("Email: " + email);
-        System.out.println("Turnstile token: " + (turnstileToken != null ? turnstileToken.substring(0, Math.min(30, turnstileToken.length())) + "..." : "null"));
-        System.out.println("Client IP from param: " + clientIp);
-
         String ip = (clientIp != null && !clientIp.isEmpty()) ? clientIp : "0.0.0.0";
-        System.out.println("Real client IP: " + ip);
 
         User user = userService.createUser(fullName, email, password, turnstileToken, ip);
         String token = jwtUtil.generateToken(user.getId(), user.getEmail());
 
-        System.out.println("✅ User created successfully: " + email);
         return new AuthPayload(token, user);
     }
 
@@ -455,8 +464,13 @@ public class GraphQLController {
     }
 
     @SchemaMapping(typeName = "User", field = "assignedTasks")
+    @Transactional(readOnly = true)
     public List<Task> assignedTasks(User user) {
-        return taskService.findTasksByAssignee(user.getId());
+        List<Task> tasks = taskService.findTasksByAssignee(user.getId());
+        for (Task task : tasks) {
+            Hibernate.initialize(task.getTags());
+        }
+        return tasks;
     }
 
     @SchemaMapping(typeName = "Project", field = "owner")
@@ -500,8 +514,13 @@ public class GraphQLController {
     }
 
     @SchemaMapping(typeName = "Subgroup", field = "tasks")
+    @Transactional(readOnly = true)
     public List<Task> subgroupTasks(Subgroup subgroup) {
-        return taskService.findTasksBySubgroup(subgroup.getId());
+        List<Task> tasks = taskService.findTasksBySubgroup(subgroup.getId());
+        for (Task task : tasks) {
+            Hibernate.initialize(task.getTags());
+        }
+        return tasks;
     }
 
     @SchemaMapping(typeName = "SubgroupMember", field = "subgroup")
@@ -556,6 +575,7 @@ public class GraphQLController {
 
     @SchemaMapping(typeName = "Task", field = "tags")
     public List<Tag> taskTags(Task task) {
+        Hibernate.initialize(task.getTags());
         return task.getTags();
     }
 
@@ -567,7 +587,14 @@ public class GraphQLController {
     }
 
     @QueryMapping
+    @Transactional(readOnly = true)
     public List<Task> tasksByAssigneeAndProject(@Argument Long userId, @Argument Long projectId) {
-        return taskService.findTasksByAssigneeAndProject(userId, projectId);
+        List<Task> tasks = taskService.findTasksByAssigneeAndProject(userId, projectId);
+        // Инициализируем теги для всех задач перед сериализацией
+        for (Task task : tasks) {
+            Hibernate.initialize(task.getTags());
+        }
+        return tasks;
     }
 }
+

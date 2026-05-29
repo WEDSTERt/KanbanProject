@@ -1,6 +1,7 @@
 /* eslint-disable no-unused-vars */
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useApolloClient } from '@apollo/client';
 import { useAuth } from '../contexts/AuthContext';
 import { useSSE } from '../contexts/SSEContext';
 import { useKanbanLogic } from '../hooks/useKanbanLogic';
@@ -11,6 +12,7 @@ import FilterPanel, { FilterModal } from './kanban/FilterPanel';
 import SortPanel from './kanban/SortPanel';
 import KanbanBoardView from './kanban/KanbanBoardView';
 import { normalizeStatus, getTaskDueDateColor, getDueWarningText, getTaskCardStyle } from './kanban/utils';
+import { GET_TASKS_BY_SUBGROUP, GET_TASKS_BY_ASSIGNEE_AND_PROJECT } from '../graphql/queries';
 
 const KanbanBoard = () => {
     const navigate = useNavigate();
@@ -20,6 +22,7 @@ const KanbanBoard = () => {
     const highlightTaskId = searchParams.get('highlightTask');
     const { user } = useAuth();
     const { subscribe, sseService, isReady } = useSSE();
+    const client = useApolloClient();
 
     // Используем custom hook для всей логики
     const logic = useKanbanLogic(projectId, urlSubgroupId, user);
@@ -297,6 +300,142 @@ const KanbanBoard = () => {
         }
     };
 
+    // ✅ Обработчик для добавления подзадачи из контекстного меню
+    const handleCreateSubtaskFromContext = async (subtaskTitle) => {
+        if (!logic.contextMenuTask) return;
+        try {
+            await logic.createTask({
+                variables: {
+                    subgroupId: logic.activeSubgroupId,
+                    title: subtaskTitle,
+                    parentTaskId: logic.contextMenuTask.id,
+                    createdByUserId: user.id,
+                    status: 'TODO',
+                    value: 2,
+                    description: null,
+                    dueDate: null,
+                    assigneeIds: []
+                }
+            });
+            logic.setShowContextMenu(false);
+            await logic.fetchSubTasksForTask(logic.contextMenuTask.id, true);
+            await logic.refetchCurrentTasks();
+        } catch (err) {
+            console.error('Ошибка создания подзадачи:', err);
+            alert('Ошибка: ' + err.message);
+        }
+    };
+
+    // ✅ Обработчик для удаления задачи из контекстного меню
+    const handleDeleteTaskFromContext = async () => {
+        if (!logic.contextMenuTask) return;
+        if (window.confirm('Вы уверены, что хотите удалить эту задачу?')) {
+            try {
+                await logic.deleteTask({ variables: { id: logic.contextMenuTask.id } });
+                logic.setShowContextMenu(false);
+                await logic.refetchCurrentTasks();
+            } catch (err) {
+                console.error('Ошибка удаления задачи:', err);
+                alert('Ошибка: ' + err.message);
+            }
+        }
+    };
+
+    // ✅ Обработчик для переключения тега на задаче
+    const handleTagToggle = async (tagId) => {
+        if (!logic.contextMenuTask) return;
+        try {
+            console.log('🔄 handleTagToggle START:', { taskId: logic.contextMenuTask.id, tagId });
+            
+            const hasTag = logic.contextMenuTask.tags?.some(t => t.id === tagId);
+            
+            if (hasTag) {
+                console.log('❌ Removing tag:', tagId);
+                const { data } = await logic.removeTagFromTask({ variables: { taskId: logic.contextMenuTask.id, tagId } });
+                if (data?.removeTagFromTask) {
+                    console.log('✅ Tag removed, new tags:', data.removeTagFromTask.tags);
+                    // ✅ Обновляем контекстное меню И кэш Apollo сразу
+                    logic.setContextMenuTask(data.removeTagFromTask);
+                    
+                    // ✅ Обновляем кэш для текущего представления
+                    client.cache.writeQuery({
+                        query: logic.activeSubgroupId === 'my-tasks' ? GET_TASKS_BY_ASSIGNEE_AND_PROJECT : GET_TASKS_BY_SUBGROUP,
+                        variables: logic.activeSubgroupId === 'my-tasks' 
+                            ? { userId: user.id, projectId: projectId }
+                            : { subgroupId: logic.activeSubgroupId },
+                        data: logic.activeSubgroupId === 'my-tasks'
+                            ? { tasksByAssigneeAndProject: logic.myTasksData.tasksByAssigneeAndProject.map(t => t.id === data.removeTagFromTask.id ? data.removeTagFromTask : t) }
+                            : { tasksBySubgroup: logic.tasksData.tasksBySubgroup.map(t => t.id === data.removeTagFromTask.id ? data.removeTagFromTask : t) }
+                    });
+                }
+            } else {
+                console.log('✅ Adding tag:', tagId);
+                const { data } = await logic.addTagToTask({ variables: { taskId: logic.contextMenuTask.id, tagId } });
+                if (data?.addTagToTask) {
+                    console.log('✅ Tag added, new tags:', data.addTagToTask.tags);
+                    // ✅ Обновляем контекстное меню И кэш Apollo сразу
+                    logic.setContextMenuTask(data.addTagToTask);
+                    
+                    // ✅ Обновляем кэш для текущего представления
+                    client.cache.writeQuery({
+                        query: logic.activeSubgroupId === 'my-tasks' ? GET_TASKS_BY_ASSIGNEE_AND_PROJECT : GET_TASKS_BY_SUBGROUP,
+                        variables: logic.activeSubgroupId === 'my-tasks'
+                            ? { userId: user.id, projectId: projectId }
+                            : { subgroupId: logic.activeSubgroupId },
+                        data: logic.activeSubgroupId === 'my-tasks'
+                            ? { tasksByAssigneeAndProject: logic.myTasksData.tasksByAssigneeAndProject.map(t => t.id === data.addTagToTask.id ? data.addTagToTask : t) }
+                            : { tasksBySubgroup: logic.tasksData.tasksBySubgroup.map(t => t.id === data.addTagToTask.id ? data.addTagToTask : t) }
+                    });
+                }
+            }
+            
+            console.log('✅ handleTagToggle COMPLETE');
+        } catch (err) {
+            console.error('Ошибка переключения тега:', err);
+            alert('Ошибка: ' + err.message);
+        }
+    };
+
+    // ✅ Обработчик для создания нового тега
+    const handleCreateNewTag = async (tagName, tagColor) => {
+        if (!tagName.trim()) {
+            alert('Название тега не может быть пустым');
+            return;
+        }
+        try {
+            const { data } = await logic.createTag({
+                variables: {
+                    projectId,
+                    name: tagName,
+                    color: tagColor
+                }
+            });
+            
+            if (data?.createTag) {
+                const newTag = data.createTag;
+                // Добавляем новый тег к задаче
+                const { data: tagData } = await logic.addTagToTask({ variables: { taskId: logic.contextMenuTask.id, tagId: newTag.id } });
+                
+                if (tagData?.addTagToTask) {
+                    // ✅ Обновляем контекстное меню с новыми полными данными
+                    logic.setContextMenuTask(tagData.addTagToTask);
+                }
+                
+                // Очищаем форму
+                logic.setNewTagName('');
+                logic.setNewTagColor('#3b82f6');
+                logic.setShowCreateTag(false);
+                
+                // ✅ ИСПРАВЛЕНИЕ: Обновляем список тегов и задачи с network-first
+                await logic.refetchTags();
+                await logic.refetchCurrentTasks();
+            }
+        } catch (err) {
+            console.error('Ошибка создания тега:', err);
+            alert('Ошибка: ' + err.message);
+        }
+    };
+
     let targetSubgroupForAssign = null;
     if (logic.activeSubgroupId && logic.activeSubgroupId !== 'my-tasks') {
         targetSubgroupForAssign = realSubgroups.find(g => g.id === logic.activeSubgroupId);
@@ -404,6 +543,22 @@ const KanbanBoard = () => {
                         onMouseEnter={() => { if (logic.highlightedTask) { logic.setHighlightedTask(null); searchParams.delete('highlightTask'); setSearchParams(searchParams); } }}
                         searchParams={searchParams}
                         setSearchParams={setSearchParams}
+                        // ✅ Context menu props
+                        showContextMenu={logic.showContextMenu}
+                        contextMenuPosition={logic.contextMenuPosition}
+                        contextMenuTask={logic.contextMenuTask}
+                        availableTags={logic.availableTags}
+                        onTagToggle={handleTagToggle}
+                        onCreateNewTag={handleCreateNewTag}
+                        showCreateTag={logic.showCreateTag}
+                        onShowCreateTag={(show) => logic.setShowCreateTag(show)}
+                        newTagName={logic.newTagName}
+                        setNewTagName={logic.setNewTagName}
+                        newTagColor={logic.newTagColor}
+                        setNewTagColor={logic.setNewTagColor}
+                        onCloseContextMenu={() => { logic.setShowContextMenu(false); logic.setContextMenuTaskId(null); logic.setContextMenuTask(null); }}
+                        onCreateSubtask={handleCreateSubtaskFromContext}
+                        onDeleteTask={handleDeleteTaskFromContext}
                     />
                 )}
             </div>

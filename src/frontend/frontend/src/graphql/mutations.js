@@ -317,28 +317,42 @@ export const DELETE_TAG = gql`
     }
 `;
 
+// ✅ ИСПРАВЛЕНИЕ: Возвращаем ПОЛНЫЕ данные задачи, чтобы кэш обновился везде
 export const ADD_TAG_TO_TASK = gql`
     mutation AddTagToTask($taskId: ID!, $tagId: ID!) {
         addTagToTask(taskId: $taskId, tagId: $tagId) {
             id
-            tags {
-                id
-                name
-                color
-            }
+            title
+            description
+            dueDate
+            status
+            value
+            parentTaskId
+            subTasksCount
+            createdBy { id fullName }
+            assignees { id fullName email }
+            attachments { id }
+            tags { id name color }
         }
     }
 `;
 
+// ✅ ИСПРАВЛЕНИЕ: Возвращаем ПОЛНЫЕ данные задачи, чтобы кэш обновился везде
 export const REMOVE_TAG_FROM_TASK = gql`
     mutation RemoveTagFromTask($taskId: ID!, $tagId: ID!) {
         removeTagFromTask(taskId: $taskId, tagId: $tagId) {
             id
-            tags {
-                id
-                name
-                color
-            }
+            title
+            description
+            dueDate
+            status
+            value
+            parentTaskId
+            subTasksCount
+            createdBy { id fullName }
+            assignees { id fullName email }
+            attachments { id }
+            tags { id name color }
         }
     }
 `;

@@ -959,3 +959,182 @@
         font-size: 0.7rem !important;
     }
 }
+
+/* ===== КОНТЕКСТНОЕ МЕНЮ - ТЕГИ ===== */
+.context-menu-tags {
+    padding: 8px 12px;
+    border-top: 1px solid #e2e8f0;
+    border-bottom: 1px solid #e2e8f0;
+    background: #fafbfc;
+}
+
+.context-menu-tags-title {
+    font-size: 0.7rem;
+    font-weight: 600;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 8px;
+    display: block;
+}
+
+.context-menu-tag-btn {
+    padding: 6px 12px;
+    border-radius: 20px;
+    border: 1px solid;
+    background: white;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.1s;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+}
+
+.context-menu-tag-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.context-menu-tag-btn.active {
+    color: white;
+    border-color: transparent;
+    font-weight: 500;
+}
+
+.context-menu-tag-btn.new-tag-btn {
+    border-style: dashed;
+    border-color: #cbd5e1;
+    color: #64748b;
+    margin-top: 8px;
+    display: block;
+    width: 100%;
+    text-align: center;
+}
+
+.context-menu-tag-btn.new-tag-btn:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+    color: #475569;
+}
+
+/* Форма создания нового тега */
+.context-menu-new-tag-form {
+    display: flex;
+    gap: 8px;
+    padding: 8px 0;
+    margin-top: 8px;
+    flex-wrap: wrap;
+}
+
+.context-menu-new-tag-input {
+    flex: 1;
+    min-width: 120px;
+    padding: 6px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    outline: none;
+    transition: border-color 0.1s;
+}
+
+.context-menu-new-tag-input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.context-menu-color-input {
+    width: 40px;
+    height: 32px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    cursor: pointer;
+    padding: 2px;
+}
+
+.context-menu-new-tag-form > button {
+    padding: 6px 12px;
+    background: #2563eb;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: background 0.1s;
+    white-space: nowrap;
+}
+
+.context-menu-new-tag-form > button:hover {
+    background: #1d4ed8;
+}
+
+.context-menu-new-tag-form > button:active {
+    background: #1e40af;
+}
+
+.context-menu-subtask-form textarea {
+    flex: 1;
+    min-width: 150px;
+    padding: 8px 10px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-family: inherit;
+    resize: vertical;
+    outline: none;
+    transition: border-color 0.1s;
+    line-height: 1.4;
+}
+
+.context-menu-subtask-form textarea:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.task-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 8px;
+}
+
+.tag-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 0.7rem;
+    font-weight: 500;
+    color: white;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+
+.tag-badge:hover {
+    opacity: 0.9;
+}
+
+@media (max-width: 768px) {
+    .context-menu-tags {
+        padding: 10px 12px;
+    }
+
+    .context-menu-new-tag-form {
+        flex-direction: column;
+    }
+
+    .context-menu-new-tag-input {
+        min-width: 100%;
+    }
+
+    .context-menu-new-tag-form > button {
+        width: 100%;
+    }
+
+    .context-menu-subtask-form textarea {
+        min-width: 100%;
+        max-height: 80px;
+    }
+}

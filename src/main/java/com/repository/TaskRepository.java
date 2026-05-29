@@ -62,6 +62,14 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
             "ORDER BY t.createdAt DESC")
     List<Task> findRootTasksBySubgroupWithDetails(@Param("subgroupId") Long subgroupId);
 
+    // ✅ НОВОЕ: Загружаем задачи с assignees И tags вместе!
+    @Query("SELECT DISTINCT t FROM Task t " +
+            "LEFT JOIN FETCH t.assignees " +
+            "LEFT JOIN FETCH t.tags " +
+            "WHERE t.subgroupId = :subgroupId AND (t.parentTaskId IS NULL OR t.parentTaskId = 0) " +
+            "ORDER BY t.createdAt DESC")
+    List<Task> findRootTasksBySubgroupWithDetailsAndTags(@Param("subgroupId") Long subgroupId);
+
     @Query("SELECT DISTINCT t FROM Task t " +
             "LEFT JOIN FETCH t.tags " +
             "WHERE t.id IN :taskIds")
