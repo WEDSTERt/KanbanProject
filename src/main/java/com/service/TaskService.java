@@ -86,6 +86,17 @@ public class TaskService {
         taskData.put("value", task.getValue());
         taskData.put("subgroupId", subgroupId);
         
+        // Добавляем теги в SSE событие
+        List<Map<String, Object>> tagsData = new ArrayList<>();
+        for (Tag tag : task.getTags()) {
+            Map<String, Object> tagData = new HashMap<>();
+            tagData.put("id", tag.getId());
+            tagData.put("name", tag.getName());
+            tagData.put("color", tag.getColor());
+            tagsData.add(tagData);
+        }
+        taskData.put("tags", tagsData);
+        
         CompletableFuture.runAsync(() -> {
             try {
                 Thread.sleep(100);
@@ -118,6 +129,17 @@ public class TaskService {
         taskData.put("dueDate", task.getDueDate());
         taskData.put("value", task.getValue());
         taskData.put("subgroupId", subgroupId);
+        
+        // Добавляем теги в SSE событие
+        List<Map<String, Object>> tagsData = new ArrayList<>();
+        for (Tag tag : task.getTags()) {
+            Map<String, Object> tagData = new HashMap<>();
+            tagData.put("id", tag.getId());
+            tagData.put("name", tag.getName());
+            tagData.put("color", tag.getColor());
+            tagsData.add(tagData);
+        }
+        taskData.put("tags", tagsData);
         
         CompletableFuture.runAsync(() -> {
             try {
