@@ -28,6 +28,7 @@ const TaskModal = ({
     const [status, setStatus] = useState('TODO');
     const [priority, setPriority] = useState(2);
     const [assigneeIds, setAssigneeIds] = useState([]);
+    const [originalAssigneeIds, setOriginalAssigneeIds] = useState([]);
     const [creatorId, setCreatorId] = useState(null);
     const [uploading, setUploading] = useState(false);
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -35,6 +36,7 @@ const TaskModal = ({
     const [isEditing, setIsEditing] = useState(false);
     const [attachments, setAttachments] = useState([]);
     const [selectedTagIds, setSelectedTagIds] = useState([]);
+    const [originalTagIds, setOriginalTagIds] = useState([]);
     const [newTagName, setNewTagName] = useState('');
     const [newTagColor, setNewTagColor] = useState('#3b82f6');
     const [showCreateTag, setShowCreateTag] = useState(false);
@@ -92,10 +94,13 @@ const TaskModal = ({
     useEffect(() => {
         if (fullTask?.tags) {
             console.log('📌 TaskModal: Теги загружены:', fullTask.tags);
-            setSelectedTagIds(fullTask.tags.map((t) => t.id));
+            const tagIds = fullTask.tags.map((t) => t.id);
+            setSelectedTagIds(tagIds);
+            setOriginalTagIds(tagIds);
         } else {
             console.log('⚠️ TaskModal: Теги не найдены в fullTask');
             setSelectedTagIds([]);
+            setOriginalTagIds([]);
         }
     }, [fullTask?.tags]);
 
@@ -120,7 +125,11 @@ const TaskModal = ({
             else if (typeof rawStatus === 'string') rawStatus = rawStatus.toUpperCase().replace('INPROGRESS', 'IN_PROGRESS');
             setStatus(['TODO', 'IN_PROGRESS', 'REVIEW'].includes(rawStatus) ? rawStatus : 'TODO');
             setPriority(fullTask.value || 2);
-            setAssigneeIds(fullTask.assignees?.map((a) => a.id) || []);
+            
+            const newAssigneeIds = fullTask.assignees?.map((a) => a.id) || [];
+            setAssigneeIds(newAssigneeIds);
+            setOriginalAssigneeIds(newAssigneeIds);
+            
             setCreatorId(fullTask.createdBy?.id || null);
             setIsEditing(false);
         } else {
@@ -130,7 +139,9 @@ const TaskModal = ({
             setDueDateInput('');
             setStatus('TODO');
             setPriority(2);
-            setAssigneeIds(initialAssigneeIds || []);
+            const newIds = initialAssigneeIds || [];
+            setAssigneeIds(newIds);
+            setOriginalAssigneeIds(newIds);
             setCreatorId(null);
             setIsEditing(true);
         }
@@ -169,6 +180,50 @@ const TaskModal = ({
         }
     };
 
+    // ✅ НОВОЕ: Сохранение изменённых тегов
+    const saveTags = async () => {
+        if (!fullTask?.id) return;
+        
+        try {
+            // Тегов добавили
+            const tagsToAdd = selectedTagIds.filter(id => !originalTagIds.includes(id));
+            for (const tagId of tagsToAdd) {
+                await addTagToTask({ variables: { taskId: parseInt(fullTask.id), tagId: parseInt(tagId) } });
+            }
+            
+            // Тегов удалили
+            const tagsToRemove = originalTagIds.filter(id => !selectedTagIds.includes(id));
+            for (const tagId of tagsToRemove) {
+                await removeTagFromTask({ variables: { taskId: parseInt(fullTask.id), tagId: parseInt(tagId) } });
+            }
+            
+            console.log('✅ Теги сохранены');
+        } catch (err) {
+            console.error('❌ Ошибка сохранения тегов:', err);
+            throw err;
+        }
+    };
+
+    // ✅ НОВОЕ: Сохранение изменённых исполнителей
+    const saveAssignees = async () => {
+        if (!fullTask?.id) return;
+        
+        try {
+            // Проверяем есть ли изменения
+            if (JSON.stringify(assigneeIds.sort()) !== JSON.stringify(originalAssigneeIds.sort())) {
+                await setTaskAssignees({ variables: { taskId: fullTask.id, userIds: assigneeIds } });
+                client.cache.evict({ fieldName: 'tasksBySubgroup' });
+                client.cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
+                client.cache.gc();
+                if (refetchCurrentTasks) await refetchCurrentTasks();
+                console.log('✅ Исполнители сохранены');
+            }
+        } catch (err) {
+            console.error('❌ Ошибка сохранения исполнителей:', err);
+            throw err;
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         if (!title.trim()) return alert('Введите название');
@@ -196,6 +251,10 @@ const TaskModal = ({
             });
             console.log('✅ onSave complete');
             
+            // ✅ НОВОЕ: Сохраняем теги и исполнителей ПОСЛЕ сохранения остального
+            await saveTags();
+            await saveAssignees();
+            
             // ИСПРАВЛЕНО: Дождаться refetch перед закрытием модала
             // Это гарантирует, что теги будут загружены из бэка
             if (refetchFullTask) {
@@ -214,26 +273,13 @@ const TaskModal = ({
         }
     };
 
-    const handleAssigneeToggle = async (userId) => {
-        const newIds = assigneeIds.includes(userId) 
-            ? assigneeIds.filter((id) => id !== userId) 
-            : [...assigneeIds, userId];
-        
-        setAssigneeIds(newIds);
-        
-        if (fullTask && fullTask.id) {
-            try {
-                await setTaskAssignees({ variables: { taskId: fullTask.id, userIds: newIds } });
-                client.cache.evict({ fieldName: 'tasksBySubgroup' });
-                client.cache.evict({ fieldName: 'tasksByAssigneeAndProject' });
-                client.cache.gc();
-                if (refetchCurrentTasks) await refetchCurrentTasks();
-            } catch (err) {
-                console.error('Ошибка обновления исполнителей:', err);
-                alert('Ошибка: ' + err.message);
-                setAssigneeIds(assigneeIds);
-            }
-        }
+    // ✅ ИСПРАВЛЕНИЕ: handleAssigneeToggle теперь НЕ сохраняет в БД, только меняет локальное состояние
+    const handleAssigneeToggle = (userId) => {
+        setAssigneeIds((prev) =>
+            prev.includes(userId)
+                ? prev.filter((id) => id !== userId)
+                : [...prev, userId]
+        );
     };
 
     const handleFileUpload = async (e) => {
@@ -297,27 +343,14 @@ const TaskModal = ({
         }
     };
 
-    const handleToggleTag = async (tagId) => {
-        if (!fullTask?.id) return;
-        try {
-            console.log('🔄 handleToggleTag START:', { fullTaskId: fullTask.id, tagId, currentSelectedTags: selectedTagIds });
-            
-            if (selectedTagIds.includes(tagId)) {
-                console.log('❌ Удаляю тег:', tagId);
-                await removeTagFromTask({ variables: { taskId: parseInt(fullTask.id), tagId: parseInt(tagId) } });
-                setSelectedTagIds((prev) => prev.filter((id) => id !== tagId));
-            } else {
-                console.log('✅ Добавляю тег:', tagId);
-                await addTagToTask({ variables: { taskId: parseInt(fullTask.id), tagId: parseInt(tagId) } });
-                setSelectedTagIds((prev) => [...prev, tagId]);
-            }
-            
-            console.log('🎉 handleToggleTag COMPLETE');
-        } catch (err) {
-            console.error('❌ handleToggleTag ERROR:', err);
-            alert('Ошибка изменения тега');
-        }
-    };;
+    // ✅ ИСПРАВЛЕНИЕ: handleToggleTag теперь НЕ сохраняет в БД, только меняет локальное состояние
+    const handleToggleTag = (tagId) => {
+        setSelectedTagIds((prev) =>
+            prev.includes(tagId)
+                ? prev.filter((id) => id !== tagId)
+                : [...prev, tagId]
+        );
+    };
 
     const handleDeleteTagFromProject = async (tagId, tagName) => {
         if (!window.confirm(`Удалить тег "${tagName}" из проекта?`)) return;
