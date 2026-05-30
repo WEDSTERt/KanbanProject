@@ -43,7 +43,7 @@ public class SecurityConfig {
                                 "/debug/**", "/debug-panel.html", "/api/auth/verify-turnstile",
                                 "/oauth2/**", "/login/oauth2/code/**", "/api/import/**", "/api/export/**",
                                 "/oauth2-redirect", "/login", "/register", "/verify-email",
-                                "/api/sse/**"
+                                "/api/sse/**", "/cdn-cgi/**"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
