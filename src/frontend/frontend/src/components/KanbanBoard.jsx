@@ -26,17 +26,38 @@ const KanbanBoard = () => {
 
     // Используем custom hook для всей логики
     const logic = useKanbanLogic(projectId, urlSubgroupId, user);
-
-    // Инициализация группы
     useEffect(() => {
-        if (!logic.projectData?.project) return;
+        if (logic.projectData?.project && user) {
+            const isMember = logic.projectData.project.members.some(m => m.userId === user.id);
+            if (!isMember) navigate('/');
+        }
+    }, [logic.projectData?.project, user, navigate]);
+
+    useEffect(() => {
+        if (!logic.projectData?.project || !user) return;
+
+        const userIsMemberOfProject = logic.projectData.project.members.some(m => m.userId === user.id);
+        if (!userIsMemberOfProject) return;
+
         const realSubgroups = logic.projectData.project.subgroups || [];
         if (urlSubgroupId) {
-            if (urlSubgroupId === 'my-tasks') logic.setActiveSubgroupId('my-tasks');
-            else if (realSubgroups.some(g => g.id === urlSubgroupId)) logic.setActiveSubgroupId(urlSubgroupId);
-            else { logic.setActiveSubgroupId('my-tasks'); setSearchParams({ projectId, subgroupId: 'my-tasks' }); }
-        } else { logic.setActiveSubgroupId('my-tasks'); setSearchParams({ projectId, subgroupId: 'my-tasks' }); }
-    }, [logic.projectData, urlSubgroupId, projectId, setSearchParams]);
+            if (urlSubgroupId === 'my-tasks') {
+                logic.setActiveSubgroupId('my-tasks');
+            } else {
+                const subgroupIdNum = Number(urlSubgroupId);
+                const subgroupExists = realSubgroups.some(g => Number(g.id) === subgroupIdNum);
+                if (subgroupExists) {
+                    logic.setActiveSubgroupId(urlSubgroupId);
+                } else {
+                    logic.setActiveSubgroupId('my-tasks');
+                    setSearchParams({ projectId, subgroupId: 'my-tasks' });
+                }
+            }
+        } else {
+            logic.setActiveSubgroupId('my-tasks');
+            setSearchParams({ projectId, subgroupId: 'my-tasks' });
+        }
+    }, [logic.projectData, urlSubgroupId, projectId, setSearchParams, user]);
 
     // ИСПРАВЛЕННАЯ SSE подписка - ОДИН useEffect, правильная синхронизация
     // НОВОЕ: Ждем пока SSE будет готов (isReady = true)
@@ -149,13 +170,6 @@ const KanbanBoard = () => {
         const userInGroup = subgroup.members?.some(m => m.userId === user.id);
         if (!userInGroup) { logic.setActiveSubgroupId('my-tasks'); setSearchParams({ projectId, subgroupId: 'my-tasks' }); }
     }, [logic.activeSubgroupId, logic.projectData?.project, user.id, projectId, setSearchParams]);
-
-    useEffect(() => {
-        if (!logic.projectLoading && logic.projectData?.project && user) {
-            const isMember = logic.projectData.project.members.some(m => m.userId === user.id);
-            if (!isMember) navigate('/');
-        }
-    }, [logic.projectLoading, logic.projectData?.project, user, navigate]);
 
     if (logic.projectLoading) return <div className="loading">Загрузка проекта...</div>;
     if (!logic.projectData?.project) return <div className="message-error">Проект не найден</div>;

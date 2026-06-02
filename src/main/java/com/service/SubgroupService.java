@@ -27,6 +27,7 @@ public class SubgroupService {
     private final SubgroupMemberRepository subgroupMemberRepository;
     private final TaskRepository taskRepository;
     private final NotificationService notificationService;
+    private final EmailNotificationService emailNotificationService;
     private final ApplicationContext applicationContext;
 
     @Autowired
@@ -36,6 +37,7 @@ public class SubgroupService {
                            SubgroupMemberRepository subgroupMemberRepository,
                            TaskRepository taskRepository,
                            NotificationService notificationService,
+                           EmailNotificationService emailNotificationService,
                            ApplicationContext applicationContext) {
         this.subgroupRepository = subgroupRepository;
         this.projectRepository = projectRepository;
@@ -43,6 +45,7 @@ public class SubgroupService {
         this.subgroupMemberRepository = subgroupMemberRepository;
         this.taskRepository = taskRepository;
         this.notificationService = notificationService;
+        this.emailNotificationService = emailNotificationService;
         this.applicationContext = applicationContext;
     }
 
@@ -203,19 +206,43 @@ public class SubgroupService {
         String subgroupName = subgroup.getName();
         String addedByName = addedBy != null ? addedBy.getFullName() : "Администратор";
         
+        // Загружаем Project для использования в email
+        Project project = projectRepository.findById(projectId).orElse(null);
+        String projectName = project != null ? project.getName() : "Проект";
+        String roleText = role != null ? role.name() : "MEMBER";
+        
         // Отправляем in-app уведомление
         try {
             notificationService.createNotification(
                 userId,
-                "SUBGROUP_MEMBER_ADDED",
-                "Добавлены в группу",
+                "user_added_to_subgroup",
+                "Вас добавили в группу",
                 addedByName + " добавил вас в группу \"" + subgroupName + "\"",
                 null,
-                projectId
+                projectId,
+                subgroupId
             );
         } catch (Exception e) {
             System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
         }
+        
+        // 📧 Отправляем EMAIL уведомление АСИНХРОННО
+        CompletableFuture.runAsync(() -> {
+            try {
+                emailNotificationService.sendEmailForAddedToSubgroup(
+                    user.getEmail(),
+                    user.getFullName(),
+                    subgroupName,
+                    projectName,
+                    roleText,
+                    addedByName,
+                    projectId,
+                    subgroupId
+                );
+            } catch (Exception e) {
+                System.err.println("Warning: Failed to send email notification: " + e.getMessage());
+            }
+        });
 
         // 📡 Отправляем SSE событие АСИНХРОННО ко ВСЕМ подписчикам проекта
         System.out.println("📢 Notifying all project subscribers that subgroups changed");
@@ -281,15 +308,31 @@ public class SubgroupService {
             try {
                 notificationService.createNotification(
                     removedUser.getId(),
-                    "SUBGROUP_MEMBER_REMOVED",
-                    "Удалены из группы",
+                    "user_removed_from_subgroup",
+                    "Вас удалили из группы",
                     "Вы удалены из группы \"" + subgroupName + "\"",
                     null,
-                    projectId
+                    projectId,
+                    subgroupId
                 );
             } catch (Exception e) {
                 System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
             }
+            
+            // 📧 Отправляем EMAIL уведомление АСИНХРОННО
+            String projectName = subgroup.getProject() != null ? subgroup.getProject().getName() : "Проект";
+            CompletableFuture.runAsync(() -> {
+                try {
+                    emailNotificationService.sendEmailForRemovedFromSubgroup(
+                        removedUser.getEmail(),
+                        removedUser.getFullName(),
+                        subgroupName,
+                        projectName
+                    );
+                } catch (Exception e) {
+                    System.err.println("Warning: Failed to send email notification: " + e.getMessage());
+                }
+            });
 
             // 📡 Отправляем SSE событие ко ВСЕМ подписчикам проекта о изменении групп
             System.out.println("📢 Notifying all project subscribers that member was removed from subgroup");

@@ -9,6 +9,7 @@ public class NotificationDTO {
     private String message;
     private Long taskId;
     private Long projectId;
+    private Long subgroupId;
     private Boolean isRead;
     private LocalDateTime createdAt;
     private LocalDateTime readAt;
@@ -17,7 +18,7 @@ public class NotificationDTO {
     public NotificationDTO() {}
 
     public NotificationDTO(Long id, String type, String title, String message, 
-                          Long taskId, Long projectId, Boolean isRead, 
+                          Long taskId, Long projectId, Long subgroupId, Boolean isRead, 
                           LocalDateTime createdAt, LocalDateTime readAt) {
         this.id = id;
         this.type = type;
@@ -25,6 +26,7 @@ public class NotificationDTO {
         this.message = message;
         this.taskId = taskId;
         this.projectId = projectId;
+        this.subgroupId = subgroupId;
         this.isRead = isRead;
         this.createdAt = createdAt;
         this.readAt = readAt;
@@ -77,6 +79,14 @@ public class NotificationDTO {
 
     public void setProjectId(Long projectId) {
         this.projectId = projectId;
+    }
+
+    public Long getSubgroupId() {
+        return subgroupId;
+    }
+
+    public void setSubgroupId(Long subgroupId) {
+        this.subgroupId = subgroupId;
     }
 
     public Boolean getIsRead() {

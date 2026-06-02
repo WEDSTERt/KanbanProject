@@ -77,9 +77,10 @@ const ProjectSettings = () => {
     if (loading) return <div className="loading">Загрузка настроек проекта...</div>;
     if (error) return <div className="message-error">{error.message}</div>;
     if (!projectId) return <div className="message-error">Проект не указан</div>;
+    if (!data?.project) return <div className="message-error">Проект не найден</div>;
 
     const project = data.project;
-    const isOwner = project.owner.id === user.id;
+    const isOwner = project?.owner?.id === user.id;
     const currentMember = project.members.find(m => m.userId === user.id);
     const isAdmin = isOwner || currentMember?.role === 'ADMIN' || currentMember?.role === 'OWNER';
     const isMember = currentMember?.role === 'MEMBER';

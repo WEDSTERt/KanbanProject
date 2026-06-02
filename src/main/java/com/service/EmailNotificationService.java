@@ -885,5 +885,55 @@ public class EmailNotificationService {
         }
         System.out.println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
+
+    public void sendEmailForAddedToSubgroup(String email, String memberName, String subgroupName,
+                                           String projectName, String role, String addedByName,
+                                           Long projectId, Long subgroupId) {
+        try {
+            String subject = "Вас добавили в группу: " + subgroupName;
+            String link = String.format("%s/board?projectId=%d&subgroupId=%d", frontendUrl, projectId, subgroupId);
+            String content = String.format(
+                    "Здравствуйте, %s!\n\n" +
+                            "Пользователь %s добавил вас в группу \"%s\" проекта \"%s\" в роли \"%s\".\n\n" +
+                            "Перейти к группе: %s\n\n" +
+                            "--\n" +
+                            "Kanban Docky",
+                    memberName,
+                    addedByName,
+                    subgroupName,
+                    projectName,
+                    role.equals("LEADER") ? "Лидер группы" : "Участник группы",
+                    link
+            );
+            System.out.println("📤 Sending email to: " + email);
+            sendEmail(email, subject, content);
+            System.out.println("✅ Email sent successfully");
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send email: " + e.getMessage());
+        }
+    }
+
+    public void sendEmailForRemovedFromSubgroup(String email, String memberName, String subgroupName,
+                                               String projectName) {
+        try {
+            String subject = "Вас удалили из группы: " + subgroupName;
+            String content = String.format(
+                    "Здравствуйте, %s!\n\n" +
+                            "Вас удалили из группы \"%s\" проекта \"%s\".\n\n" +
+                            "Если это произошло по ошибке, свяжитесь с администратором проекта.\n\n" +
+                            "--\n" +
+                            "Kanban Docky",
+                    memberName,
+                    subgroupName,
+                    projectName
+            );
+            System.out.println("📤 Sending email to: " + email);
+            sendEmail(email, subject, content);
+            System.out.println("✅ Email sent successfully");
+        } catch (Exception e) {
+            System.err.println("❌ Failed to send email: " + e.getMessage());
+        }
+    }
+
 }
 

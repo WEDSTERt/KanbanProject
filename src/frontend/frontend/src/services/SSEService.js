@@ -111,7 +111,6 @@ class SSEService {
         // КРИТИЧНОЕ ИСПРАВЛЕНИЕ: Проверяем что соединение живо
         if (this.connections[connectionKey]) {
           if (this._isConnectionAlive(connectionKey)) {
-            console.log(`📡 Already subscribed to ${connectionKey}, reusing alive connection`);
             resolve(this.connections[connectionKey]);
             return;
           } else {
@@ -261,18 +260,16 @@ class SSEService {
       // Экспоненциальная задержка: 1s, 2s, 4s, 8s, 16s
       const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts[channelName] - 1);
 
-      console.log(`⏳ Reconnecting attempt ${this.reconnectAttempts[channelName]}/${this.maxReconnectAttempts} in ${delay}ms...`);
-
       setTimeout(() => {
         try {
           if (channelName === 'global') {
-            this.connect().catch(err => console.error('Reconnect failed:', err));
+            this.connect().catch();
           } else if (channelName.startsWith('project-')) {
             const projectId = channelName.split('-')[1];
-            this.subscribeToProject(projectId).catch(err => console.error('Reconnect failed:', err));
+
           } else if (channelName.startsWith('subgroup-')) {
             const subgroupId = channelName.split('-')[1];
-            this.subscribeToSubgroup(subgroupId).catch(err => console.error('Reconnect failed:', err));
+            this.subscribeToSubgroup(subgroupId).catch();
           }
         } catch (e) {
         }

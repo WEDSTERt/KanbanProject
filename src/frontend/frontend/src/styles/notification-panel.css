@@ -183,7 +183,6 @@
     padding: 16px;
     border-bottom: 1px solid #f1f5f9;
     transition: background-color 0.2s;
-    cursor: pointer;
 }
 
 .notification-item:hover {
@@ -193,6 +192,14 @@
 .notification-item.unread {
     background-color: #f0f9ff;
     border-left: 3px solid #3b82f6;
+}
+
+.notification-item.hoverable {
+    cursor: pointer;
+}
+
+.notification-item.hoverable:hover {
+    background-color: #eff6ff;
 }
 
 /* ===== NOTIFICATION ITEM LEFT ===== */
@@ -284,6 +291,18 @@
     background: #fee2e2;
     border-color: #fca5a5;
     color: #ef4444;
+}
+
+.action-btn.navigate-btn {
+    background: #dbeafe;
+    border-color: #93c5fd;
+    color: #3b82f6;
+}
+
+.action-btn.navigate-btn:hover {
+    background: #bfdbfe;
+    border-color: #60a5fa;
+    color: #1d4ed8;
 }
 
 /* ===== MOBILE RESPONSIVE ===== */

@@ -29,6 +29,9 @@ public class Notification {
     @Column(name = "project_id")
     private Long projectId;
 
+    @Column(name = "subgroup_id")
+    private Long subgroupId;
+
     @Column(name = "is_read")
     private Boolean isRead = false;
 
@@ -98,6 +101,14 @@ public class Notification {
 
     public void setProjectId(Long projectId) {
         this.projectId = projectId;
+    }
+
+    public Long getSubgroupId() {
+        return subgroupId;
+    }
+
+    public void setSubgroupId(Long subgroupId) {
+        this.subgroupId = subgroupId;
     }
 
     public Boolean getIsRead() {

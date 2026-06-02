@@ -47,16 +47,17 @@ public class NotificationService {
     }
 
     /**
-     * Создание уведомления
+     * Создание уведомления (перегруженный метод с subgroupId)
      */
     @Transactional
     public NotificationDTO createNotification(Long recipientId, String type, String title, 
-                                             String message, Long taskId, Long projectId) {
+                                             String message, Long taskId, Long projectId, Long subgroupId) {
         System.out.println("🔔 [NotificationService] Creating notification:");
         System.out.println("   recipientId: " + recipientId);
         System.out.println("   type: " + type);
         System.out.println("   title: " + title);
         System.out.println("   projectId: " + projectId);
+        System.out.println("   subgroupId: " + subgroupId);
         
         User recipient = userRepository.findById(recipientId)
                 .orElseThrow(() -> {
@@ -71,6 +72,7 @@ public class NotificationService {
         notification.setMessage(message);
         notification.setTaskId(taskId);
         notification.setProjectId(projectId);
+        notification.setSubgroupId(subgroupId);
         notification.setIsRead(false);
 
         System.out.println("💾 Saving notification to DB...");
@@ -107,6 +109,15 @@ public class NotificationService {
         }
         
         return dto;
+    }
+
+    /**
+     * Создание уведомления (старый метод для совместимости)
+     */
+    @Transactional
+    public NotificationDTO createNotification(Long recipientId, String type, String title, 
+                                             String message, Long taskId, Long projectId) {
+        return createNotification(recipientId, type, title, message, taskId, projectId, null);
     }
 
     /**
@@ -236,6 +247,7 @@ public class NotificationService {
                 notification.getMessage(),
                 notification.getTaskId(),
                 notification.getProjectId(),
+                notification.getSubgroupId(),
                 notification.getIsRead(),
                 notification.getCreatedAt(),
                 notification.getReadAt()
