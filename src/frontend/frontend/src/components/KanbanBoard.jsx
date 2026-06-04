@@ -283,8 +283,36 @@ const KanbanBoard = () => {
         const taskId = e.dataTransfer.getData('taskId');
         const fromStatus = e.dataTransfer.getData('fromStatus');
         if (!taskId || fromStatus === toStatus) return;
-        await logic.updateTask({ variables: { id: taskId, status: toStatus } });
-        await logic.refetchCurrentTasks();
+
+        // ⚡ ОПТИМИЗАЦИЯ: обновляем кэш Apollo локально для МГНОВЕННОГО обновления UI
+        // Затем отправляем обновление на сервер в фоне
+        const isMyTasks = logic.activeSubgroupId === 'my-tasks';
+        const query = isMyTasks ? GET_TASKS_BY_ASSIGNEE_AND_PROJECT : GET_TASKS_BY_SUBGROUP;
+        const queryVars = isMyTasks 
+            ? { userId: user.id, projectId }
+            : { subgroupId: logic.activeSubgroupId };
+        
+        const tasksField = isMyTasks ? 'tasksByAssigneeAndProject' : 'tasksBySubgroup';
+        const currentTasks = (isMyTasks ? logic.myTasksData : logic.tasksData)?.[tasksField] || [];
+        
+        // Обнови статус задачи локально
+        const updatedTasks = currentTasks.map(task => 
+            task.id === taskId ? { ...task, status: toStatus } : task
+        );
+        
+        // Запиши в Apollo кэш (БЕЗ refetch) - UI обновится мгновенно
+        client.cache.writeQuery({
+            query,
+            variables: queryVars,
+            data: { [tasksField]: updatedTasks }
+        });
+        
+        // Отправь на сервер в фоне (не ждём)
+        logic.updateTask({ variables: { id: taskId, status: toStatus } })
+            .catch(() => {
+                // Если ошибка, перезагрузи
+                logic.refetchCurrentTasks();
+            });
     };
 
     const handleDragOver = (e) => e.preventDefault();
