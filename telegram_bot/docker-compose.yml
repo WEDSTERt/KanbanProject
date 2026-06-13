@@ -1,0 +1,79 @@
+services:
+  # PostgreSQL база данных для бота
+  postgres:
+    image: postgres:15-alpine
+    container_name: kanban_bot_db
+    environment:
+      # Используем переменные из корневого .env
+      POSTGRES_DB: postgres
+      POSTGRES_USER: ${DATASOURCE_USERNAME:-postgres}
+      POSTGRES_PASSWORD: ${DATASOURCE_PASSWORD:-postgres}
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - kanban_network
+
+  # Redis для кэширования (опционально)
+  redis:
+    image: redis:7-alpine
+    container_name: kanban_bot_redis
+    ports:
+      - "6380:6379"
+    networks:
+      - kanban_network
+
+  # Telegram Bot
+  telegram_bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: kanban_telegram_bot
+    environment:
+      # Используем переменные из корневого .env
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      DATASOURCE_URL: ${DATASOURCE_URL}
+      DATASOURCE_USERNAME: ${DATASOURCE_USERNAME}
+      DATASOURCE_PASSWORD: ${DATASOURCE_PASSWORD}
+      FRONTEND_URL: ${FRONTEND_URL}
+      API_URL: ${API_URL:-http://localhost:8080}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - kanban_network
+    restart: unless-stopped
+
+  # FastAPI сервер для интеграции с основным приложением
+  api_server:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    container_name: kanban_bot_api
+    environment:
+      # Используем переменные из корневого .env
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      DATASOURCE_URL: ${DATASOURCE_URL}
+      DATASOURCE_USERNAME: ${DATASOURCE_USERNAME}
+      DATASOURCE_PASSWORD: ${DATASOURCE_PASSWORD}
+      FRONTEND_URL: ${FRONTEND_URL}
+      API_URL: ${API_URL:-http://localhost:8080}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    ports:
+      - "8001:8000"
+    depends_on:
+      - postgres
+    networks:
+      - kanban_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  kanban_network:
+    driver: bridge

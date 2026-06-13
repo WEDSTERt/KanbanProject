@@ -1,0 +1,82 @@
+        elif callback_data == "settings_projects":
+            logger.debug(f"  → Открытие настроек проектов")
+            # Получить проекты с информацией о владельце
+            projects = db.fetch_all("""
+                SELECT p.id, p.name, u.full_name as owner_name
+                FROM projects p
+                LEFT JOIN users u ON p.owner_user_id = u.id
+                LIMIT 10
+            """)
+            
+            if projects:
+                logger.info(f"  ℹ️ Найдено проектов: {len(projects)}")
+                for p in projects:
+                    logger.debug(f"    - {p['name']} (от {p['owner_name']})")
+                # Форматируем для меню - передаём кортежи (id, display_name)
+                formatted_projects = [
+                    (p['id'], f"{p['name']} (от {p['owner_name'] or 'N/A'})") 
+                    for p in projects
+                ]
+            else:
+                logger.warning(f"  ⚠️ Проекты не найдены")
+                formatted_projects = []
+                
+            text = "📋 <b>Уведомления по проектам</b>\n\nВыберите проект:"
+            await bot.edit_message_text(
+                text,
+                chat_id,
+                message_id,
+                reply_markup=keyboards.projects_menu(formatted_projects),
+                parse_mode="HTML"
+            )
+
+        elif callback_data.startswith("project_") and not callback_data.startswith("project_types_"):
+            logger.debug(f"  → Открытие настроек проекта")
+            project_id = callback_data.split("_")[1]
+            # Получить информацию о проекте с именем владельца
+            project = db.fetch_one("""
+                SELECT p.id, p.name, u.full_name as owner_name
+                FROM projects p
+                LEFT JOIN users u ON p.owner_user_id = u.id
+                WHERE p.id = %s
+            """, (int(project_id),))
+            
+            if project:
+                settings = get_notification_settings(db, chat_id, project_id=int(project_id))
+                enabled = len(settings) > 0 and settings[0]['enabled']
+                project_display = f"{project['name']} (от {project['owner_name'] or 'N/A'})"
+                text = f"📋 <b>{project_display}</b>\n\nНастройки для этого проекта:"
+                await bot.edit_message_text(
+                    text,
+                    chat_id,
+                    message_id,
+                    reply_markup=keyboards.project_settings_menu(int(project_id), project_display, enabled),
+                    parse_mode="HTML"
+                )
+                logger.info(f"✅ Настройки проекта открыты")
+
+        elif callback_data.startswith("toggle_project_"):
+            logger.debug(f"  → Переключение проекта")
+            parts = callback_data.split("_")
+            project_id = int(parts[2])
+            enabled = parts[3] == "True"
+            set_notification_setting(db, chat_id, enabled, project_id=project_id)
+            
+            project = db.fetch_one("""
+                SELECT p.id, p.name, u.full_name as owner_name
+                FROM projects p
+                LEFT JOIN users u ON p.owner_user_id = u.id
+                WHERE p.id = %s
+            """, (project_id,))
+            
+            status = "✅ Включены" if enabled else "❌ Отключены"
+            project_display = f"{project['name']} (от {project['owner_name'] or 'N/A'})"
+            text = f"📋 <b>{project_display}</b>\n\nНастройки для этого проекта:\n{status}"
+            await bot.edit_message_text(
+                text,
+                chat_id,
+                message_id,
+                reply_markup=keyboards.project_settings_menu(project_id, project_display, enabled),
+                parse_mode="HTML"
+            )
+            logger.info(f"✅ Проект переключен на {enabled}")

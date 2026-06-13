@@ -1,0 +1,54 @@
+        elif callback_data == "settings_projects":
+            logger.debug(f"  → Открытие настроек проектов")
+            # Получить проекты - используем базовый запрос
+            projects = db.fetch_all("""
+                SELECT id, name
+                FROM projects
+                LIMIT 10
+            """)
+            
+            if projects:
+                logger.info(f"  ℹ️ Найдено проектов: {len(projects)}")
+                for p in projects:
+                    logger.debug(f"    - {p['name']} (ID: {p['id']})")
+                # Форматируем для меню
+                formatted_projects = [
+                    (p['id'], p['name']) 
+                    for p in projects
+                ]
+            else:
+                logger.warning(f"  ⚠️ Проекты не найдены")
+                formatted_projects = []
+                
+            text = "📋 <b>Уведомления по проектам</b>\n\nВыберите проект:"
+            await bot.edit_message_text(
+                text,
+                chat_id,
+                message_id,
+                reply_markup=keyboards.projects_menu(formatted_projects),
+                parse_mode="HTML"
+            )
+
+        elif callback_data.startswith("project_") and not callback_data.startswith("project_types_"):
+            logger.debug(f"  → Открытие настроек проекта")
+            project_id = callback_data.split("_")[1]
+            # Получить информацию о проекте
+            project = db.fetch_one("""
+                SELECT id, name
+                FROM projects
+                WHERE id = %s
+            """, (int(project_id),))
+            
+            if project:
+                settings = get_notification_settings(db, chat_id, project_id=int(project_id))
+                enabled = len(settings) > 0 and settings[0]['enabled']
+                project_display = project['name']
+                text = f"📋 <b>{project_display}</b>\n\nНастройки для этого проекта:"
+                await bot.edit_message_text(
+                    text,
+                    chat_id,
+                    message_id,
+                    reply_markup=keyboards.project_settings_menu(int(project_id), project_display, enabled),
+                    parse_mode="HTML"
+                )
+                logger.info(f"✅ Настройки проекта открыты")

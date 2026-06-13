@@ -39,6 +39,9 @@ public class User {
     @Column(name = "email_notifications_enabled", nullable = false)
     private Boolean emailNotificationsEnabled = true;
 
+    @Column(name = "telegram_chat_id", unique = true)
+    private Long telegramChatId;
+
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<Project> ownedProjects = new ArrayList<>();
@@ -98,6 +101,9 @@ public class User {
     public void setEmailNotificationsEnabled(Boolean emailNotificationsEnabled) {
         this.emailNotificationsEnabled = emailNotificationsEnabled != null ? emailNotificationsEnabled : true;
     }
+
+    public Long getTelegramChatId() { return telegramChatId; }
+    public void setTelegramChatId(Long telegramChatId) { this.telegramChatId = telegramChatId; }
 
     public List<Project> getOwnedProjects() { return ownedProjects; }
     public void setOwnedProjects(List<Project> ownedProjects) { this.ownedProjects = ownedProjects; }

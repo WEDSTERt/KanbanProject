@@ -1,0 +1,175 @@
+2026-06-13 16:27:23,154 - asyncio - DEBUG - [__init__:633] - Using proactor: IocpProactor
+2026-06-13 16:27:23,155 - __main__ - INFO - [main:174] - 
+
+2026-06-13 16:27:23,155 - __main__ - INFO - [main:175] - 🚀 ЗАПУСК ДИАГНОСТИКИ TELEGRAM БОТА
+2026-06-13 16:27:23,155 - __main__ - INFO - [main:176] - Время: 2026-06-13 16:27:23,155
+2026-06-13 16:27:23,155 - __main__ - INFO - [main:179] - 
+
+2026-06-13 16:27:23,155 - __main__ - INFO - [check_config:21] - ================================================================================
+2026-06-13 16:27:23,155 - __main__ - INFO - [check_config:22] - 🔍 ПРОВЕРКА КОНФИГУРАЦИИ БОТА
+2026-06-13 16:27:23,155 - __main__ - INFO - [check_config:23] - ================================================================================
+2026-06-13 16:27:23,155 - __main__ - INFO - [check_config:25] - BOT_TOKEN: 8959833473:AAHV7m-9V... (скрыто)
+2026-06-13 16:27:23,155 - __main__ - INFO - [check_config:26] - DB_HOST: 192.168.70.132
+2026-06-13 16:27:23,155 - __main__ - INFO - [check_config:27] - DB_PORT: 5432
+2026-06-13 16:27:23,155 - __main__ - INFO - [check_config:28] - DB_NAME: postgres
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_config:29] - DB_USER: postgres
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_config:35] - ✅ Конфигурация загружена успешно
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_bot_token:79] - ================================================================================
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_bot_token:80] - 🤖 ПРОВЕРКА ТОКЕНА БОТА
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_bot_token:81] - ================================================================================
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_bot_token:107] - ✅ Формат токена корректен
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_bot_token:108] -   Bot ID: 8959833473
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_bot_token:109] -   Secret: AAHV7m-9Vi... (скрыто)
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_database:40] - ================================================================================
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_database:41] - 🗄️ ПРОВЕРКА БАЗЫ ДАННЫХ
+2026-06-13 16:27:23,156 - __main__ - INFO - [check_database:42] - ================================================================================
+2026-06-13 16:27:23,156 - database - INFO - [__init__:12] - 🗄️ Database объект инициализирован (host=192.168.70.132:5432, db=postgres)
+2026-06-13 16:27:23,156 - database - INFO - [connect:17] - 🔌 Попытка подключения: postgres@192.168.70.132:5432/postgres
+2026-06-13 16:27:23,196 - database - INFO - [connect:26] - ✅ Подключение к БД успешно
+2026-06-13 16:27:23,196 - __main__ - INFO - [check_database:47] - ✅ Подключение к БД успешно
+2026-06-13 16:27:23,207 - database - DEBUG - [fetch_all:68] - ✅ Fetch all: 
+            SELECT table_name FROM information_sc... → 13 rows
+2026-06-13 16:27:23,207 - __main__ - INFO - [check_database:56] - ✅ Найдено таблиц: 13
+2026-06-13 16:27:23,207 - __main__ - INFO - [check_database:58] -   - subgroup_members
+2026-06-13 16:27:23,207 - __main__ - INFO - [check_database:58] -   - tags
+2026-06-13 16:27:23,207 - __main__ - INFO - [check_database:58] -   - task_tags
+2026-06-13 16:27:23,207 - __main__ - INFO - [check_database:58] -   - telegram_notification_settings
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - flyway_schema_history
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - attachments
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - notifications
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - projects
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - subgroups
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - project_members
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - users
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - task_assignees
+2026-06-13 16:27:23,208 - __main__ - INFO - [check_database:58] -   - tasks
+2026-06-13 16:27:23,210 - database - ERROR - [fetch_all:71] - ❌ Database fetch_all error: relation "telegram_users" does not exist
+LINE 1: SELECT COUNT(*) as count FROM telegram_users
+                                      ^
+Traceback (most recent call last):
+  File "C:\Users\Marat\IdeaProjects\ProjectKanban\telegram_bot\database.py", line 66, in fetch_all
+    cursor.execute(query, params)
+    ~~~~~~~~~~~~~~^^^^^^^^^^^^^^^
+  File "C:\Users\Marat\AppData\Roaming\Python\Python314\site-packages\psycopg2\extras.py", line 236, in execute
+    return super().execute(query, vars)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+psycopg2.errors.UndefinedTable: relation "telegram_users" does not exist
+LINE 1: SELECT COUNT(*) as count FROM telegram_users
+                                      ^
+
+2026-06-13 16:27:23,215 - database - INFO - [close:35] - ✅ Соединение закрыто
+2026-06-13 16:27:23,215 - __main__ - INFO - [check_database:70] - ✅ БД проверена успешно
+2026-06-13 16:27:23,215 - __main__ - INFO - [check_bot_api:114] - ================================================================================
+2026-06-13 16:27:23,215 - __main__ - INFO - [check_bot_api:115] - 📡 ПРОВЕРКА ПОДКЛЮЧЕНИЯ К TELEGRAM API
+2026-06-13 16:27:23,215 - __main__ - INFO - [check_bot_api:116] - ================================================================================
+2026-06-13 16:27:24,031 - __main__ - INFO - [check_bot_api:122] - ✅ AsyncTeleBot инициализирован
+2026-06-13 16:27:45,049 - TeleBot - ERROR - [_process_request:109] - Aiohttp ClientError: ClientConnectorError
+2026-06-13 16:27:45,049 - __main__ - ERROR - [check_bot_api:133] - ❌ Ошибка при подключении к Telegram: Request timeout. Request: method=get url=getMe params=<aiohttp.formdata.FormData object at 0x0000027AD715A3C0> files=None request_timeout=300
+Traceback (most recent call last):
+  File "C:\Users\Marat\IdeaProjects\ProjectKanban\telegram_bot\diagnose.py", line 126, in check_bot_api
+    me = await bot.get_me()
+         ^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Marat\AppData\Roaming\Python\Python314\site-packages\telebot\async_telebot.py", line 2811, in get_me
+    result = await asyncio_helper.get_me(self.token)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Marat\AppData\Roaming\Python\Python314\site-packages\telebot\asyncio_helper.py", line 166, in get_me
+    return await _process_request(token, method_url)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Marat\AppData\Roaming\Python\Python314\site-packages\telebot\asyncio_helper.py", line 113, in _process_request
+    raise RequestTimeout("Request timeout. Request: method={0} url={1} params={2} files={3} request_timeout={4}".format(method, url, params, files, request_timeout, current_try))
+telebot.asyncio_helper.RequestTimeout: Request timeout. Request: method=get url=getMe params=<aiohttp.formdata.FormData object at 0x0000027AD715A3C0> files=None request_timeout=300
+2026-06-13 16:27:45,052 - __main__ - INFO - [print_summary:142] - ================================================================================
+2026-06-13 16:27:45,053 - __main__ - INFO - [print_summary:143] - 📊 ИТОГИ ДИАГНОСТИКИ
+2026-06-13 16:27:45,053 - __main__ - INFO - [print_summary:144] - ================================================================================
+2026-06-13 16:27:45,053 - __main__ - INFO - [print_summary:156] - ✅ Конфигурация
+2026-06-13 16:27:45,053 - __main__ - INFO - [print_summary:156] - ✅ Токен бота
+2026-06-13 16:27:45,053 - __main__ - INFO - [print_summary:156] - ✅ База данных
+2026-06-13 16:27:45,053 - __main__ - INFO - [print_summary:156] - ❌ Telegram API
+2026-06-13 16:27:45,053 - __main__ - INFO - [print_summary:160] - ================================================================================
+2026-06-13 16:27:45,053 - __main__ - ERROR - [print_summary:165] - ❌ НЕКОТОРЫЕ ПРОВЕРКИ НЕ ПРОШЛИ!
+2026-06-13 16:27:45,053 - __main__ - ERROR - [print_summary:166] - Исправьте ошибки перед запуском бота.
+2026-06-13 16:27:45,053 - __main__ - INFO - [print_summary:168] - ================================================================================
+2026-06-13 16:27:45,053 - __main__ - INFO - [main:190] - 
+📋 ЛОГИ СОХРАНЕНЫ В: bot_debug.log
+
+2026-06-13 16:27:45,084 - asyncio - ERROR - [default_exception_handler:1886] - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x0000027AD715AA50>
+2026-06-13 16:29:52,243 - asyncio - DEBUG - [__init__:633] - Using proactor: IocpProactor
+2026-06-13 16:29:52,244 - __main__ - INFO - [main:174] - 
+
+2026-06-13 16:29:52,244 - __main__ - INFO - [main:175] - 🚀 ЗАПУСК ДИАГНОСТИКИ TELEGRAM БОТА
+2026-06-13 16:29:52,245 - __main__ - INFO - [main:176] - Время: 2026-06-13 16:29:52,245
+2026-06-13 16:29:52,245 - __main__ - INFO - [main:179] - 
+
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:21] - ================================================================================
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:22] - 🔍 ПРОВЕРКА КОНФИГУРАЦИИ БОТА
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:23] - ================================================================================
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:25] - BOT_TOKEN: 8959833473:AAHV7m-9V... (скрыто)
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:26] - DB_HOST: 192.168.70.132
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:27] - DB_PORT: 5432
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:28] - DB_NAME: postgres
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:29] - DB_USER: postgres
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_config:35] - ✅ Конфигурация загружена успешно
+2026-06-13 16:29:52,245 - __main__ - INFO - [check_bot_token:79] - ================================================================================
+2026-06-13 16:29:52,246 - __main__ - INFO - [check_bot_token:80] - 🤖 ПРОВЕРКА ТОКЕНА БОТА
+2026-06-13 16:29:52,246 - __main__ - INFO - [check_bot_token:81] - ================================================================================
+2026-06-13 16:29:52,246 - __main__ - INFO - [check_bot_token:107] - ✅ Формат токена корректен
+2026-06-13 16:29:52,246 - __main__ - INFO - [check_bot_token:108] -   Bot ID: 8959833473
+2026-06-13 16:29:52,246 - __main__ - INFO - [check_bot_token:109] -   Secret: AAHV7m-9Vi... (скрыто)
+2026-06-13 16:29:52,246 - __main__ - INFO - [check_database:40] - ================================================================================
+2026-06-13 16:29:52,246 - __main__ - INFO - [check_database:41] - 🗄️ ПРОВЕРКА БАЗЫ ДАННЫХ
+2026-06-13 16:29:52,246 - __main__ - INFO - [check_database:42] - ================================================================================
+2026-06-13 16:29:52,246 - database - INFO - [__init__:12] - 🗄️ Database объект инициализирован (host=192.168.70.132:5432, db=postgres)
+2026-06-13 16:29:52,246 - database - INFO - [connect:17] - 🔌 Попытка подключения: postgres@192.168.70.132:5432/postgres
+2026-06-13 16:29:52,277 - database - INFO - [connect:26] - ✅ Подключение к БД успешно
+2026-06-13 16:29:52,278 - __main__ - INFO - [check_database:47] - ✅ Подключение к БД успешно
+2026-06-13 16:29:52,284 - database - DEBUG - [fetch_all:68] - ✅ Fetch all: 
+            SELECT table_name FROM information_sc... → 16 rows
+2026-06-13 16:29:52,284 - __main__ - INFO - [check_database:56] - ✅ Найдено таблиц: 16
+2026-06-13 16:29:52,284 - __main__ - INFO - [check_database:58] -   - subgroup_members
+2026-06-13 16:29:52,284 - __main__ - INFO - [check_database:58] -   - tags
+2026-06-13 16:29:52,284 - __main__ - INFO - [check_database:58] -   - task_tags
+2026-06-13 16:29:52,284 - __main__ - INFO - [check_database:58] -   - telegram_notification_settings
+2026-06-13 16:29:52,284 - __main__ - INFO - [check_database:58] -   - flyway_schema_history
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - notification_log
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - attachments
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - telegram_users
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - notifications
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - notification_settings
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - projects
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - subgroups
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - project_members
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - users
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - task_assignees
+2026-06-13 16:29:52,285 - __main__ - INFO - [check_database:58] -   - tasks
+2026-06-13 16:29:52,289 - database - DEBUG - [fetch_all:68] - ✅ Fetch all: SELECT COUNT(*) as count FROM telegram_users... → 1 rows
+2026-06-13 16:29:52,289 - __main__ - INFO - [check_database:67] - ✅ Пользователей в БД: 0
+2026-06-13 16:29:52,289 - database - INFO - [close:35] - ✅ Соединение закрыто
+2026-06-13 16:29:52,289 - __main__ - INFO - [check_database:70] - ✅ БД проверена успешно
+2026-06-13 16:29:52,289 - __main__ - INFO - [check_bot_api:114] - ================================================================================
+2026-06-13 16:29:52,290 - __main__ - INFO - [check_bot_api:115] - 📡 ПРОВЕРКА ПОДКЛЮЧЕНИЯ К TELEGRAM API
+2026-06-13 16:29:52,290 - __main__ - INFO - [check_bot_api:116] - ================================================================================
+2026-06-13 16:29:52,775 - __main__ - INFO - [check_bot_api:122] - ✅ AsyncTeleBot инициализирован
+2026-06-13 16:29:55,775 - __main__ - INFO - [check_bot_api:127] - ✅ Подключение к Telegram успешно!
+2026-06-13 16:29:55,775 - __main__ - INFO - [check_bot_api:128] -   Bot username: @kanban_docky_bot
+2026-06-13 16:29:55,775 - __main__ - INFO - [check_bot_api:129] -   Bot ID: 8959833473
+2026-06-13 16:29:55,775 - __main__ - INFO - [check_bot_api:130] -   Bot name: KanbanDocky
+2026-06-13 16:29:55,775 - __main__ - INFO - [print_summary:142] - ================================================================================
+2026-06-13 16:29:55,775 - __main__ - INFO - [print_summary:143] - 📊 ИТОГИ ДИАГНОСТИКИ
+2026-06-13 16:29:55,775 - __main__ - INFO - [print_summary:144] - ================================================================================
+2026-06-13 16:29:55,775 - __main__ - INFO - [print_summary:156] - ✅ Конфигурация
+2026-06-13 16:29:55,776 - __main__ - INFO - [print_summary:156] - ✅ Токен бота
+2026-06-13 16:29:55,776 - __main__ - INFO - [print_summary:156] - ✅ База данных
+2026-06-13 16:29:55,776 - __main__ - INFO - [print_summary:156] - ✅ Telegram API
+2026-06-13 16:29:55,776 - __main__ - INFO - [print_summary:160] - ================================================================================
+2026-06-13 16:29:55,776 - __main__ - INFO - [print_summary:162] - 🎉 ВСЕ ПРОВЕРКИ ПРОЙДЕНЫ УСПЕШНО!
+2026-06-13 16:29:55,776 - __main__ - INFO - [print_summary:163] - Бот готов к запуску.
+2026-06-13 16:29:55,776 - __main__ - INFO - [print_summary:168] - ================================================================================
+2026-06-13 16:29:55,776 - __main__ - INFO - [main:190] - 
+📋 ЛОГИ СОХРАНЕНЫ В: bot_debug.log
+
+2026-06-13 16:29:55,800 - asyncio - ERROR - [default_exception_handler:1886] - Unclosed client session
+client_session: <aiohttp.client.ClientSession object at 0x000001EFE35C2A50>
+2026-06-13 16:29:55,801 - asyncio - ERROR - [default_exception_handler:1886] - Unclosed connector
+connections: ['deque([(<aiohttp.client_proto.ResponseHandler object at 0x000001EFE356A440>, 219177.4567068)])']
+connector: <aiohttp.connector.TCPConnector object at 0x000001EFE35C2660>
