@@ -499,10 +499,21 @@ public class TaskService {
 
     @CacheEvict(value = {"tasksBySubgroup", "tasksByAssignee"}, allEntries = true)
     @Transactional
-    public boolean deleteTask(Long id) {
+        public boolean deleteTask(Long id) {
         if (taskRepository.existsById(id)) {
             Task task = taskRepository.findById(id).orElse(null);
             Long subgroupId = task != null && task.getSubgroup() != null ? task.getSubgroup().getId() : null;
+            
+            // 📧 Отправляем уведомление об удалении задачи всем исполнителям
+            if (task != null && task.getAssignees() != null && !task.getAssignees().isEmpty()) {
+                for (User assignee : task.getAssignees()) {
+                    try {
+                        emailNotificationService.notifyTaskDeleted(task, assignee);
+                    } catch (Exception e) {
+                        System.err.println("⚠️ Failed to notify " + assignee.getEmail() + " about task deletion: " + e.getMessage());
+                    }
+                }
+            }
             
             taskRepository.deleteById(id);
             
@@ -993,4 +1004,5 @@ public class TaskService {
         return saved;
     }
 }
+
 

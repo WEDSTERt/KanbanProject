@@ -118,6 +118,7 @@ const KanbanBoard = () => {
             if (unsubscribeTaskUpdated) unsubscribeTaskUpdated();
             if (unsubscribeTaskDeleted) unsubscribeTaskDeleted();
             if (unsubscribeTaskStatusChanged) unsubscribeTaskStatusChanged();
+            if (unsubscribeTasksListChanged) unsubscribeTasksListChanged();
             
             // Закрываем соединение к subgroup
             if (sseService) {
@@ -628,3 +629,10 @@ const KanbanBoard = () => {
 };
 
 export default KanbanBoard;
+
+
+
+
+
+
+
