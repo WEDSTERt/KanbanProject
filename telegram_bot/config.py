@@ -23,36 +23,46 @@ logger.info(f"🌍 Frontend URL: {FRONTEND_URL}")
 logger.info(f"🌐 Backend URL (OAuth): {BACKEND_URL}")
 
 # Database Configuration из корневого .env
-# Парсим DATASOURCE_URL
-DATASOURCE_URL = os.getenv("DATASOURCE_URL", "jdbc:postgresql://localhost:5432/postgres")
+# Попытка 1: Прямые переменные
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT_STR = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DATASOURCE_USERNAME", os.getenv("DB_USER", "postgres"))
+DB_PASSWORD = os.getenv("DATASOURCE_PASSWORD", os.getenv("DB_PASSWORD", "password"))
 
-# Извлекаем параметры из JDBC URL
-if "jdbc:postgresql://" in DATASOURCE_URL:
-    # Пример: jdbc:postgresql://192.168.70.132:5432/postgres
-    url_part = DATASOURCE_URL.replace("jdbc:postgresql://", "")
-    if "/" in url_part:
-        db_part, db_name = url_part.rsplit("/", 1)
-        if ":" in db_part:
-            DB_HOST, DB_PORT = db_part.split(":")
-            DB_PORT = int(DB_PORT)
+# Попытка 2: Парсим из DATASOURCE_URL если прямые не установлены
+if not DB_HOST:
+    DATASOURCE_URL = os.getenv("DATASOURCE_URL", "jdbc:postgresql://localhost:5432/postgres")
+    logger.info(f"📋 Парсим DATASOURCE_URL: {DATASOURCE_URL}")
+    
+    if "jdbc:postgresql://" in DATASOURCE_URL:
+        # Пример: jdbc:postgresql://192.168.70.132:5432/postgres
+        url_part = DATASOURCE_URL.replace("jdbc:postgresql://", "")
+        logger.info(f"📋 URL part after removing prefix: {url_part}")
+        
+        # Разбираем хост и порт
+        if "/" in url_part:
+            host_port, db_name_part = url_part.split("/", 1)
+            DB_NAME = db_name_part
         else:
-            DB_HOST = db_part
-            DB_PORT = 5432
+            host_port = url_part
+            DB_NAME = "postgres"
+        
+        if ":" in host_port:
+            DB_HOST, DB_PORT_STR = host_port.split(":", 1)
+        else:
+            DB_HOST = host_port
+            DB_PORT_STR = "5432"
     else:
-        DB_HOST = url_part.split(":")[0] if ":" in url_part else url_part
-        DB_PORT = int(url_part.split(":")[1]) if ":" in url_part else 5432
-        db_name = "postgres"
-else:
-    # Fallback
-    DB_HOST = os.getenv("DB_HOST", "localhost")
-    DB_PORT = int(os.getenv("DB_PORT", "5432"))
-    db_name = "kanban_bot"
+        DB_HOST = "localhost"
+        DB_PORT_STR = "5432"
+        DB_NAME = "postgres"
 
-DB_NAME = db_name
-DB_USER = os.getenv("DATASOURCE_USERNAME", "postgres")
-DB_PASSWORD = os.getenv("DATASOURCE_PASSWORD", "password")
+# Преобразуем порт в число
+DB_PORT = int(DB_PORT_STR) if DB_PORT_STR else 5432
 
 logger.info(f"📊 Database config: {DB_HOST}:{DB_PORT}/{DB_NAME}")
+logger.info(f"👤 Database user: {DB_USER}")
 
 # Redis Configuration (для кэширования состояния пользователя)
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
@@ -74,6 +84,7 @@ TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 YANDEX_CLIENT_ID = os.getenv("YANDEX_CLIENT_ID", "")
 GITHUB_CLIENT_ID = os.getenv("GITHUB_CLIENT_ID", "")
+
 
 logger.info(f"🔐 OAuth Providers:")
 logger.info(f"   Google: {GOOGLE_CLIENT_ID[:20]}..." if GOOGLE_CLIENT_ID else "   Google: NOT CONFIGURED")

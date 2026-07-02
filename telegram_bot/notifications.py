@@ -4,6 +4,9 @@ from enum import Enum
 
 logger = logging.getLogger(__name__)
 
+# URL фронтенда
+FRONTEND_URL = "https://kanbandocky.ru"
+
 
 class NotificationType(Enum):
     PROJECT = "project"  # Добавление/удаление проекта
@@ -40,72 +43,108 @@ class Notification:
         self.data = data or {}
         self.timestamp = datetime.now()
 
+    def _get_project_url(self):
+        """Получить ссылку на проект"""
+        if self.project_id:
+            return f"{FRONTEND_URL}/board?projectId={self.project_id}"
+        return ""
+
+    def _get_group_url(self):
+        """Получить ссылку на группу"""
+        if self.project_id and self.group_id:
+            return f"{FRONTEND_URL}/board?projectId={self.project_id}&subgroupId={self.group_id}"
+        return ""
+
+    def _get_task_url(self):
+        """Получить ссылку на задачу"""
+        if self.project_id and self.group_id and self.task_id:
+            return f"{FRONTEND_URL}/board?projectId={self.project_id}&subgroupId={self.group_id}&highlightTask={self.task_id}"
+        return ""
+
     def get_message(self):
         """Получить текст уведомления"""
+        project_url = self._get_project_url()
+        group_url = self._get_group_url()
+        task_url = self._get_task_url()
+        
+        project_name = self.data.get('name', 'N/A')
+        project_name_link = f'<a href="{project_url}">{project_name}</a>' if project_url else project_name
+        
+        project_name_full = self.data.get('project_name', 'N/A')
+        project_name_full_link = f'<a href="{project_url}">{project_name_full}</a>' if project_url else project_name_full
+        
+        group_name = self.data.get('name', 'N/A')
+        group_name_link = f'<a href="{group_url}">{group_name}</a>' if group_url else group_name
+        
+        group_name_full = self.data.get('group_name', 'N/A')
+        group_name_full_link = f'<a href="{group_url}">{group_name_full}</a>' if group_url else group_name_full
+        
+        task_name = self.data.get('title', 'N/A')
+        task_name_link = f'<a href="{task_url}">{task_name}</a>' if task_url else task_name
+        
         messages = {
             NotificationEvent.PROJECT_CREATED.value: (
-                f"📋 <b>Новый проект</b>\n"
-                f"Название: <code>{self.data.get('name', 'N/A')}</code>\n"
-                f"Описание: {self.data.get('description', 'Нет описания')}"
+                f"📋 <b>Вас добавили в проект</b>\n"
+                f"Название: {project_name_link}"
             ),
             NotificationEvent.PROJECT_DELETED.value: (
-                f"📋 <b>Проект удален</b>\n"
-                f"Название: <code>{self.data.get('name', 'N/A')}</code>"
+                f"📋 <b>Вас удалили из проекта</b>\n"
+                f"Название: {project_name}"
             ),
             NotificationEvent.PROJECT_UPDATED.value: (
                 f"📋 <b>Проект обновлен</b>\n"
-                f"Название: <code>{self.data.get('name', 'N/A')}</code>\n"
+                f"Название: {project_name_link}\n"
                 f"Изменения: {self.data.get('changes', 'N/A')}"
             ),
             NotificationEvent.GROUP_CREATED.value: (
-                f"👥 <b>Новая группа</b>\n"
-                f"Проект: <code>{self.data.get('project_name', 'N/A')}</code>\n"
-                f"Группа: <code>{self.data.get('name', 'N/A')}</code>\n"
+                f"👥 <b>Вас добавили в группу</b>\n"
+                f"Проект: {project_name_full_link}\n"
+                f"Группа: {group_name_link}\n"
                 f"Описание: {self.data.get('description', 'Нет описания')}"
             ),
             NotificationEvent.GROUP_DELETED.value: (
-                f"👥 <b>Группа удалена</b>\n"
-                f"Проект: <code>{self.data.get('project_name', 'N/A')}</code>\n"
-                f"Группа: <code>{self.data.get('name', 'N/A')}</code>"
+                f"👥 <b>Вас удалили из группы</b>\n"
+                f"Проект: {project_name_full}\n"
+                f"Группа: {group_name}"
             ),
             NotificationEvent.GROUP_UPDATED.value: (
-                f"👥 <b>Группа обновлена</b>\n"
-                f"Проект: <code>{self.data.get('project_name', 'N/A')}</code>\n"
-                f"Группа: <code>{self.data.get('name', 'N/A')}</code>"
+                f"👥 <b>Вас добавили в группу</b>\n"
+                f"Проект: {project_name_full_link}\n"
+                f"Группа: {group_name_link}"
             ),
             NotificationEvent.TASK_CREATED.value: (
                 f"✅ <b>Новая задача</b>\n"
-                f"Проект: <code>{self.data.get('project_name', 'N/A')}</code>\n"
-                f"Группа: <code>{self.data.get('group_name', 'N/A')}</code>\n"
-                f"Задача: <code>{self.data.get('title', 'N/A')}</code>\n"
+                f"Проект: {project_name_full_link}\n"
+                f"Группа: {group_name_full_link}\n"
+                f"Задача: {task_name_link}\n"
                 f"Приоритет: {self.data.get('priority', 'N/A')}"
             ),
             NotificationEvent.TASK_DELETED.value: (
                 f"✅ <b>Задача удалена</b>\n"
-                f"Проект: <code>{self.data.get('project_name', 'N/A')}</code>\n"
-                f"Группа: <code>{self.data.get('group_name', 'N/A')}</code>\n"
-                f"Задача: <code>{self.data.get('title', 'N/A')}</code>"
+                f"Проект: {project_name_full}\n"
+                f"Группа: {group_name_full}\n"
+                f"Задача: {task_name}"
             ),
             NotificationEvent.TASK_UPDATED.value: (
                 f"✅ <b>Задача обновлена</b>\n"
-                f"Проект: <code>{self.data.get('project_name', 'N/A')}</code>\n"
-                f"Группа: <code>{self.data.get('group_name', 'N/A')}</code>\n"
-                f"Задача: <code>{self.data.get('title', 'N/A')}</code>\n"
-                f"Изменения: {self.data.get('changes', 'N/A')}"
+                f"Проект: {project_name_full_link}\n"
+                f"Группа: {group_name_full_link}\n"
+                f"Задача: {task_name_link}\n"
+                f"Изменения: {self.data.get('changes', 'Нет описания')}"
             ),
             NotificationEvent.TASK_STATUS_CHANGED.value: (
                 f"✅ <b>Статус задачи изменился</b>\n"
-                f"Проект: <code>{self.data.get('project_name', 'N/A')}</code>\n"
-                f"Группа: <code>{self.data.get('group_name', 'N/A')}</code>\n"
-                f"Задача: <code>{self.data.get('title', 'N/A')}</code>\n"
+                f"Проект: {project_name_full_link}\n"
+                f"Группа: {group_name_full_link}\n"
+                f"Задача: {task_name_link}\n"
                 f"Старый статус: {self.data.get('old_status', 'N/A')}\n"
                 f"Новый статус: {self.data.get('new_status', 'N/A')}"
             ),
             NotificationEvent.TASK_OVERDUE.value: (
                 f"⚠️ <b>ЗАДАЧА ПРОСРОЧЕНА</b>\n"
-                f"Проект: <code>{self.data.get('project_name', 'N/A')}</code>\n"
-                f"Группа: <code>{self.data.get('group_name', 'N/A')}</code>\n"
-                f"Задача: <code>{self.data.get('title', 'N/A')}</code>\n"
+                f"Проект: {project_name_full_link}\n"
+                f"Группа: {group_name_full_link}\n"
+                f"Задача: {task_name_link}\n"
                 f"Срок: {self.data.get('due_date', 'N/A')}\n"
                 f"Дней просрочки: {self.data.get('days_overdue', 'N/A')}"
             ),
@@ -161,7 +200,7 @@ class NotificationManager:
             project_id,
             data={
                 "name": project_name,
-                "description": description
+                "description": description or "Нет описания"
             }
         )
         telegram_ids = await self._get_telegram_ids_for_users(user_ids, project_id)
@@ -178,7 +217,7 @@ class NotificationManager:
             data={
                 "project_name": project_name,
                 "name": group_name,
-                "description": description
+                "description": description or "Нет описания"
             }
         )
         telegram_ids = await self._get_telegram_ids_for_users(user_ids, project_id)
@@ -197,7 +236,7 @@ class NotificationManager:
                 "project_name": project_name,
                 "group_name": group_name,
                 "title": title,
-                "priority": priority
+                "priority": priority or "Средняя"
             }
         )
         telegram_ids = await self._get_telegram_ids_for_users(user_ids, project_id)

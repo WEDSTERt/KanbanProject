@@ -31,7 +31,6 @@ if not BOT_TOKEN:
     sys.exit(1)
 
 logger.info(f"✅ Токен загружен: {BOT_TOKEN[:20]}...")
-logger.info(f"🌐 Backend URL: {BACKEND_URL}")
 
 bot = AsyncTeleBot(BOT_TOKEN)
 logger.info(f"✅ AsyncTeleBot инициализирован")
@@ -461,15 +460,47 @@ async def main():
         
         # Проверка подключения к Telegram
         logger.info("📡 Проверка подключения к Telegram API...")
-        try:
-            me = await bot.get_me()
-            logger.info(f"✅ Подключение к Telegram успешно!")
-            logger.info(f"   Bot: @{me.username} (ID: {me.id})")
-        except Exception as e:
-            logger.error(f"❌ Ошибка подключения к Telegram: {e}", exc_info=True)
-            raise
+        max_retries = 5
+        for attempt in range(max_retries):
+            try:
+                me = await bot.get_me()
+                logger.info(f"✅ Подключение к Telegram успешно!")
+                logger.info(f"   Bot: @{me.username} (ID: {me.id})")
+                break
+            except Exception as e:
+                if attempt < max_retries - 1:
+                    wait_time = (attempt + 1) * 15  # 15, 30, 45, 60 сек
+                    logger.warning(f"⚠️ Попытка подключения #{attempt + 1}/{max_retries} не удалась.")
+                    logger.warning(f"   Ошибка: {str(e)[:100]}")
+                    logger.warning(f"   Ожидание {wait_time} сек перед следующей попыткой...")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"❌ Ошибка подключения к Telegram после {max_retries} попыток: {e}", exc_info=True)
+                    raise
         
         # Запуск фоновых задач
+        # 🔧 ИНИЦИАЛИЗИРОВАТЬ API С ГЛОБАЛЬНЫМИ ПЕРЕМЕННЫМИ
+        logger.info("🔧 Инициализация API с глобальными переменными...")
+        try:
+            from api import set_api_instances
+            from notifications import NotificationManager
+            notification_manager = NotificationManager(db, bot)
+            set_api_instances(db, bot, notification_manager)
+            logger.info("✅ API полностью инициализирован и готов принимать запросы")
+        except Exception as e:
+            logger.error(f"⚠️ Ошибка при инициализации API: {e}", exc_info=True)
+        
+        # 🔧 ИНИЦИАЛИЗИРОВАТЬ API С ГЛОБАЛЬНЫМИ ПЕРЕМЕННЫМИ
+        logger.info("🔧 Инициализация API с глобальными переменными...")
+        try:
+            from api import set_api_instances
+            from notifications import NotificationManager
+            notification_manager = NotificationManager(db, bot)
+            set_api_instances(db, bot, notification_manager)
+            logger.info("✅ API полностью инициализирован и готов принимать запросы")
+        except Exception as e:
+            logger.error(f"⚠️ Ошибка при инициализации API: {e}", exc_info=True)
+        
         logger.info("⏰ Запуск фоновых задач...")
         
         oauth_task = asyncio.create_task(check_oauth_completion())

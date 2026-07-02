@@ -1,9 +1,46 @@
 import psycopg2
 from psycopg2.extras import RealDictCursor
-from config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASSWORD
 import logging
+import os
+from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+
+# ✅ ИСПРАВЛЕНИЕ: Явно загружаем .env
+env_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), '.env')
+logger.info(f"📋 Loading .env from: {env_path}")
+load_dotenv(env_path)
+
+# ✅ Получаем переменные напрямую
+DATASOURCE_URL = os.getenv("DATASOURCE_URL", "jdbc:postgresql://localhost:5432/postgres")
+logger.info(f"📋 DATASOURCE_URL: {DATASOURCE_URL}")
+
+# Парсим DATASOURCE_URL
+if "jdbc:postgresql://" in DATASOURCE_URL:
+    url_part = DATASOURCE_URL.replace("jdbc:postgresql://", "")
+    if "/" in url_part:
+        host_port, db_name = url_part.split("/", 1)
+    else:
+        host_port = url_part
+        db_name = "postgres"
+    
+    if ":" in host_port:
+        DB_HOST, DB_PORT_STR = host_port.split(":", 1)
+    else:
+        DB_HOST = host_port
+        DB_PORT_STR = "5432"
+    
+    DB_PORT = int(DB_PORT_STR)
+    DB_NAME = db_name
+else:
+    DB_HOST = "localhost"
+    DB_PORT = 5432
+    DB_NAME = "postgres"
+
+DB_USER = os.getenv("DATASOURCE_USERNAME", "postgres")
+DB_PASSWORD = os.getenv("DATASOURCE_PASSWORD", "password")
+
+logger.info(f"✅ Database config: {DB_HOST}:{DB_PORT}/{DB_NAME}")
 
 
 class Database:
@@ -57,7 +94,6 @@ class Database:
                 return result
         except Exception as e:
             logger.error(f"❌ Database fetch_one error: {e}", exc_info=True)
-            # Попытаться восстановить соединение при критических ошибках
             if "transaction" in str(e).lower():
                 logger.warning("⚠️ Попытка восстановления соединения...")
                 try:
@@ -76,7 +112,6 @@ class Database:
                 return result
         except Exception as e:
             logger.error(f"❌ Database fetch_all error: {e}", exc_info=True)
-            # Попытаться восстановить соединение при критических ошибках
             if "transaction" in str(e).lower():
                 logger.warning("⚠️ Попытка восстановления соединения...")
                 try:

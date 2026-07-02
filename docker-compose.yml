@@ -1,0 +1,50 @@
+services:
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: telegram-bot-xray
+    restart: always
+    env_file:
+      - .env
+    environment:
+      # Telegram бот переменные
+      BACKEND_URL: http://host.docker.internal:8080
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      LOG_LEVEL: INFO
+      
+      # Proxy переменные для Python
+      http_proxy: socks5://127.0.0.1:10808
+      https_proxy: socks5://127.0.0.1:10808
+      HTTP_PROXY: socks5://127.0.0.1:10808
+      HTTPS_PROXY: socks5://127.0.0.1:10808
+
+    volumes:
+      # Логи бота
+      - ./telegram_bot:/app/telegram_bot
+      # Xray конфиг
+      - ./xray-config.json:/etc/xray/config.json:ro
+      # .env файл (опционально для отладки)
+      - ./.env:/app/.env:ro
+
+    ports:
+      # FastAPI API для уведомлений от Java (8000 внутри контейнера -> 8001 снаружи)
+      - "8001:8000"
+      # Xray SOCKS5 (только для отладки если нужен)
+      - "10808:10808"
+
+    networks:
+      - bot-network
+
+    cap_add:
+      - NET_ADMIN
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  bot-network:
+    driver: bridge
