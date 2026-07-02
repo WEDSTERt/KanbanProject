@@ -141,6 +141,8 @@ class SSEService {
           'task-created',
           'task-updated',
           'task-deleted',
+          'task-status-changed',
+          'tasks-list-changed',
           'message',
           'test'
         ];
@@ -328,3 +330,4 @@ class SSEService {
 }
 
 export default SSEService;
+

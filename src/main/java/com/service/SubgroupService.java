@@ -28,6 +28,7 @@ public class SubgroupService {
     private final TaskRepository taskRepository;
     private final NotificationService notificationService;
     private final EmailNotificationService emailNotificationService;
+    private final TelegramNotificationService telegramNotificationService;
     private final ApplicationContext applicationContext;
 
     @Autowired
@@ -38,6 +39,7 @@ public class SubgroupService {
                            TaskRepository taskRepository,
                            NotificationService notificationService,
                            EmailNotificationService emailNotificationService,
+                           TelegramNotificationService telegramNotificationService,
                            ApplicationContext applicationContext) {
         this.subgroupRepository = subgroupRepository;
         this.projectRepository = projectRepository;
@@ -46,6 +48,7 @@ public class SubgroupService {
         this.taskRepository = taskRepository;
         this.notificationService = notificationService;
         this.emailNotificationService = emailNotificationService;
+        this.telegramNotificationService = telegramNotificationService;
         this.applicationContext = applicationContext;
     }
 
@@ -121,6 +124,29 @@ public class SubgroupService {
         // 📡 Отправляем SSE событие АСИНХРОННО
         notifySubgroupsChangedAsync(projectId);
         
+        // 📱 Отправляем уведомление в Telegram АСИНХРОННО
+        final Long subgroupId = subgroup.getId();
+        final String projectName = project.getName();
+        final List<Long> memberIds = subgroup.getMembers() != null 
+            ? subgroup.getMembers().stream().map(m -> m.getUser().getId()).toList()
+            : java.util.List.of();
+        
+        CompletableFuture.runAsync(() -> {
+            try {
+                telegramNotificationService.notifyGroupEvent(
+                    "created",
+                    projectId,
+                    projectName,
+                    subgroupId,
+                    name,
+                    "",
+                    memberIds
+                );
+            } catch (Exception e) {
+                System.err.println("⚠️ Failed to send Telegram notification: " + e.getMessage());
+            }
+        });
+        
         return subgroup;
     }
 
@@ -149,11 +175,37 @@ public class SubgroupService {
         if (subgroupOpt.isPresent()) {
             Subgroup subgroup = subgroupOpt.get();
             Long projectId = subgroup.getProjectId();
+            String subgroupName = subgroup.getName();
+            Project project = subgroup.getProject();
+            
+            List<Long> memberIds = subgroup.getMembers() != null 
+                ? subgroup.getMembers().stream().map(m -> m.getUser().getId()).toList()
+                : java.util.List.of();
             
             subgroupRepository.deleteById(id);
             
             // 📡 Отправляем SSE событие АСИНХРОННО
             notifySubgroupsChangedAsync(projectId);
+            
+            // 📱 Отправляем уведомление в Telegram АСИНХРОННО
+            final String projectNameFinal = project.getName();
+            final List<Long> memberIdsFinal = memberIds;
+            
+            CompletableFuture.runAsync(() -> {
+                try {
+                    telegramNotificationService.notifyGroupEvent(
+                        "deleted",
+                        projectId,
+                        projectNameFinal,
+                        id,
+                        subgroupName,
+                        "",
+                        memberIdsFinal
+                    );
+                } catch (Exception e) {
+                    System.err.println("⚠️ Failed to send Telegram notification: " + e.getMessage());
+                }
+            });
             
             return true;
         }
@@ -243,6 +295,25 @@ public class SubgroupService {
                 System.err.println("Warning: Failed to send email notification: " + e.getMessage());
             }
         });
+        
+        // 📱 Отправляем уведомление в Telegram АСИНХРОННО
+        final String userFullName = user.getFullName();
+        
+        CompletableFuture.runAsync(() -> {
+            try {
+                telegramNotificationService.notifyGroupEvent(
+                    "updated",
+                    projectId,
+                    projectName,
+                    subgroupId,
+                    subgroupName,
+                    "Новый участник: " + userFullName,
+                    java.util.List.of(userId)
+                );
+            } catch (Exception e) {
+                System.err.println("⚠️ Failed to send Telegram notification: " + e.getMessage());
+            }
+        });
 
         // 📡 Отправляем SSE событие АСИНХРОННО ко ВСЕМ подписчикам проекта
         System.out.println("📢 Notifying all project subscribers that subgroups changed");
@@ -280,15 +351,19 @@ public class SubgroupService {
             
             Subgroup subgroup = member.getSubgroup();
             User removedUser = member.getUser();
-            User adminUser = getCurrentUser(); // Пользователь который исключает (админ)
+            User adminUser = getCurrentUser();
             Long projectId = subgroup.getProjectId();
             String subgroupName = subgroup.getName();
             Long subgroupId = subgroup.getId();
             Long removedUserId = removedUser.getId();
             Long adminUserId = adminUser != null ? adminUser.getId() : null;
+            String removedUserEmail = removedUser.getEmail();
+            String removedUserFullName = removedUser.getFullName();
 
-            // ✅ НОВОЕ (v2): Использовать SQL методы для эффективного обновления БД
-            
+            // Загрузить projectName ДО удаления из БД
+            Project project = projectRepository.findById(projectId).orElse(null);
+            String projectName = project != null ? project.getName() : "Проект";
+
             // 1️⃣ Перенести все задачи удаляемого пользователя на админа в БД
             if (adminUserId != null) {
                 System.out.println("🔄 Transferring tasks from user " + removedUserId + " to admin " + adminUserId);
@@ -319,18 +394,21 @@ public class SubgroupService {
                 System.err.println("Warning: Failed to create in-app notification: " + e.getMessage());
             }
             
-            // 📧 Отправляем EMAIL уведомление АСИНХРОННО
-            String projectName = subgroup.getProject() != null ? subgroup.getProject().getName() : "Проект";
+            // 📧 Отправляем EMAIL и Telegram уведомление АСИНХРОННО
+            // Передаем явные данные вместо объектов Hibernate чтобы избежать ошибок с закрытой сессией
             CompletableFuture.runAsync(() -> {
                 try {
-                    emailNotificationService.sendEmailForRemovedFromSubgroup(
-                        removedUser.getEmail(),
-                        removedUser.getFullName(),
+                    emailNotificationService.notifyUserRemovedFromSubgroupWithData(
+                        removedUserEmail,
+                        removedUserFullName,
                         subgroupName,
-                        projectName
+                        projectName,
+                        projectId,
+                        subgroupId,
+                        removedUserId
                     );
                 } catch (Exception e) {
-                    System.err.println("Warning: Failed to send email notification: " + e.getMessage());
+                    System.err.println("Warning: Failed to send notification: " + e.getMessage());
                 }
             });
 

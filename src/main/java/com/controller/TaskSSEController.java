@@ -18,6 +18,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
  * - task-updated: Задача обновлена
  * - task-deleted: Задача удалена
  * - task-status-changed: ✅ НОВОЕ - Статус задачи изменился (перетаскивание, смена в модальном окне)
+ * - tasks-list-changed: 📋 НОВОЕ - Список задач обновлен (пользователь удален из группы/проекта)
  */
 @Controller
 public class TaskSSEController {
@@ -372,6 +373,35 @@ public class TaskSSEController {
             } catch (IOException e) {
                 System.out.println("❌ Failed to send project removed notification to user " + userId);
                 userEmitters.remove(userId);
+            }
+        }
+    }
+
+    /**
+     * 📋 Отправить событие об обновлении списка задач в подгруппе
+     * (обновляется при удалении пользователя из группы/проекта)
+     */
+    public void notifyTasksListChanged(Long subgroupId) {
+        System.out.println("📋 Notifying about tasks list change in subgroup " + subgroupId);
+
+        List<SseEmitter> emitters = subgroupEmitters.get(subgroupId);
+        if (emitters != null && !emitters.isEmpty()) {
+            for (SseEmitter emitter : new ArrayList<>(emitters)) {
+                try {
+                    emitter.send(SseEmitter.event()
+                            .id(UUID.randomUUID().toString())
+                            .name("tasks-list-changed")
+                            .data(new Object() {
+                                public String action = "tasks-list-changed";
+                                public Long subgroupId_field = subgroupId;
+                                public long timestamp = System.currentTimeMillis();
+                            })
+                            .build());
+                    System.out.println("✅ Tasks list change notification sent");
+                } catch (IOException e) {
+                    System.out.println("❌ Failed: " + e.getMessage());
+                    emitters.remove(emitter);
+                }
             }
         }
     }

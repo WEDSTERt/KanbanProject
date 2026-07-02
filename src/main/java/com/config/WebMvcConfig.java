@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import java.time.Duration;
 
 @Configuration
 public class WebMvcConfig implements WebMvcConfigurer {
@@ -15,11 +16,15 @@ public class WebMvcConfig implements WebMvcConfigurer {
     private ResponseCacheInterceptor responseCacheInterceptor;
 
     /**
-     * ✅ НОВОЕ: RestTemplate для HTTP запросов (используется для GitHub API)
+     * ✅ RestTemplate для HTTP запросов (используется для GitHub API и Telegram Bot)
+     * С таймаутами для надежности
      */
     @Bean
     public RestTemplate restTemplate(RestTemplateBuilder builder) {
-        return builder.build();
+        return builder
+            .setConnectTimeout(Duration.ofSeconds(5))
+            .setReadTimeout(Duration.ofSeconds(10))
+            .build();
     }
 
     /**
